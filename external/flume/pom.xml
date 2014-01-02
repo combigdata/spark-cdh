@@ -47,7 +47,7 @@
     <dependency>
       <groupId>org.apache.flume</groupId>
       <artifactId>flume-ng-sdk</artifactId>
-      <version>1.2.0</version>
+      <version>${cdh.flume-ng.version}</version>
       <exclusions>
         <exclusion>
           <groupId>org.jboss.netty</groupId>
