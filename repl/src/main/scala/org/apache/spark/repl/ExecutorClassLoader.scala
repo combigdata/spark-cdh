@@ -24,9 +24,8 @@ import java.util.concurrent.{Executors, ExecutorService}
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.{FileSystem, Path}
 
-import org.objectweb.asm._
-import org.objectweb.asm.Opcodes._
-
+import com.esotericsoftware.reflectasm.shaded.org.objectweb.asm._
+import com.esotericsoftware.reflectasm.shaded.org.objectweb.asm.Opcodes._
 
 /**
  * A ClassLoader that reads classes from a Hadoop FileSystem or HTTP URI,

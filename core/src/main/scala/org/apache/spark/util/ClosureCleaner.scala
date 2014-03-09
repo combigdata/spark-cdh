@@ -22,9 +22,10 @@ import java.lang.reflect.Field
 import scala.collection.mutable.Map
 import scala.collection.mutable.Set
 
-import org.objectweb.asm.{ClassReader, ClassVisitor, MethodVisitor, Type}
-import org.objectweb.asm.Opcodes._
+import com.esotericsoftware.reflectasm.shaded.org.objectweb.asm.{ClassReader, ClassVisitor, MethodVisitor, Type}
+import com.esotericsoftware.reflectasm.shaded.org.objectweb.asm.Opcodes._
 import java.io.{InputStream, IOException, ByteArrayOutputStream, ByteArrayInputStream, BufferedInputStream}
+
 import org.apache.spark.Logging
 
 private[spark] object ClosureCleaner extends Logging {
