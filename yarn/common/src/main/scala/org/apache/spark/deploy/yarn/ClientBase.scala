@@ -29,10 +29,8 @@ import org.apache.hadoop.fs._
 import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.io.DataOutputBuffer
 import org.apache.hadoop.mapred.Master
-import org.apache.hadoop.mapreduce.MRJobConfig
 import org.apache.hadoop.net.NetUtils
 import org.apache.hadoop.security.UserGroupInformation
-import org.apache.hadoop.util.StringUtils
 import org.apache.hadoop.yarn.api._
 import org.apache.hadoop.yarn.api.ApplicationConstants.Environment
 import org.apache.hadoop.yarn.api.protocolrecords._
@@ -381,17 +379,7 @@ object ClientBase {
 
   // Based on code from org.apache.hadoop.mapreduce.v2.util.MRApps
   def populateHadoopClasspath(conf: Configuration, env: HashMap[String, String]) {
-    val classpathEntries = Option(conf.getStrings(
-      YarnConfiguration.YARN_APPLICATION_CLASSPATH)).getOrElse(
-        YarnConfiguration.DEFAULT_YARN_APPLICATION_CLASSPATH)
-    for (c <- classpathEntries) {
-      Apps.addToEnvironment(env, Environment.CLASSPATH.name, c.trim)
-    }
-
-    val mrClasspathEntries = Option(conf.getStrings(
-      MRJobConfig.MAPREDUCE_APPLICATION_CLASSPATH)).getOrElse(
-        StringUtils.getStrings(MRJobConfig.DEFAULT_MAPREDUCE_APPLICATION_CLASSPATH))
-    for (c <- mrClasspathEntries) {
+    for (c <- conf.getStrings(YarnConfiguration.YARN_APPLICATION_CLASSPATH)) {
       Apps.addToEnvironment(env, Environment.CLASSPATH.name, c.trim)
     }
   }
