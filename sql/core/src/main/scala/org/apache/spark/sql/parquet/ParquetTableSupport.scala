@@ -19,8 +19,8 @@ package org.apache.spark.sql.parquet
 
 import org.apache.hadoop.conf.Configuration
 
-import parquet.column.ParquetProperties
-import parquet.hadoop.ParquetOutputFormat
+//import parquet.column.ParquetProperties
+//import parquet.hadoop.ParquetOutputFormat
 import parquet.hadoop.api.ReadSupport.ReadContext
 import parquet.hadoop.api.{ReadSupport, WriteSupport}
 import parquet.io.api._
@@ -90,8 +90,8 @@ private[parquet] class RowWriteSupport extends WriteSupport[Row] with Logging {
       RowWriteSupport.PARQUET_ROW_SCHEMA,
       schema.toString)
     configuration.set(
-      ParquetOutputFormat.WRITER_VERSION,
-      ParquetProperties.WriterVersion.PARQUET_1_0.toString)
+      "parquet.writer.version",
+      "PARQUET_1_0")
   }
 
   def getSchema(configuration: Configuration): MessageType = {

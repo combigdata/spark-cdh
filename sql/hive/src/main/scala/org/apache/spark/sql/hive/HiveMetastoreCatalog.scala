@@ -257,7 +257,6 @@ private[hive] case class MetastoreRelation
   override def isPartitioned = hiveQlTable.isPartitioned
 
   val tableDesc = new TableDesc(
-    Class.forName(hiveQlTable.getSerializationLib).asInstanceOf[Class[Deserializer]],
     hiveQlTable.getInputFormatClass,
     // The class of table should be org.apache.hadoop.hive.ql.metadata.Table because
     // getOutputFormatClass will use HiveFileFormatUtils.getOutputFormatSubstitute to

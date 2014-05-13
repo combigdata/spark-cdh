@@ -174,7 +174,7 @@ class HiveContext(sc: SparkContext) extends SQLContext(sc) {
       val cmd_trimmed: String = cmd.trim()
       val tokens: Array[String] = cmd_trimmed.split("\\s+")
       val cmd_1: String = cmd_trimmed.substring(tokens(0).length()).trim()
-      val proc: CommandProcessor = CommandProcessorFactory.get(tokens(0), hiveconf)
+      val proc: CommandProcessor = CommandProcessorFactory.get(tokens, hiveconf)
 
       SessionState.start(sessionState)
 

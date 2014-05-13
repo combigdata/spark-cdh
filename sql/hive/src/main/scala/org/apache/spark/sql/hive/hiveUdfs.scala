@@ -84,7 +84,7 @@ private[hive] object HiveFunctionRegistry
     case c: Class[_] if c == classOf[hadoopIo.FloatWritable] => FloatType
     case c: Class[_] if c == classOf[hadoopIo.BooleanWritable] => BooleanType
     case c: Class[_] if c == classOf[hadoopIo.BytesWritable] => BinaryType
-    
+
     // java class
     case c: Class[_] if c == classOf[java.lang.String] => StringType
     case c: Class[_] if c == classOf[java.sql.Timestamp] => TimestampType
@@ -98,7 +98,7 @@ private[hive] object HiveFunctionRegistry
     case c: Class[_] if c == classOf[java.lang.Byte] => ByteType
     case c: Class[_] if c == classOf[java.lang.Float] => FloatType
     case c: Class[_] if c == classOf[java.lang.Boolean] => BooleanType
-    
+
     // primitive type
     case c: Class[_] if c == java.lang.Short.TYPE => ShortType
     case c: Class[_] if c == java.lang.Integer.TYPE => IntegerType
@@ -107,7 +107,7 @@ private[hive] object HiveFunctionRegistry
     case c: Class[_] if c == java.lang.Byte.TYPE => ByteType
     case c: Class[_] if c == java.lang.Float.TYPE => FloatType
     case c: Class[_] if c == java.lang.Boolean.TYPE => BooleanType
-    
+
     case c: Class[_] if c.isArray => ArrayType(javaClassToDataType(c.getComponentType))
   }
 }
@@ -205,7 +205,7 @@ private[hive] case class HiveSimpleUdf(name: String, children: Seq[Expression]) 
       } else {
         constructor.newInstance(a match {
           case i: Int => i: java.lang.Integer
-          case bd: BigDecimal => new HiveDecimal(bd.underlying())
+          case bd: BigDecimal => HiveDecimal.create(bd.underlying())
           case other: AnyRef => other
         }).asInstanceOf[AnyRef]
       }

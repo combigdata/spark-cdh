@@ -198,7 +198,7 @@ case class InsertIntoHiveTable(
       new HiveVarchar(s, s.size)
 
     case (bd: BigDecimal, oi: JavaHiveDecimalObjectInspector) =>
-      new HiveDecimal(bd.underlying())
+      HiveDecimal.create(bd.underlying())
 
     case (row: Row, oi: StandardStructObjectInspector) =>
       val struct = oi.create()
