@@ -44,15 +44,19 @@ class ReplSuite extends FunSuite {
         }
       }
     }
+    val classpath = paths.mkString(File.pathSeparator)
+    System.setProperty("spark.executor.extraClassPath", classpath)
+
     val interp = new SparkILoop(in, new PrintWriter(out), master)
     org.apache.spark.repl.Main.interp = interp
-    interp.process(Array("-classpath", paths.mkString(File.pathSeparator)))
+    interp.process(Array("-classpath", classpath))
     org.apache.spark.repl.Main.interp = null
     if (interp.sparkContext != null) {
       interp.sparkContext.stop()
     }
     // To avoid Akka rebinding to the same port, since it doesn't unbind immediately on shutdown
     System.clearProperty("spark.driver.port")
+    System.clearProperty("spark.executor.extraClassPath")
     return out.toString
   }
 

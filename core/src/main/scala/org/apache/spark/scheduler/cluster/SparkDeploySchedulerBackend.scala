@@ -44,7 +44,8 @@ private[spark] class SparkDeploySchedulerBackend(
     val driverUrl = "akka.tcp://spark@%s:%s/user/%s".format(
       conf.get("spark.driver.host"), conf.get("spark.driver.port"),
       CoarseGrainedSchedulerBackend.ACTOR_NAME)
-    val args = Seq(driverUrl, "{{EXECUTOR_ID}}", "{{HOSTNAME}}", "{{CORES}}", "{{WORKER_URL}}")
+    val args = Seq(driverUrl, "{{EXECUTOR_ID}}", "{{HOSTNAME}}", "{{CORES}}", "{{WORKER_URL}}",
+      "{{CORES}}")
     val extraJavaOpts = sc.conf.getOption("spark.executor.extraJavaOptions")
     val classPathEntries = sc.conf.getOption("spark.executor.extraClassPath").toSeq.flatMap { cp =>
       cp.split(java.io.File.pathSeparator)
