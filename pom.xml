@@ -116,7 +116,7 @@
     <slf4j.version>${cdh.slf4j.version}</slf4j.version>
     <log4j.version>1.2.17</log4j.version>
     <hadoop.version>${cdh.hadoop.version}</hadoop.version>
-    <protobuf.version>2.4.1</protobuf.version>
+    <protobuf.version>${cdh.protobuf.version}</protobuf.version>
     <yarn.version>${cdh.hadoop.version}</yarn.version>
     <hbase.version>${cdh.hbase.version}</hbase.version>
     <zookeeper.version>${cdh.zookeeper.version}</zookeeper.version>
@@ -127,7 +127,7 @@
     <chill.version>0.3.6</chill.version>
     <codahale.metrics.version>3.0.0</codahale.metrics.version>
     <avro.version>${cdh.avro.version}</avro.version>
-    <jets3t.version>0.7.1</jets3t.version>
+    <jets3t.version>${cdh.jets3t.version}</jets3t.version>
 
     <PermGen>64m</PermGen>
     <MaxPermGen>512m</MaxPermGen>
