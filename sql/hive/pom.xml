@@ -31,6 +31,11 @@
   <name>Spark Project Hive</name>
   <url>http://spark.apache.org/</url>
 
+  <properties>
+    <sql.skipTests>true</sql.skipTests>
+    <skipTests>${sql.skipTests}</skipTests>
+  </properties>
+
   <dependencies>
     <dependency>
       <groupId>org.apache.spark</groupId>
