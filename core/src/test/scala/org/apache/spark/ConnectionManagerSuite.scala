@@ -161,7 +161,7 @@ class ConnectionManagerSuite extends FunSuite {
       manager.sendMessageReliably(managerServer.id, bufferMessage)
     }).foreach(f => {
       try {
-        val g = Await.result(f, 1 second)
+        val g = Await.result(f, 10 second)
         assert(false)
       } catch {
         case e: TimeoutException => {
@@ -209,7 +209,7 @@ class ConnectionManagerSuite extends FunSuite {
       manager.sendMessageReliably(managerServer.id, bufferMessage)
     }).foreach(f => {
       try {
-        val g = Await.result(f, 1 second)
+        val g = Await.result(f, 10 second)
         if (!g.isDefined) assert(false) else assert(true)
       } catch {
         case e: Exception => {
