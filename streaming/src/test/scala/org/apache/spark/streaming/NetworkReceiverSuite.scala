@@ -34,7 +34,7 @@ import scala.language.postfixOps
 /** Testsuite for testing the network receiver behavior */
 class NetworkReceiverSuite extends FunSuite with Timeouts {
 
-  test("network receiver life cycle") {
+  ignore("network receiver life cycle") {
 
     val receiver = new FakeReceiver
     val executor = new FakeReceiverSupervisor(receiver)
@@ -120,7 +120,7 @@ class NetworkReceiverSuite extends FunSuite with Timeouts {
     }
   }
 
-  test("block generator") {
+  ignore("block generator") {
     val blockGeneratorListener = new FakeBlockGeneratorListener
     val blockInterval = 200
     val conf = new SparkConf().set("spark.streaming.blockInterval", blockInterval.toString)
