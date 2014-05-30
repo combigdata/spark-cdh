@@ -32,6 +32,8 @@
   <url>http://spark.apache.org/</url>
   <properties>
     <sbt.project.name>catalyst</sbt.project.name>
+    <sql.skipTests>true</sql.skipTests>
+    <skipTests>${sql.skipTests}</skipTests>
   </properties>
 
   <dependencies>
