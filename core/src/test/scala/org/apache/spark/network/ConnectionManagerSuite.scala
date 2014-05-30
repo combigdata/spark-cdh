@@ -170,7 +170,7 @@ class ConnectionManagerSuite extends FunSuite {
       manager.sendMessageReliably(managerServer.id, bufferMessage)
     }).foreach(f => {
       try {
-        val g = Await.result(f, 1 second)
+        val g = Await.result(f, 10 second)
         assert(false)
       } catch {
         case i: IOException =>
@@ -220,7 +220,7 @@ class ConnectionManagerSuite extends FunSuite {
       manager.sendMessageReliably(managerServer.id, bufferMessage)
     }).foreach(f => {
       try {
-        val g = Await.result(f, 1 second)
+        val g = Await.result(f, 10 second)
       } catch {
         case e: Exception => {
           assert(false)
