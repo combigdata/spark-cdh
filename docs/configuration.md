@@ -406,6 +406,19 @@ Apart from these, the following properties are also available, and may be useful
   </td>
 </tr>
 <tr>
+    <td>spark.hadoop.validateOutputSpecs</td>
+    <td>true</td>
+    <td>If set to true, validates the output specification (e.g. checking if the output directory already exists) 
+    used in saveAsHadoopFile and other variants. This can be disabled to silence exceptions due to pre-existing 
+    output directories. We recommend that users do not disable this except if trying to achieve compatibility with 
+    previous versions of Spark. Simply use Hadoop's FileSystem API to delete output directories by hand.</td>
+</tr>
+</table>
+
+#### Networking
+<table class="table">
+<tr><th>Property Name</th><th>Default</th><th>Meaning</th></tr>
+<tr>
   <td><code>spark.worker.cleanup.interval</code></td>
   <td>1800 (30 minutes)</td>
   <td>
