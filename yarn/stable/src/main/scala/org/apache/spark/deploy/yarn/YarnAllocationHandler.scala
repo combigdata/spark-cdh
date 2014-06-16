@@ -86,6 +86,10 @@ private[yarn] class YarnAllocationHandler(
   // Containers to be released in next request to RM
   private val pendingReleaseContainers = new ConcurrentHashMap[ContainerId, Boolean]
 
+  // Additional memory overhead - in mb.
+  private def memoryOverhead: Int = sparkConf.getInt("spark.yarn.executor.memoryOverhead",
+    YarnAllocationHandler.MEMORY_OVERHEAD)
+
   // Number of container requests that have been sent to, but not yet allocated by the
   // ApplicationMaster.
   private val numPendingAllocate = new AtomicInteger()
@@ -102,7 +106,7 @@ private[yarn] class YarnAllocationHandler(
   def getNumWorkersFailed: Int = numWorkersFailed.intValue
 
   def isResourceConstraintSatisfied(container: Container): Boolean = {
-    container.getResource.getMemory >= (workerMemory + YarnAllocationHandler.MEMORY_OVERHEAD)
+    container.getResource.getMemory >= (workerMemory + memoryOverhead)
   }
 
   def releaseContainer(container: Container) {
@@ -244,7 +248,7 @@ private[yarn] class YarnAllocationHandler(
         val workerHostname = container.getNodeId.getHost
         val containerId = container.getId
 
-        val workerMemoryOverhead = (workerMemory + YarnAllocationHandler.MEMORY_OVERHEAD)
+        val workerMemoryOverhead = (workerMemory + memoryOverhead)
         assert(container.getResource.getMemory >= workerMemoryOverhead)
 
         if (numWorkersRunningNow > maxWorkers) {
@@ -472,7 +476,7 @@ private[yarn] class YarnAllocationHandler(
       numPendingAllocate.addAndGet(numWorkers)
       logInfo("Will Allocate %d worker containers, each with %d memory".format(
         numWorkers,
-        (workerMemory + YarnAllocationHandler.MEMORY_OVERHEAD)))
+        (workerMemory + memoryOverhead)))
     } else {
       logDebug("Empty allocation request ...")
     }
@@ -532,7 +536,7 @@ private[yarn] class YarnAllocationHandler(
       priority: Int
     ): ArrayBuffer[ContainerRequest] = {
 
-    val memoryRequest = workerMemory + YarnAllocationHandler.MEMORY_OVERHEAD
+    val memoryRequest = workerMemory + memoryOverhead
     val resource = Resource.newInstance(memoryRequest, workerCores)
 
     val prioritySetting = Records.newRecord(classOf[Priority])
