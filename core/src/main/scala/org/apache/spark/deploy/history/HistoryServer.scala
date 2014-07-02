@@ -172,6 +172,8 @@ class HistoryServer(
 object HistoryServer {
   private val conf = new SparkConf
 
+  val UI_PATH_PREFIX = "/history/"
+
   def main(argStrings: Array[String]) {
     initSecurity()
     val args = new HistoryServerArguments(conf, argStrings)

@@ -35,6 +35,7 @@ import org.apache.hadoop.fs.FileSystem
 import org.apache.spark.{Logging, SecurityManager, SparkConf, SparkException}
 import org.apache.spark.deploy.{ApplicationDescription, DriverDescription, ExecutorState}
 import org.apache.spark.deploy.DeployMessages._
+import org.apache.spark.deploy.history.HistoryServer
 import org.apache.spark.deploy.master.DriverState.DriverState
 import org.apache.spark.deploy.master.MasterMessages._
 import org.apache.spark.deploy.master.ui.MasterWebUI
@@ -678,7 +679,7 @@ private[spark] class Master(
       try {
         val replayBus = new ReplayListenerBus(eventLogPaths, fileSystem, compressionCodec)
         val ui = new SparkUI(
-          new SparkConf, replayBus, appName + " (completed)", "/history/" + app.id)
+          new SparkConf, replayBus, appName + " (completed)", HistoryServer.UI_PATH_PREFIX + app.id)
         replayBus.replay()
         app.desc.appUiUrl = ui.basePath
         appIdToUI(app.id) = ui
