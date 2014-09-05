@@ -26,7 +26,7 @@ import scala.collection
 import scala.collection.JavaConversions._
 import scala.collection.mutable.{ArrayBuffer, HashMap, HashSet}
 
-import org.apache.spark.{Logging, SparkConf, SparkEnv}
+import org.apache.spark.{Logging, SecurityManager, SparkConf, SparkEnv}
 import org.apache.spark.scheduler.{SplitInfo,TaskSchedulerImpl}
 import org.apache.spark.scheduler.cluster.CoarseGrainedSchedulerBackend
 import org.apache.spark.util.Utils
@@ -67,9 +67,10 @@ private[yarn] class YarnAllocationHandler(
     val maxExecutors: Int,
     val executorMemory: Int,
     val executorCores: Int,
-    val preferredHostToCount: Map[String, Int], 
+    val preferredHostToCount: Map[String, Int],
     val preferredRackToCount: Map[String, Int],
-    val sparkConf: SparkConf)
+    val sparkConf: SparkConf,
+    val securityMgr: SecurityManager)
   extends Logging {
   // These three are locked on allocatedHostToContainersMap. Complementary data structures
   // allocatedHostToContainersMap : containers which are running : host, Set<containerid>
@@ -295,7 +296,8 @@ private[yarn] class YarnAllocationHandler(
             executorId,
             executorHostname,
             executorMemory,
-            executorCores)
+            executorCores,
+            securityMgr)
           new Thread(executorRunnable).start()
         }
       }
@@ -442,7 +444,7 @@ private[yarn] class YarnAllocationHandler(
           numExecutors,
           YarnAllocationHandler.PRIORITY).toList
       } else {
-        // Request for all hosts in preferred nodes and for numExecutors - 
+        // Request for all hosts in preferred nodes and for numExecutors -
         // candidates.size, request by default allocation policy.
         val hostContainerRequests = new ArrayBuffer[ContainerRequest](preferredHostToCount.size)
         for ((candidateHost, candidateCount) <- preferredHostToCount) {
@@ -559,7 +561,7 @@ private[yarn] class YarnAllocationHandler(
 object YarnAllocationHandler {
 
   val ANY_HOST = "*"
-  // All requests are issued with same priority : we do not (yet) have any distinction between 
+  // All requests are issued with same priority : we do not (yet) have any distinction between
   // request types (like map/reduce in hadoop for example)
   val PRIORITY = 1
 
@@ -578,18 +580,20 @@ object YarnAllocationHandler {
       amClient: AMRMClient[ContainerRequest],
       appAttemptId: ApplicationAttemptId,
       args: ApplicationMasterArguments,
-      sparkConf: SparkConf
+      sparkConf: SparkConf,
+      securityMgr: SecurityManager
     ): YarnAllocationHandler = {
     new YarnAllocationHandler(
       conf,
       amClient,
       appAttemptId,
-      args.numExecutors, 
+      args.numExecutors,
       args.executorMemory,
       args.executorCores,
       Map[String, Int](),
       Map[String, Int](),
-      sparkConf)
+      sparkConf,
+      securityMgr)
   }
 
   def newAllocator(
@@ -599,19 +603,21 @@ object YarnAllocationHandler {
       args: ApplicationMasterArguments,
       map: collection.Map[String,
       collection.Set[SplitInfo]],
-      sparkConf: SparkConf
+      sparkConf: SparkConf,
+      securityMgr: SecurityManager
     ): YarnAllocationHandler = {
     val (hostToSplitCount, rackToSplitCount) = generateNodeToWeight(conf, map)
     new YarnAllocationHandler(
       conf,
       amClient,
       appAttemptId,
-      args.numExecutors, 
+      args.numExecutors,
       args.executorMemory,
       args.executorCores,
       hostToSplitCount,
       rackToSplitCount,
-      sparkConf)
+      sparkConf,
+      securityMgr)
   }
 
   def newAllocator(
@@ -622,7 +628,8 @@ object YarnAllocationHandler {
       executorMemory: Int,
       executorCores: Int,
       map: collection.Map[String, collection.Set[SplitInfo]],
-      sparkConf: SparkConf
+      sparkConf: SparkConf,
+      securityMgr: SecurityManager
     ): YarnAllocationHandler = {
     val (hostToCount, rackToCount) = generateNodeToWeight(conf, map)
     new YarnAllocationHandler(
@@ -634,7 +641,8 @@ object YarnAllocationHandler {
       executorCores,
       hostToCount,
       rackToCount,
-      sparkConf)
+      sparkConf,
+      securityMgr)
   }
 
   // A simple method to copy the split info map.

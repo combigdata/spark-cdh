@@ -41,11 +41,11 @@ import org.apache.spark.deploy.SparkHadoopUtil
  *
  * This is used only in yarn-client mode.
  */
-class ExecutorLauncher(args: ApplicationMasterArguments, conf: Configuration, sparkConf: SparkConf)
-  extends Logging {
+class ExecutorLauncher(args: ApplicationMasterArguments, conf: Configuration, sparkConf: SparkConf,
+  securityMgr: SecurityManager) extends Logging {
 
   def this(args: ApplicationMasterArguments, sparkConf: SparkConf) =
-    this(args, new Configuration(), sparkConf)
+    this(args, new Configuration(), sparkConf, new SecurityManager(sparkConf))
 
   def this(args: ApplicationMasterArguments) = this(args, new SparkConf())
 
@@ -65,9 +65,8 @@ class ExecutorLauncher(args: ApplicationMasterArguments, conf: Configuration, sp
   private val maxNumExecutorFailures = sparkConf.getInt("spark.yarn.max.executor.failures",
     sparkConf.getInt("spark.yarn.max.worker.failures", math.max(args.numExecutors * 2, 3)))
 
-  val securityManager = new SecurityManager(sparkConf)
   val actorSystem: ActorSystem = AkkaUtils.createActorSystem("sparkYarnAM", Utils.localHostName, 0,
-    conf = sparkConf, securityManager = securityManager)._1
+    conf = sparkConf, securityManager = securityMgr)._1
   var actor: ActorRef = _
 
   // This actor just working as a monitor to watch on Driver Actor.
@@ -227,7 +226,7 @@ class ExecutorLauncher(args: ApplicationMasterArguments, conf: Configuration, sp
       scala.collection.immutable.Map()
 
     yarnAllocator = YarnAllocationHandler.newAllocator(yarnConf, resourceManager, appAttemptId,
-      args, preferredNodeLocationData, sparkConf)
+      args, preferredNodeLocationData, sparkConf, securityManager)
 
     logInfo("Allocating " + args.numExecutors + " executors.")
     // Wait until all containers have finished

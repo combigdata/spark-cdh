@@ -29,9 +29,10 @@ import org.apache.hadoop.security.UserGroupInformation
 import org.apache.hadoop.util.StringInterner
 import org.apache.hadoop.yarn.conf.YarnConfiguration
 import org.apache.hadoop.yarn.api.ApplicationConstants
+import org.apache.hadoop.yarn.api.records.ApplicationAccessType
 import org.apache.hadoop.conf.Configuration
 
-import org.apache.spark.{SparkConf, SparkContext}
+import org.apache.spark.{SecurityManager, SparkConf, SparkContext}
 import org.apache.spark.deploy.history.HistoryServer
 import org.apache.spark.deploy.SparkHadoopUtil
 
@@ -171,6 +172,14 @@ object YarnSparkHadoopUtil {
     } else {
       arg
     }
+  }
+
+  private[spark] def getApplicationAclsForYarn(securityMgr: SecurityManager):
+      Map[ApplicationAccessType, String] = {
+    Map[ApplicationAccessType, String] (
+      ApplicationAccessType.VIEW_APP -> securityMgr.getViewAcls,
+      ApplicationAccessType.MODIFY_APP -> securityMgr.getModifyAcls
+    )
   }
 
 }

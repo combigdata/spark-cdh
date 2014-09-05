@@ -101,7 +101,7 @@ class ApplicationMaster(args: ApplicationMasterArguments, conf: Configuration,
 
     // This a bit hacky, but we need to wait until the spark.driver.port property has
     // been set by the Thread executing the user class.
-    waitForSparkContextInitialized()
+    waitForSparkContextInitialized(securityMgr)
 
     // Do this after spark master is up and SparkContext is created so that we can register UI Url
     synchronized {
@@ -201,7 +201,7 @@ class ApplicationMaster(args: ApplicationMasterArguments, conf: Configuration,
   }
 
   // this need to happen before allocateExecutors
-  private def waitForSparkContextInitialized() {
+  private def waitForSparkContextInitialized(securityMgr: SecurityManager) {
     logInfo("Waiting for spark context initialization")
     try {
       var sparkContext: SparkContext = null
@@ -227,7 +227,8 @@ class ApplicationMaster(args: ApplicationMasterArguments, conf: Configuration,
             appAttemptId,
             args,
             sparkContext.preferredNodeLocationData,
-            sparkContext.getConf)
+            sparkContext.getConf,
+            securityMgr)
         } else {
           logWarning("Unable to retrieve sparkContext inspite of waiting for %d, numTries = %d".
             format(count * waitTime, numTries))
@@ -236,7 +237,8 @@ class ApplicationMaster(args: ApplicationMasterArguments, conf: Configuration,
             resourceManager,
             appAttemptId,
             args,
-            sparkContext.getConf)
+            sparkContext.getConf,
+            securityMgr)
         }
       }
     }
