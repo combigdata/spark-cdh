@@ -118,22 +118,22 @@
     <mesos.classifier>shaded-protobuf</mesos.classifier>
     <akka.group>org.spark-project.akka</akka.group>
     <akka.version>2.2.3-shaded-protobuf</akka.version>
-    <slf4j.version>1.7.5</slf4j.version>
+    <slf4j.version>${cdh.slf4j.version}</slf4j.version>
     <log4j.version>1.2.17</log4j.version>
-    <hadoop.version>1.0.4</hadoop.version>
-    <protobuf.version>2.4.1</protobuf.version>
+    <hadoop.version>${cdh.hadoop.version}</hadoop.version>
+    <protobuf.version>${cdh.protobuf.version}</protobuf.version>
     <yarn.version>${hadoop.version}</yarn.version>
-    <hbase.version>0.94.6</hbase.version>
-    <flume.version>1.4.0</flume.version>
-    <zookeeper.version>3.4.5</zookeeper.version>
-    <hive.version>0.12.0</hive.version>
-    <parquet.version>1.4.3</parquet.version>
+    <hbase.version>${cdh.hbase.version}</hbase.version>
+    <flume.version>${cdh.flume-ng.version}</flume.version>
+    <zookeeper.version>${cdh.zookeeper.version}</zookeeper.version>
+    <hive.version>${cdh.hive.version}</hive.version>
+    <parquet.version>${cdh.parquet.version}</parquet.version>
     <jblas.version>1.2.3</jblas.version>
     <jetty.version>8.1.14.v20131031</jetty.version>
     <chill.version>0.3.6</chill.version>
     <codahale.metrics.version>3.0.0</codahale.metrics.version>
-    <avro.version>1.7.6</avro.version>
-    <jets3t.version>0.7.1</jets3t.version>
+    <avro.version>${cdh.avro.version}</avro.version>
+    <jets3t.version>${cdh.jets3t.version}</jets3t.version>
     <aws.java.sdk.version>1.8.3</aws.java.sdk.version>
     <aws.kinesis.client.version>1.1.0</aws.kinesis.client.version>
 
