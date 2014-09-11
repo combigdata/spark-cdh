@@ -1235,7 +1235,6 @@
         <activeByDefault>false</activeByDefault>
       </activation>
       <modules>
-        <module>sql/hive-thriftserver</module>
       </modules>
     </profile>
 
