@@ -128,7 +128,7 @@ private[hive] case class HiveSimpleUdf(functionClassName: String, children: Seq[
           } else {
             constructor.newInstance(a match {
               case i: Int => i: java.lang.Integer
-              case bd: BigDecimal => new HiveDecimal(bd.underlying())
+              case bd: BigDecimal => HiveDecimal.create(bd.underlying())
               case other: AnyRef => other
             }).asInstanceOf[AnyRef]
           }

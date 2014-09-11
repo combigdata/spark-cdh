@@ -27,12 +27,12 @@ import scala.reflect.runtime.universe.{TypeTag, typeTag}
 
 import org.apache.hadoop.fs.FileSystem
 import org.apache.hadoop.fs.Path
+import org.apache.hadoop.hive.common.StatsSetupConst
 import org.apache.hadoop.hive.conf.HiveConf
 import org.apache.hadoop.hive.ql.Driver
 import org.apache.hadoop.hive.ql.metadata.Table
 import org.apache.hadoop.hive.ql.processors._
 import org.apache.hadoop.hive.ql.session.SessionState
-import org.apache.hadoop.hive.ql.stats.StatsSetupConst
 import org.apache.hadoop.hive.serde2.io.TimestampWritable
 
 import org.apache.spark.SparkContext
@@ -286,7 +286,7 @@ class HiveContext(sc: SparkContext) extends SQLContext(sc) {
       val cmd_trimmed: String = cmd.trim()
       val tokens: Array[String] = cmd_trimmed.split("\\s+")
       val cmd_1: String = cmd_trimmed.substring(tokens(0).length()).trim()
-      val proc: CommandProcessor = CommandProcessorFactory.get(tokens(0), hiveconf)
+      val proc: CommandProcessor = CommandProcessorFactory.get(tokens, hiveconf)
 
       SessionState.start(sessionState)
 

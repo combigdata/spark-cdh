@@ -76,7 +76,7 @@ case class InsertIntoHiveTable(
       new HiveVarchar(s, s.size)
 
     case (bd: BigDecimal, oi: JavaHiveDecimalObjectInspector) =>
-      new HiveDecimal(bd.underlying())
+      HiveDecimal.create(bd.underlying())
 
     case (row: Row, oi: StandardStructObjectInspector) =>
       val struct = oi.create()
@@ -129,7 +129,7 @@ case class InsertIntoHiveTable(
     conf.setOutputCommitter(classOf[FileOutputCommitter])
     FileOutputFormat.setOutputPath(
       conf,
-      SparkHiveHadoopWriter.createPathFromString(fileSinkConf.getDirName, conf))
+      SparkHiveHadoopWriter.createPathFromString(fileSinkConf.getDirName.toString, conf))
 
     log.debug("Saving as hadoop file of type " + valueClass.getSimpleName)
 
@@ -176,8 +176,8 @@ case class InsertIntoHiveTable(
     // instances within the closure, since Serializer is not serializable while TableDesc is.
     val tableDesc = table.tableDesc
     val tableLocation = table.hiveQlTable.getDataLocation
-    val tmpLocation = hiveContext.getExternalTmpFileURI(tableLocation)
-    val fileSinkConf = new FileSinkDesc(tmpLocation.toString, tableDesc, false)
+    val tmpLocation = hiveContext.getExternalTmpPath(tableLocation.toUri)
+    val fileSinkConf = new FileSinkDesc(tmpLocation, tableDesc, false)
     val rdd = childRdd.mapPartitions { iter =>
       val serializer = newSerializer(fileSinkConf.getTableInfo)
       val standardOI = ObjectInspectorUtils

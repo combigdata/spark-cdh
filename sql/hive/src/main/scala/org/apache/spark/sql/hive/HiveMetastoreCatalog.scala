@@ -19,11 +19,11 @@ package org.apache.spark.sql.hive
 
 import scala.util.parsing.combinator.RegexParsers
 
+import org.apache.hadoop.hive.common.StatsSetupConst
 import org.apache.hadoop.hive.metastore.api.{FieldSchema, StorageDescriptor, SerDeInfo}
 import org.apache.hadoop.hive.metastore.api.{Table => TTable, Partition => TPartition}
 import org.apache.hadoop.hive.ql.metadata.{Hive, Partition, Table}
 import org.apache.hadoop.hive.ql.plan.TableDesc
-import org.apache.hadoop.hive.ql.stats.StatsSetupConst
 import org.apache.hadoop.hive.serde2.Deserializer
 
 import org.apache.spark.annotation.DeveloperApi
@@ -59,7 +59,7 @@ private[hive] class HiveMetastoreCatalog(hive: HiveContext) extends Catalog with
     val table = client.getTable(databaseName, tblName)
     val partitions: Seq[Partition] =
       if (table.isPartitioned) {
-        client.getAllPartitionsForPruner(table).toSeq
+        client.getAllPartitionsOf(table).toSeq
       } else {
         Nil
       }
@@ -287,10 +287,6 @@ private[hive] case class MetastoreRelation
   )
 
   val tableDesc = new TableDesc(
-    Class.forName(
-      hiveQlTable.getSerializationLib,
-      true,
-      Utils.getContextOrSparkClassLoader).asInstanceOf[Class[Deserializer]],
     hiveQlTable.getInputFormatClass,
     // The class of table should be org.apache.hadoop.hive.ql.metadata.Table because
     // getOutputFormatClass will use HiveFileFormatUtils.getOutputFormatSubstitute to

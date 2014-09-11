@@ -20,8 +20,6 @@ package org.apache.spark.sql.parquet
 import java.util.{HashMap => JHashMap}
 
 import org.apache.hadoop.conf.Configuration
-import parquet.column.ParquetProperties
-import parquet.hadoop.ParquetOutputFormat
 import parquet.hadoop.api.ReadSupport.ReadContext
 import parquet.hadoop.api.{ReadSupport, WriteSupport}
 import parquet.io.api._
@@ -346,8 +344,8 @@ private[parquet] object RowWriteSupport {
     val encoded = ParquetTypesConverter.convertToString(schema)
     configuration.set(SPARK_ROW_SCHEMA, encoded)
     configuration.set(
-      ParquetOutputFormat.WRITER_VERSION,
-      ParquetProperties.WriterVersion.PARQUET_1_0.toString)
+      "parquet.writer.version",
+      "PARQUET_1_O")
   }
 }
 
