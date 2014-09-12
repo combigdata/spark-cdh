@@ -145,7 +145,7 @@ class NetworkReceiverSuite extends FunSuite with Timeouts {
     assert(recordedData.toSet === generatedData.toSet)
   }
 
-  test("block generator throttling") {
+  ignore("block generator throttling") {
     val blockGeneratorListener = new FakeBlockGeneratorListener
     val blockInterval = 50
     val maxRate = 200
