@@ -195,7 +195,6 @@ class ApplicationMaster(args: ApplicationMasterArguments, conf: Configuration,
           ApplicationMaster.sparkContextRef.wait(waitTime)
         }
         sparkContext = ApplicationMaster.sparkContextRef.get()
-        assert(sparkContext != null || numTries >= maxNumTries)
 
         if (sparkContext != null) {
           uiAddress = sparkContext.ui.appUIAddress
@@ -209,8 +208,8 @@ class ApplicationMaster(args: ApplicationMasterArguments, conf: Configuration,
             sparkContext.getConf,
             securityMgr)
         } else {
-          logWarning("Unable to retrieve SparkContext in spite of waiting for %d, maxNumTries = %d".
-            format(numTries * waitTime, maxNumTries))
+          logError(("SparkContext did not initialize after waiting for %d ms. Please check earlier"
+            + " log output for errors. Failing the application.").format(numTries * waitTime))
           this.yarnAllocator = YarnAllocationHandler.newAllocator(
             yarnConf,
             amClient,
