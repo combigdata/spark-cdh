@@ -46,7 +46,7 @@ except ImportError:
             for line in open('/proc/self/status'):
                 if line.startswith('VmRSS:'):
                     return int(line.split()[1]) >> 10
-         else:
+        else:
             warnings.warn("Please install psutil to have better "
                           "support with spilling")
             if platform.system() == "Darwin":
@@ -142,7 +142,7 @@ class InMemoryMerger(Merger):
         for k, v in iterator:
             d[k] = comb(d[k], v) if k in d else v
 
-     def iteritems(self):
+    def iteritems(self):
         """ Return the merged items ad iterator """
         return self.data.iteritems()
 
