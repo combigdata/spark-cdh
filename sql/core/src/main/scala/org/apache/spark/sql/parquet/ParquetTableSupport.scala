@@ -345,7 +345,7 @@ private[parquet] object RowWriteSupport {
     configuration.set(SPARK_ROW_SCHEMA, encoded)
     configuration.set(
       "parquet.writer.version",
-      "PARQUET_1_O")
+      "PARQUET_1_0")
   }
 }
 
