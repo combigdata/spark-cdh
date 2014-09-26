@@ -292,7 +292,7 @@ class HiveContext(sc: SparkContext) extends SQLContext(sc) {
 
       proc match {
         case driver: Driver =>
-          driver.init()
+          //driver.init()
 
           val results = new JArrayList[String]
           val response: CommandProcessorResponse = driver.run(cmd)
@@ -303,7 +303,7 @@ class HiveContext(sc: SparkContext) extends SQLContext(sc) {
           }
           driver.setMaxRows(maxRows)
           driver.getResults(results)
-          driver.destroy()
+          //driver.destroy()
           results
         case _ =>
           sessionState.out.println(tokens(0) + " " + cmd_1)
