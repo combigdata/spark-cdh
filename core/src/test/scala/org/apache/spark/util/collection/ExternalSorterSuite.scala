@@ -171,7 +171,7 @@ class ExternalSorterSuite extends FunSuite with LocalSparkContext with PrivateMe
     sorter.stop()
   }
 
-  test("spilling in local cluster") {
+  ignore("spilling in local cluster") {
     val conf = createSparkConf(true)  // Load defaults, otherwise SPARK_HOME is not found
     conf.set("spark.shuffle.memoryFraction", "0.001")
     conf.set("spark.shuffle.manager", "org.apache.spark.shuffle.sort.SortShuffleManager")
@@ -242,7 +242,7 @@ class ExternalSorterSuite extends FunSuite with LocalSparkContext with PrivateMe
     assert(resultE === (0 until 100000).map(i => (i/4, i)).toSeq)
   }
 
-  test("spilling in local cluster with many reduce tasks") {
+  ignore("spilling in local cluster with many reduce tasks") {
     val conf = createSparkConf(true)  // Load defaults, otherwise SPARK_HOME is not found
     conf.set("spark.shuffle.memoryFraction", "0.001")
     conf.set("spark.shuffle.manager", "org.apache.spark.shuffle.sort.SortShuffleManager")
