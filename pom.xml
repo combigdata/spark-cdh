@@ -121,6 +121,7 @@
     <slf4j.version>${cdh.slf4j.version}</slf4j.version>
     <log4j.version>1.2.17</log4j.version>
     <hadoop.version>${cdh.hadoop.version}</hadoop.version>
+    <hadoop.deps.scope>compile</hadoop.deps.scope>
     <protobuf.version>${cdh.protobuf.version}</protobuf.version>
     <yarn.version>${hadoop.version}</yarn.version>
     <hbase.version>${cdh.hbase.version}</hbase.version>
@@ -561,10 +562,15 @@
         <groupId>org.apache.hadoop</groupId>
         <artifactId>hadoop-client</artifactId>
         <version>${hadoop.version}</version>
+        <scope>${hadoop.deps.scope}</scope>
         <exclusions>
           <exclusion>
             <groupId>asm</groupId>
             <artifactId>asm</artifactId>
+          </exclusion>
+          <exclusion>
+            <groupId>org.apache.hadoop</groupId>
+            <artifactId>hadoop-aws</artifactId>
           </exclusion>
           <exclusion>
             <groupId>org.ow2.asm</groupId>
@@ -596,6 +602,7 @@
         <groupId>org.apache.avro</groupId>
         <artifactId>avro</artifactId>
         <version>${avro.version}</version>
+        <scope>${hadoop.deps.scope}</scope>
       </dependency>
       <dependency>
         <groupId>org.apache.avro</groupId>
@@ -633,6 +640,7 @@
         <artifactId>avro-mapred</artifactId>
         <version>${avro.version}</version>
         <classifier>${avro.mapred.classifier}</classifier>
+        <scope>${hadoop.deps.scope}</scope>
         <exclusions>
           <exclusion>
             <groupId>io.netty</groupId>
@@ -661,6 +669,7 @@
         <groupId>org.apache.hive</groupId>
         <artifactId>hive-exec</artifactId>
         <version>${hive.version}</version>
+        <scope>${hadoop.deps.scope}</scope>
         <exclusions>
           <exclusion>
             <groupId>commons-logging</groupId>
@@ -672,11 +681,13 @@
         <groupId>org.apache.hive</groupId>
         <artifactId>hive-metastore</artifactId>
         <version>${hive.version}</version>
+        <scope>${hadoop.deps.scope}</scope>
       </dependency>
       <dependency>
         <groupId>org.apache.hive</groupId>
         <artifactId>hive-serde</artifactId>
         <version>${hive.version}</version>
+        <scope>${hadoop.deps.scope}</scope>
         <exclusions>
           <exclusion>
             <groupId>commons-logging</groupId>
@@ -692,16 +703,19 @@
         <groupId>com.twitter</groupId>
         <artifactId>parquet-column</artifactId>
         <version>${parquet.version}</version>
+        <scope>${hadoop.deps.scope}</scope>
       </dependency>
       <dependency>
         <groupId>com.twitter</groupId>
         <artifactId>parquet-hadoop</artifactId>
         <version>${parquet.version}</version>
+        <scope>${hadoop.deps.scope}</scope>
       </dependency>
       <dependency>
         <groupId>com.twitter</groupId>
         <artifactId>parquet-hive-bundle</artifactId>
         <version>1.5.0</version>
+        <scope>${hadoop.deps.scope}</scope>
       </dependency>
 
       <!-- See SPARK-1556 for info on this dependency: -->
@@ -709,6 +723,7 @@
         <groupId>net.java.dev.jets3t</groupId>
         <artifactId>jets3t</artifactId>
         <version>${jets3t.version}</version>
+        <scope>${hadoop.deps.scope}</scope>
         <exclusions>
           <exclusion>
             <groupId>commons-logging</groupId>
@@ -720,6 +735,7 @@
         <groupId>org.apache.hadoop</groupId>
         <artifactId>hadoop-yarn-api</artifactId>
         <version>${yarn.version}</version>
+        <scope>${hadoop.deps.scope}</scope>
         <exclusions>
           <exclusion>
             <groupId>javax.servlet</groupId>
@@ -747,6 +763,7 @@
         <groupId>org.apache.hadoop</groupId>
         <artifactId>hadoop-yarn-common</artifactId>
         <version>${yarn.version}</version>
+        <scope>${hadoop.deps.scope}</scope>
         <exclusions>
           <exclusion>
             <groupId>asm</groupId>
@@ -774,6 +791,7 @@
         <groupId>org.apache.hadoop</groupId>
         <artifactId>hadoop-yarn-server-web-proxy</artifactId>
         <version>${yarn.version}</version>
+        <scope>${hadoop.deps.scope}</scope>
         <exclusions>
           <exclusion>
             <groupId>asm</groupId>
@@ -801,6 +819,7 @@
         <groupId>org.apache.hadoop</groupId>
         <artifactId>hadoop-yarn-client</artifactId>
         <version>${yarn.version}</version>
+        <scope>${hadoop.deps.scope}</scope>
         <exclusions>
           <exclusion>
             <groupId>asm</groupId>
@@ -1251,94 +1270,9 @@
       <activation>
         <activeByDefault>false</activeByDefault>
       </activation>
-      <dependencyManagement>
-        <dependencies>
-          <dependency>
-            <groupId>org.apache.hadoop</groupId>
-            <artifactId>hadoop-client</artifactId>
-            <version>${hadoop.version}</version>
-            <scope>provided</scope>
-          </dependency>
-          <dependency>
-            <groupId>org.apache.hadoop</groupId>
-            <artifactId>hadoop-yarn-api</artifactId>
-            <version>${hadoop.version}</version>
-            <scope>provided</scope>
-          </dependency>
-          <dependency>
-            <groupId>org.apache.hadoop</groupId>
-            <artifactId>hadoop-yarn-common</artifactId>
-            <version>${hadoop.version}</version>
-            <scope>provided</scope>
-          </dependency>
-          <dependency>
-            <groupId>org.apache.hadoop</groupId>
-            <artifactId>hadoop-yarn-server-web-proxy</artifactId>
-            <version>${hadoop.version}</version>
-            <scope>provided</scope>
-          </dependency>
-          <dependency>
-            <groupId>org.apache.hadoop</groupId>
-            <artifactId>hadoop-yarn-client</artifactId>
-            <version>${hadoop.version}</version>
-            <scope>provided</scope>
-          </dependency>
-          <dependency>
-            <groupId>org.apache.avro</groupId>
-            <artifactId>avro</artifactId>
-            <version>${avro.version}</version>
-            <scope>provided</scope>
-          </dependency>
-          <dependency>
-            <groupId>org.apache.avro</groupId>
-            <artifactId>avro-ipc</artifactId>
-            <version>${avro.version}</version>
-            <scope>provided</scope>
-          </dependency>
-          <dependency>
-            <groupId>org.apache.hive</groupId>
-            <artifactId>hive-exec</artifactId>
-            <version>${hive.version}</version>
-            <scope>provided</scope>
-          </dependency>
-          <dependency>
-            <groupId>org.apache.hive</groupId>
-            <artifactId>hive-metastore</artifactId>
-            <version>${hive.version}</version>
-            <scope>provided</scope>
-          </dependency>
-          <dependency>
-            <groupId>org.apache.hive</groupId>
-            <artifactId>hive-serde</artifactId>
-            <version>${hive.version}</version>
-            <scope>provided</scope>
-          </dependency>
-          <dependency>
-            <groupId>org.apache.zookeeper</groupId>
-            <artifactId>zookeeper</artifactId>
-            <version>${zookeeper.version}</version>
-            <scope>provided</scope>
-          </dependency>
-          <dependency>
-            <groupId>com.twitter</groupId>
-            <artifactId>parquet-column</artifactId>
-            <version>${parquet.version}</version>
-            <scope>provided</scope>
-          </dependency>
-          <dependency>
-            <groupId>com.twitter</groupId>
-            <artifactId>parquet-hadoop</artifactId>
-            <version>${parquet.version}</version>
-            <scope>provided</scope>
-          </dependency>
-          <dependency>
-            <groupId>com.twitter</groupId>
-            <artifactId>parquet-hive-bundle</artifactId>
-            <version>1.5.0</version>
-            <scope>provided</scope>
-          </dependency>
-        </dependencies>
-      </dependencyManagement>
+      <properties>
+        <hadoop.deps.scope>provided</hadoop.deps.scope>
+      </properties>
     </profile>
 
     <profile>
