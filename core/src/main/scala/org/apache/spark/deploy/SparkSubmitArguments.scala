@@ -57,8 +57,12 @@ private[spark] class SparkSubmitArguments(args: Seq[String]) {
   var pyFiles: String = null
   val sparkProperties: HashMap[String, String] = new HashMap[String, String]()
 
+  // Set parameters from command line arguments
   parseOpts(args.toList)
-  mergeSparkProperties()
+  // Populate `sparkProperties` map from properties file
+  mergeDefaultSparkProperties()
+  // Use `sparkProperties` map along with env vars to fill in any missing parameters
+  loadEnvironmentArguments()
   checkRequiredArguments()
 
   /** Return default present in the currently defined defaults file. */
@@ -80,10 +84,10 @@ private[spark] class SparkSubmitArguments(args: Seq[String]) {
   }
 
   /**
-   * Fill in any undefined values based on the default properties file or options passed in through
-   * the '--conf' flag.
+   * Merge values from the default properties file with those specified through --conf.
+   * When this is called, `sparkProperties` is already filled with configs from the latter.
    */
-  private def mergeSparkProperties(): Unit = {
+  private def mergeDefaultSparkProperties(): Unit = {
     // Use common defaults file, if not specified by user
     if (propertiesFile == null) {
       sys.env.get("SPARK_CONF_DIR").foreach { sparkConfDir =>
@@ -107,24 +111,39 @@ private[spark] class SparkSubmitArguments(args: Seq[String]) {
       }
     }
 
-    val properties = getDefaultSparkProperties
-    properties.putAll(sparkProperties)
+    // Honor --conf before the defaults file
+    getDefaultSparkProperties.foreach { case (k, v) =>
+      if (!sparkProperties.contains(k)) {
+        sparkProperties(k) = v
+      }
+    }
+  }
 
-    // Use properties file as fallback for values which have a direct analog to
-    // arguments in this script.
-    master = Option(master).getOrElse(properties.get("spark.master").orNull)
+  /**
+   * Load arguments from environment variables, Spark properties etc.
+   */
+  private def loadEnvironmentArguments(): Unit = {
+    master = Option(master)
+      .orElse(sparkProperties.get("spark.master"))
+      .orElse(sys.env.get("MASTER"))
+      .orNull
+    driverMemory = Option(driverMemory)
+      .orElse(sparkProperties.get("spark.driver.memory"))
+      .orElse(sys.env.get("SPARK_DRIVER_MEMORY"))
+      .orNull
     executorMemory = Option(executorMemory)
-      .getOrElse(properties.get("spark.executor.memory").orNull)
+      .orElse(sparkProperties.get("spark.executor.memory"))
+      .orElse(sys.env.get("SPARK_EXECUTOR_MEMORY"))
+      .orNull
     executorCores = Option(executorCores)
-      .getOrElse(properties.get("spark.executor.cores").orNull)
+      .orElse(sparkProperties.get("spark.executor.cores"))
+      .orNull
     totalExecutorCores = Option(totalExecutorCores)
-      .getOrElse(properties.get("spark.cores.max").orNull)
-    name = Option(name).getOrElse(properties.get("spark.app.name").orNull)
-    jars = Option(jars).getOrElse(properties.get("spark.jars").orNull)
-
-    // This supports env vars in older versions of Spark
-    master = Option(master).getOrElse(System.getenv("MASTER"))
-    deployMode = Option(deployMode).getOrElse(System.getenv("DEPLOY_MODE"))
+      .orElse(sparkProperties.get("spark.cores.max"))
+      .orNull
+    name = Option(name).orElse(sparkProperties.get("spark.app.name")).orNull
+    jars = Option(jars).orElse(sparkProperties.get("spark.jars")).orNull
+    deployMode = Option(deployMode).orElse(sys.env.get("DEPLOY_MODE")).orNull
 
     // Try to set main class from JAR if no --class argument is given
     if (mainClass == null && !isPython && primaryResource != null) {
@@ -150,7 +169,7 @@ private[spark] class SparkSubmitArguments(args: Seq[String]) {
   }
 
   /** Ensure that required fields exists. Call this only once all defaults are loaded. */
-  private def checkRequiredArguments() = {
+  private def checkRequiredArguments(): Unit = {
     if (args.length == 0) {
       printUsageAndExit(-1)
     }
@@ -185,7 +204,7 @@ private[spark] class SparkSubmitArguments(args: Seq[String]) {
     }
   }
 
-  override def toString =  {
+  override def toString = {
     s"""Parsed arguments:
     |  master                  $master
     |  deployMode              $deployMode
@@ -193,7 +212,6 @@ private[spark] class SparkSubmitArguments(args: Seq[String]) {
     |  executorCores           $executorCores
     |  totalExecutorCores      $totalExecutorCores
     |  propertiesFile          $propertiesFile
-    |  extraSparkProperties    $sparkProperties
     |  driverMemory            $driverMemory
     |  driverCores             $driverCores
     |  driverExtraClassPath    $driverExtraClassPath
@@ -212,8 +230,9 @@ private[spark] class SparkSubmitArguments(args: Seq[String]) {
     |  jars                    $jars
     |  verbose                 $verbose
     |
-    |Default properties from $propertiesFile:
-    |${getDefaultSparkProperties.mkString("  ", "\n  ", "\n")}
+    |Spark properties used, including those specified through
+    | --conf and those from the properties file $propertiesFile:
+    |${sparkProperties.mkString("  ", "\n  ", "\n")}
     """.stripMargin
   }
 
@@ -346,7 +365,7 @@ private[spark] class SparkSubmitArguments(args: Seq[String]) {
     }
   }
 
-  private def printUsageAndExit(exitCode: Int, unknownParam: Any = null) {
+  private def printUsageAndExit(exitCode: Int, unknownParam: Any = null): Unit = {
     val outStream = SparkSubmit.printStream
     if (unknownParam != null) {
       outStream.println("Unknown/unsupported param " + unknownParam)
