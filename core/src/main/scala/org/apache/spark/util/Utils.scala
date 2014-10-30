@@ -23,8 +23,6 @@ import java.nio.ByteBuffer
 import java.util.{Properties, Locale, Random, UUID}
 import java.util.concurrent.{ThreadFactory, ConcurrentHashMap, Executors, ThreadPoolExecutor}
 
-import org.apache.log4j.PropertyConfigurator
-
 import scala.collection.JavaConversions._
 import scala.collection.Map
 import scala.collection.mutable.ArrayBuffer
@@ -37,6 +35,8 @@ import com.google.common.io.Files
 import com.google.common.util.concurrent.ThreadFactoryBuilder
 import org.apache.commons.lang3.SystemUtils
 import org.apache.hadoop.fs.{FileSystem, FileUtil, Path}
+import org.apache.log4j.PropertyConfigurator
+import org.eclipse.jetty.util.MultiException
 import org.json4s._
 import tachyon.client.{TachyonFile,TachyonFS}
 
@@ -902,8 +902,8 @@ private[spark] object Utils extends Logging {
    */
   def getCallSite: CallSite = {
     val trace = Thread.currentThread.getStackTrace()
-      .filterNot { ste:StackTraceElement => 
-        // When running under some profilers, the current stack trace might contain some bogus 
+      .filterNot { ste:StackTraceElement =>
+        // When running under some profilers, the current stack trace might contain some bogus
         // frames. This is intended to ensure that we don't crash in these situations by
         // ignoring any frames that we can't examine.
         (ste == null || ste.getMethodName == null || ste.getMethodName.contains("getStackTrace"))
@@ -1245,6 +1245,11 @@ private[spark] object Utils extends Logging {
   val isWindows = SystemUtils.IS_OS_WINDOWS
 
   /**
+   * Whether the underlying operating system is Mac OS X.
+   */
+  val isMac = SystemUtils.IS_OS_MAC_OSX
+
+  /**
    * Pattern for matching a Windows drive, which contains only a single alphabet character.
    */
   val windowsDrive = "([a-zA-Z])".r
@@ -1304,7 +1309,7 @@ private[spark] object Utils extends Logging {
     }
   }
 
-  /** 
+  /**
    * Execute the given block, logging and re-throwing any uncaught exception.
    * This is particularly useful for wrapping code that runs in a thread, to ensure
    * that exceptions are printed, and to avoid having to catch Throwable.
@@ -1494,6 +1499,40 @@ private[spark] object Utils extends Logging {
     pro.put("log4j.appender.console.layout.ConversionPattern",
       "%d{yy/MM/dd HH:mm:ss} %p %c{1}: %m%n")
     PropertyConfigurator.configure(pro)
+  }
+
+  /**
+   * Return the current system LD_LIBRARY_PATH name
+   */
+  def libraryPathEnvName: String = {
+    if (isWindows) {
+      "PATH"
+    } else if (isMac) {
+      "DYLD_LIBRARY_PATH"
+    } else {
+      "LD_LIBRARY_PATH"
+    }
+  }
+
+  /**
+   * Return the prefix of a command that appends the given library paths to the
+   * system-specific library path environment variable. On Unix, for instance,
+   * this returns the string LD_LIBRARY_PATH="path1:path2:$LD_LIBRARY_PATH".
+   */
+  def libraryPathEnvPrefix(libraryPaths: Seq[String]): String = {
+    val libraryPathScriptVar = if (isWindows) {
+      s"%${libraryPathEnvName}%"
+    } else {
+      "$" + libraryPathEnvName
+    }
+    val libraryPath = (libraryPaths :+ libraryPathScriptVar).mkString("\"",
+      File.pathSeparator, "\"")
+    val ampersand = if (Utils.isWindows) {
+      " &"
+    } else {
+      ""
+    }
+    s"$libraryPathEnvName=$libraryPath$ampersand"
   }
 
 }
