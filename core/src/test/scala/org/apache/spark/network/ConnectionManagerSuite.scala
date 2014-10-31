@@ -53,7 +53,7 @@ class ConnectionManagerSuite extends FunSuite {
     buffer.flip
 
     val bufferMessage = Message.createBufferMessage(buffer.duplicate)
-    Await.result(manager.sendMessageReliably(manager.id, bufferMessage), 10 seconds)
+    Await.result(manager.sendMessageReliably(manager.id, bufferMessage), 20 seconds)
 
     assert(receivedMessage == true)
 
@@ -86,7 +86,7 @@ class ConnectionManagerSuite extends FunSuite {
 
     (0 until count).map(i => {
       val bufferMessage = Message.createBufferMessage(buffer.duplicate)
-      Await.result(manager.sendMessageReliably(managerServer.id, bufferMessage), 10 seconds)
+      Await.result(manager.sendMessageReliably(managerServer.id, bufferMessage), 20 seconds)
     })
 
     assert(numReceivedServerMessages == 10)
@@ -127,7 +127,7 @@ class ConnectionManagerSuite extends FunSuite {
     val bufferMessage = Message.createBufferMessage(buffer.duplicate)
     // Expect managerServer to close connection, which we'll report as an error:
     intercept[IOException] {
-      Await.result(manager.sendMessageReliably(managerServer.id, bufferMessage), 10 seconds)
+      Await.result(manager.sendMessageReliably(managerServer.id, bufferMessage), 20 seconds)
     }
 
     assert(numReceivedServerMessages == 0)
@@ -170,7 +170,7 @@ class ConnectionManagerSuite extends FunSuite {
       manager.sendMessageReliably(managerServer.id, bufferMessage)
     }).foreach(f => {
       try {
-        val g = Await.result(f, 10 second)
+        val g = Await.result(f, 20 second)
         assert(false)
       } catch {
         case i: IOException =>
@@ -220,7 +220,7 @@ class ConnectionManagerSuite extends FunSuite {
       manager.sendMessageReliably(managerServer.id, bufferMessage)
     }).foreach(f => {
       try {
-        val g = Await.result(f, 10 second)
+        val g = Await.result(f, 20 second)
       } catch {
         case e: Exception => {
           assert(false)
