@@ -20,9 +20,9 @@
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
   <modelVersion>4.0.0</modelVersion>
   <parent>
-    <groupId>org.apache</groupId>
-    <artifactId>apache</artifactId>
-    <version>14</version>
+    <groupId>com.cloudera.cdh</groupId>
+    <artifactId>cdh-root</artifactId>
+    <version>5.4.0-SNAPSHOT</version>
   </parent>
   <groupId>org.apache.spark</groupId>
   <artifactId>spark-parent_2.10</artifactId>
@@ -117,22 +117,22 @@
     <scala.macros.version>2.0.1</scala.macros.version>
     <mesos.version>0.21.0</mesos.version>
     <mesos.classifier>shaded-protobuf</mesos.classifier>
-    <slf4j.version>1.7.10</slf4j.version>
+    <slf4j.version>${cdh.slf4j.version}</slf4j.version>
     <log4j.version>1.2.17</log4j.version>
-    <hadoop.version>1.0.4</hadoop.version>
-    <protobuf.version>2.4.1</protobuf.version>
+    <hadoop.version>${cdh.hadoop.version}</hadoop.version>
+    <protobuf.version>${cdh.protobuf.version}</protobuf.version>
     <yarn.version>${hadoop.version}</yarn.version>
-    <hbase.version>0.98.7-hadoop1</hbase.version>
-    <hbase.artifact>hbase</hbase.artifact>
-    <flume.version>1.4.0</flume.version>
-    <zookeeper.version>3.4.5</zookeeper.version>
-    <hive.group>org.spark-project.hive</hive.group>
+    <hbase.version>${cdh.hbase.version}</hbase.version>
+    <hbase.artifact>hbase-server</hbase.artifact>
+    <flume.version>${cdh.flume-ng.version}</flume.version>
+    <zookeeper.version>${cdh.zookeeper.version}</zookeeper.version>
+    <hive.group>org.apache.hive</hive.group>
     <!-- Version used in Maven Hive dependency -->
-    <hive.version>0.13.1a</hive.version>
+    <hive.version>${cdh.hive.version}</hive.version>
     <!-- Version used for internal directory structure -->
     <hive.version.short>0.13.1</hive.version.short>
-    <derby.version>10.10.1.1</derby.version>
-    <parquet.version>1.6.0rc3</parquet.version>
+    <derby.version>10.6.1.0</derby.version>
+    <parquet.version>${cdh.parquet.version}</parquet.version>
     <jblas.version>1.2.3</jblas.version>
     <jetty.version>8.1.14.v20131031</jetty.version>
     <orbit.version>3.0.0.v201112011016</orbit.version>
@@ -140,9 +140,9 @@
     <ivy.version>2.4.0</ivy.version>
     <oro.version>2.0.8</oro.version>
     <codahale.metrics.version>3.1.0</codahale.metrics.version>
-    <avro.version>1.7.6</avro.version>
-    <avro.mapred.classifier></avro.mapred.classifier>
-    <jets3t.version>0.7.1</jets3t.version>
+    <avro.version>${cdh.avro.version}</avro.version>
+    <avro.mapred.classifier>hadoop2</avro.mapred.classifier>
+    <jets3t.version>${cdh.jets3t.version}</jets3t.version>
     <aws.java.sdk.version>1.8.3</aws.java.sdk.version>
     <aws.kinesis.client.version>1.1.0</aws.kinesis.client.version>
     <commons.httpclient.version>4.2.6</commons.httpclient.version>
@@ -153,9 +153,9 @@
     <jline.version>${scala.version}</jline.version>
     <jline.groupid>org.scala-lang</jline.groupid>
     <jodd.version>3.6.3</jodd.version>
-    <codehaus.jackson.version>1.8.8</codehaus.jackson.version>
+    <codehaus.jackson.version>${cdh.jackson.version}</codehaus.jackson.version>
     <fasterxml.jackson.version>2.4.4</fasterxml.jackson.version>
-    <snappy.version>1.1.1.6</snappy.version>
+    <snappy.version>${cdh.hadoop-snappy.version}</snappy.version>
 
     <!--
       Dependency scopes that can be overridden by enabling certain profiles. These profiles are
@@ -183,6 +183,25 @@
   </properties>
 
   <repositories>
+    <repository>
+      <id>cdh.repo</id>
+      <url>https://repository.cloudera.com/artifactory/cloudera-repos</url>
+      <name>Cloudera Repositories</name>
+      <snapshots>
+        <enabled>false</enabled>
+      </snapshots>
+    </repository>
+    <repository>
+      <id>cdh.snapshots.repo</id>
+      <url>https://repository.cloudera.com/artifactory/libs-snapshot-local</url>
+      <name>Cloudera Snapshots Repository</name>
+      <snapshots>
+        <enabled>true</enabled>
+      </snapshots>
+      <releases>
+        <enabled>false</enabled>
+      </releases>
+    </repository>
     <repository>
       <id>central</id>
       <!-- This should be at top, it makes maven try the central repo first and then others and hence faster dep resolution -->
@@ -1602,6 +1621,11 @@
 
     <profile>
       <id>yarn</id>
+      <activation>
+        <property>
+          <name>cdh.build</name>
+        </property>
+      </activation>
       <modules>
         <module>yarn</module>
         <module>network/yarn</module>
@@ -1648,6 +1672,11 @@
 
     <profile>
       <id>hive-thriftserver</id>
+      <activation>
+        <property>
+          <name>cdh.build</name>
+        </property>
+      </activation>
       <modules>
         <module>sql/hive-thriftserver</module>
       </modules>

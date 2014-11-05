@@ -400,12 +400,22 @@
     <!-- Profiles that disable inclusion of certain dependencies. -->
     <profile>
       <id>flume-provided</id>
+      <activation>
+        <property>
+          <name>cdh.build</name>
+        </property>
+      </activation>
       <properties>
         <flume.deps.scope>provided</flume.deps.scope>
       </properties>
     </profile>
     <profile>
       <id>hadoop-provided</id>
+      <activation>
+        <property>
+          <name>cdh.build</name>
+        </property>
+      </activation>
       <properties>
         <hadoop.deps.scope>provided</hadoop.deps.scope>
       </properties>
@@ -418,6 +428,11 @@
     </profile>
     <profile>
       <id>hive-provided</id>
+      <activation>
+        <property>
+          <name>cdh.build</name>
+        </property>
+      </activation>
       <properties>
         <hive.deps.scope>provided</hive.deps.scope>
       </properties>
