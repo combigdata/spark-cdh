@@ -181,6 +181,11 @@
     </profile>
     <profile>
       <id>yarn</id>
+      <activation>
+        <property>
+          <name>cdh.build</name>
+        </property>
+      </activation>
       <dependencies>
         <dependency>
           <groupId>org.apache.spark</groupId>
@@ -191,6 +196,11 @@
     </profile>
     <profile>
       <id>hive</id>
+      <activation>
+        <property>
+          <name>cdh.build</name>
+        </property>
+      </activation>
       <dependencies>
         <dependency>
           <groupId>org.apache.spark</groupId>
@@ -201,6 +211,11 @@
     </profile>
     <profile>
       <id>hive-thriftserver</id>
+      <activation>
+        <property>
+          <name>cdh.build</name>
+        </property>
+      </activation>
       <dependencies>
         <dependency>
           <groupId>org.apache.spark</groupId>
@@ -368,12 +383,22 @@
     <!-- Profiles that disable inclusion of certain dependencies. -->
     <profile>
       <id>hadoop-provided</id>
+      <activation>
+        <property>
+          <name>cdh.build</name>
+        </property>
+      </activation>
       <properties>
         <hadoop.deps.scope>provided</hadoop.deps.scope>
       </properties>
     </profile>
     <profile>
       <id>hive-provided</id>
+      <activation>
+        <property>
+          <name>cdh.build</name>
+        </property>
+      </activation>
       <properties>
         <hive.deps.scope>provided</hive.deps.scope>
       </properties>

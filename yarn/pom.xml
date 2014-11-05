@@ -102,6 +102,11 @@
 
     <profile>
       <id>yarn</id>
+      <activation>
+        <property>
+          <name>cdh.build</name>
+        </property>
+      </activation>
       <modules>
         <module>stable</module>
       </modules>
