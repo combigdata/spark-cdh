@@ -116,11 +116,6 @@
       <artifactId>scopt_${scala.binary.version}</artifactId>
       <version>3.3.0</version>
     </dependency>
-    <dependency>
-      <groupId>com.twitter</groupId>
-      <artifactId>parquet-hadoop-bundle</artifactId>
-      <scope>provided</scope>
-    </dependency>
   </dependencies>
 
   <build>
@@ -161,6 +156,52 @@
           <scope>provided</scope>
         </dependency>
       </dependencies>
+    </profile>
+
+    <!-- Profiles that disable inclusion of certain dependencies. -->
+    <profile>
+      <id>flume-provided</id>
+      <activation>
+        <property>
+          <name>cdh.build</name>
+        </property>
+      </activation>
+      <properties>
+        <flume.deps.scope>provided</flume.deps.scope>
+      </properties>
+    </profile>
+    <profile>
+      <id>hadoop-provided</id>
+      <activation>
+        <property>
+          <name>cdh.build</name>
+        </property>
+      </activation>
+      <properties>
+        <hadoop.deps.scope>provided</hadoop.deps.scope>
+      </properties>
+    </profile>
+    <profile>
+      <id>hive-provided</id>
+      <activation>
+        <property>
+          <name>cdh.build</name>
+        </property>
+      </activation>
+      <properties>
+        <hive.deps.scope>provided</hive.deps.scope>
+      </properties>
+    </profile>
+    <profile>
+      <id>parquet-provided</id>
+      <activation>
+        <property>
+          <name>cdh.build</name>
+        </property>
+      </activation>
+      <properties>
+        <parquet.deps.scope>provided</parquet.deps.scope>
+      </properties>
     </profile>
   </profiles>
 </project>
