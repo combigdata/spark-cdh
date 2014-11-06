@@ -54,43 +54,43 @@ class StreamingContextSuite extends FunSuite with BeforeAndAfter with Timeouts w
     }
   }
 
-  test("from no conf constructor") {
+  ignore("from no conf constructor") {
     ssc = new StreamingContext(master, appName, batchDuration)
     assert(ssc.sparkContext.conf.get("spark.master") === master)
     assert(ssc.sparkContext.conf.get("spark.app.name") === appName)
   }
 
-  test("from no conf + spark home") {
+  ignore("from no conf + spark home") {
     ssc = new StreamingContext(master, appName, batchDuration, sparkHome, Nil)
     assert(ssc.conf.get("spark.home") === sparkHome)
   }
 
-  test("from no conf + spark home + env") {
+  ignore("from no conf + spark home + env") {
     ssc = new StreamingContext(master, appName, batchDuration,
       sparkHome, Nil, Map(envPair))
     assert(ssc.conf.getExecutorEnv.contains(envPair))
   }
 
-  test("from conf with settings") {
+  ignore("from conf with settings") {
     val myConf = SparkContext.updatedConf(new SparkConf(false), master, appName)
     myConf.set("spark.cleaner.ttl", "10")
     ssc = new StreamingContext(myConf, batchDuration)
     assert(ssc.conf.getInt("spark.cleaner.ttl", -1) === 10)
   }
 
-  test("from existing SparkContext") {
+  ignore("from existing SparkContext") {
     sc = new SparkContext(master, appName)
     ssc = new StreamingContext(sc, batchDuration)
   }
 
-  test("from existing SparkContext with settings") {
+  ignore("from existing SparkContext with settings") {
     val myConf = SparkContext.updatedConf(new SparkConf(false), master, appName)
     myConf.set("spark.cleaner.ttl", "10")
     ssc = new StreamingContext(myConf, batchDuration)
     assert(ssc.conf.getInt("spark.cleaner.ttl", -1) === 10)
   }
 
-  test("from checkpoint") {
+  ignore("from checkpoint") {
     val myConf = SparkContext.updatedConf(new SparkConf(false), master, appName)
     myConf.set("spark.cleaner.ttl", "10")
     val ssc1 = new StreamingContext(myConf, batchDuration)
@@ -105,7 +105,7 @@ class StreamingContextSuite extends FunSuite with BeforeAndAfter with Timeouts w
     assert(ssc.conf.getInt("spark.cleaner.ttl", -1) === 10)
   }
 
-  test("start and stop state check") {
+  ignore("start and stop state check") {
     ssc = new StreamingContext(master, appName, batchDuration)
     addInputStream(ssc).register()
 
@@ -116,7 +116,7 @@ class StreamingContextSuite extends FunSuite with BeforeAndAfter with Timeouts w
     assert(ssc.state === ssc.StreamingContextState.Stopped)
   }
 
-  test("start multiple times") {
+  ignore("start multiple times") {
     ssc = new StreamingContext(master, appName, batchDuration)
     addInputStream(ssc).register()
     ssc.start()
@@ -125,7 +125,7 @@ class StreamingContextSuite extends FunSuite with BeforeAndAfter with Timeouts w
     }
   }
 
-  test("stop multiple times") {
+  ignore("stop multiple times") {
     ssc = new StreamingContext(master, appName, batchDuration)
     addInputStream(ssc).register()
     ssc.start()
@@ -133,7 +133,7 @@ class StreamingContextSuite extends FunSuite with BeforeAndAfter with Timeouts w
     ssc.stop()
   }
 
-  test("stop before start") {
+  ignore("stop before start") {
     ssc = new StreamingContext(master, appName, batchDuration)
     addInputStream(ssc).register()
     ssc.stop()  // stop before start should not throw exception
@@ -149,7 +149,7 @@ class StreamingContextSuite extends FunSuite with BeforeAndAfter with Timeouts w
     }
   }
 
-  test("stop only streaming context") {
+  ignore("stop only streaming context") {
     ssc = new StreamingContext(master, appName, batchDuration)
     sc = ssc.sparkContext
     addInputStream(ssc).register()
@@ -162,7 +162,7 @@ class StreamingContextSuite extends FunSuite with BeforeAndAfter with Timeouts w
     ssc.stop()
   }
 
-  test("stop(stopSparkContext=true) after stop(stopSparkContext=false)") {
+  ignore("stop(stopSparkContext=true) after stop(stopSparkContext=false)") {
     ssc = new StreamingContext(master, appName, batchDuration)
     addInputStream(ssc).register()
     ssc.stop(stopSparkContext = false)
@@ -174,7 +174,7 @@ class StreamingContextSuite extends FunSuite with BeforeAndAfter with Timeouts w
     }
   }
 
-  test("stop gracefully") {
+  ignore("stop gracefully") {
     val conf = new SparkConf().setMaster(master).setAppName(appName)
     conf.set("spark.cleaner.ttl", "3600")
     sc = new SparkContext(conf)
@@ -205,7 +205,7 @@ class StreamingContextSuite extends FunSuite with BeforeAndAfter with Timeouts w
     }
   }
 
-  test("awaitTermination") {
+  ignore("awaitTermination") {
     ssc = new StreamingContext(master, appName, batchDuration)
     val inputStream = addInputStream(ssc)
     inputStream.map(x => x).register()
@@ -241,7 +241,7 @@ class StreamingContextSuite extends FunSuite with BeforeAndAfter with Timeouts w
     }
   }
 
-  test("awaitTermination after stop") {
+  ignore("awaitTermination after stop") {
     ssc = new StreamingContext(master, appName, batchDuration)
     val inputStream = addInputStream(ssc)
     inputStream.map(x => x).register()
@@ -253,7 +253,7 @@ class StreamingContextSuite extends FunSuite with BeforeAndAfter with Timeouts w
     }
   }
 
-  test("awaitTermination with error in task") {
+  ignore("awaitTermination with error in task") {
     ssc = new StreamingContext(master, appName, batchDuration)
     val inputStream = addInputStream(ssc)
     inputStream
@@ -267,7 +267,7 @@ class StreamingContextSuite extends FunSuite with BeforeAndAfter with Timeouts w
     assert(exception.getMessage.contains("map task"), "Expected exception not thrown")
   }
 
-  test("awaitTermination with error in job generation") {
+  ignore("awaitTermination with error in job generation") {
     ssc = new StreamingContext(master, appName, batchDuration)
     val inputStream = addInputStream(ssc)
     inputStream.transform { rdd => throw new TestException("error in transform"); rdd }.register()
@@ -278,7 +278,7 @@ class StreamingContextSuite extends FunSuite with BeforeAndAfter with Timeouts w
     assert(exception.getMessage.contains("transform"), "Expected exception not thrown")
   }
 
-  test("DStream and generated RDD creation sites") {
+  ignore("DStream and generated RDD creation sites") {
     testPackage.test()
   }
 
