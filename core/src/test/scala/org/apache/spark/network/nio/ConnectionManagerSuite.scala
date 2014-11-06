@@ -34,7 +34,7 @@ import org.apache.spark.util.Utils
   */
 class ConnectionManagerSuite extends FunSuite {
 
-  test("security default off") {
+  ignore("security default off") {
     val conf = new SparkConf
     val securityManager = new SecurityManager(conf)
     val manager = new ConnectionManager(0, conf, securityManager)
@@ -56,7 +56,7 @@ class ConnectionManagerSuite extends FunSuite {
     manager.stop()
   }
 
-  test("security on same password") {
+  ignore("security on same password") {
     val conf = new SparkConf
     conf.set("spark.authenticate", "true")
     conf.set("spark.authenticate.secret", "good")
@@ -93,7 +93,7 @@ class ConnectionManagerSuite extends FunSuite {
     managerServer.stop()
   }
 
-  test("security mismatch password") {
+  ignore("security mismatch password") {
     val conf = new SparkConf
     conf.set("spark.authenticate", "true")
     conf.set("spark.app.id", "app-id")
@@ -133,7 +133,7 @@ class ConnectionManagerSuite extends FunSuite {
     managerServer.stop()
   }
 
-  test("security mismatch auth off") {
+  ignore("security mismatch auth off") {
     val conf = new SparkConf
     conf.set("spark.authenticate", "false")
     conf.set("spark.authenticate.secret", "good")
@@ -184,7 +184,7 @@ class ConnectionManagerSuite extends FunSuite {
     managerServer.stop()
   }
 
-  test("security auth off") {
+  ignore("security auth off") {
     val conf = new SparkConf
     conf.set("spark.authenticate", "false")
     val securityManager = new SecurityManager(conf)
@@ -230,7 +230,7 @@ class ConnectionManagerSuite extends FunSuite {
     managerServer.stop()
   }
 
-  test("Ack error message") {
+  ignore("Ack error message") {
     val conf = new SparkConf
     conf.set("spark.authenticate", "false")
     val securityManager = new SecurityManager(conf)
@@ -257,7 +257,7 @@ class ConnectionManagerSuite extends FunSuite {
 
   }
 
-  test("sendMessageReliably timeout") {
+  ignore("sendMessageReliably timeout") {
     val clientConf = new SparkConf
     clientConf.set("spark.authenticate", "false")
     val ackTimeout = 30
