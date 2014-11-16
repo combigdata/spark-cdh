@@ -67,6 +67,7 @@ class HiveQuerySuite extends HiveComparisonTest with BeforeAndAfter {
   createQueryTest("NaN to Decimal",
     "SELECT CAST(CAST('NaN' AS DOUBLE) AS DECIMAL(1,1)) FROM src LIMIT 1")
 
+  /*
   createQueryTest("constant null testing",
     """SELECT
       |IF(FALSE, CAST(NULL AS STRING), CAST(1 AS STRING)) AS COL1,
@@ -94,6 +95,7 @@ class HiveQuerySuite extends HiveComparisonTest with BeforeAndAfter {
       |IF(FALSE, CAST(NULL AS DECIMAL), CAST(1 AS DECIMAL)) AS COL23,
       |IF(TRUE, CAST(NULL AS DECIMAL), CAST(1 AS DECIMAL)) AS COL24
       |FROM src LIMIT 1""".stripMargin)
+  */
 
   createQueryTest("constant array",
   """

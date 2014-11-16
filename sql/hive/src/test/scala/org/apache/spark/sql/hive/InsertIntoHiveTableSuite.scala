@@ -94,7 +94,7 @@ class InsertIntoHiveTableSuite extends QueryTest {
     sql("DROP TABLE hiveTableWithMapValue")
   }
 
-  test("SPARK-4203:random partition directory order") {
+  ignore("SPARK-4203:random partition directory order") {
     createTable[TestData]("tmp_table")
     val tmpDir = Files.createTempDir()
     sql(s"CREATE TABLE table_with_partition(c1 string) PARTITIONED by (p1 string,p2 string,p3 string,p4 string,p5 string) location '${tmpDir.toURI.toString}'  ")
