@@ -132,6 +132,12 @@ if [[ $SPARK_TESTING == 1 ]]; then
   CLASSPATH="$CLASSPATH:$FWDIR/sql/hive/target/scala-$SPARK_SCALA_VERSION/test-classes"
 fi
 
+# Append the parent class path if requested by the test code. Note this is outside of
+# the check for SPARK_TESTING because some tests reset that variable.
+if [ -n "$SPARK_TEST_PARENT_CLASS_PATH" ]; then
+  CLASSPATH="$CLASSPATH:$SPARK_TEST_PARENT_CLASS_PATH"
+fi
+
 # Add hadoop conf dir if given -- otherwise FileSystem.*, etc fail !
 # Note, this assumes that there is either a HADOOP_CONF_DIR or YARN_CONF_DIR which hosts
 # the configurtion files.
@@ -140,6 +146,13 @@ if [ -n "$HADOOP_CONF_DIR" ]; then
 fi
 if [ -n "$YARN_CONF_DIR" ]; then
   CLASSPATH="$CLASSPATH:$YARN_CONF_DIR"
+fi
+
+# To allow for distributions to append needed libraries to the classpath (e.g. when
+# using the "hadoop-provided" profile to build Spark), check SPARK_DIST_CLASSPATH and
+# append it to tbe final classpath.
+if [ -n "$SPARK_DIST_CLASSPATH" ]; then
+  CLASSPATH="$CLASSPATH:$SPARK_DIST_CLASSPATH"
 fi
 
 echo "$CLASSPATH"
