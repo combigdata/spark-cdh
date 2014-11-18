@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 @echo off
 
 rem
@@ -98,6 +99,12 @@ if "x%SPARK_TESTING%"=="x1" (
   set CLASSPATH=%SPARK_CLASSES%;%SPARK_TEST_CLASSES%;%CLASSPATH%
 )
 
+rem Append the parent class path if requested by the test code. Note this is outside of
+rem the check for SPARK_TESTING because some tests reset that variable.
+if not "x%SPARK_TEST_PARENT_CLASS_PATH%"=="x" (
+  set CLASSPATH=%CLASSPATH%;%SPARK_TEST_PARENT_CLASS_PATH%
+)
+
 rem Add hadoop conf dir - else FileSystem.*, etc fail
 rem Note, this assumes that there is either a HADOOP_CONF_DIR or YARN_CONF_DIR which hosts
 rem the configurtion files.
@@ -108,6 +115,24 @@ if "x%HADOOP_CONF_DIR%"=="x" goto no_hadoop_conf_dir
 if "x%YARN_CONF_DIR%"=="x" goto no_yarn_conf_dir
   set CLASSPATH=%CLASSPATH%;%YARN_CONF_DIR%
 :no_yarn_conf_dir
+
+rem Add hadoop conf dir - else FileSystem.*, etc fail
+rem Note, this assumes that there is either a HADOOP_CONF_DIR or YARN_CONF_DIR which hosts
+rem the configurtion files.
+if "x%HADOOP_CONF_DIR%"=="x" goto no_hadoop_conf_dir
+  set CLASSPATH=%CLASSPATH%;%HADOOP_CONF_DIR%
+:no_hadoop_conf_dir
+
+if "x%YARN_CONF_DIR%"=="x" goto no_yarn_conf_dir
+  set CLASSPATH=%CLASSPATH%;%YARN_CONF_DIR%
+:no_yarn_conf_dir
+
+rem To allow for distributions to append needed libraries to the classpath (e.g. when
+rem using the "hadoop-provided" profile to build Spark), check SPARK_DIST_CLASSPATH and
+rem append it to tbe final classpath.
+if not "x%$SPARK_DIST_CLASSPATH%"=="x" (
+  set CLASSPATH=%CLASSPATH%;%SPARK_DIST_CLASSPATH%
+)
 
 rem A bit of a hack to allow calling this script within run2.cmd without seeing output
 if "%DONT_PRINT_CLASSPATH%"=="1" goto exit

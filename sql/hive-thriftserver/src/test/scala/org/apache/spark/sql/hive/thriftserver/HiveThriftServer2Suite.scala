@@ -155,8 +155,12 @@ class HiveThriftServer2Suite extends FunSuite with Logging {
       }
     }
 
-    // Resets SPARK_TESTING to avoid loading Log4J configurations in testing class paths
-    val env = Seq("SPARK_TESTING" -> "0")
+    val env = Seq(
+      // Resets SPARK_TESTING to avoid loading Log4J configurations in testing class paths
+      "SPARK_TESTING" -> "0",
+      // Allows the child process to inherit the parent's class path so the server works when
+      // *-provided profiles are used.
+      "SPARK_TEST_PARENT_CLASS_PATH" -> sys.props("java.class.path"))
 
     Process(command, None, env: _*).run(ProcessLogger(
       captureThriftServerOutput("stdout"),
@@ -190,7 +194,7 @@ class HiveThriftServer2Suite extends FunSuite with Logging {
     } finally {
       warehousePath.delete()
       metastorePath.delete()
-      Process(stopScript).run().exitValue()
+      Process(stopScript, None, env: _*).run().exitValue()
       // The `spark-daemon.sh' script uses kill, which is not synchronous, have to wait for a while.
       Thread.sleep(3.seconds.toMillis)
       Option(logTailingProcess).map(_.destroy())
