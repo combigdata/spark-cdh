@@ -219,7 +219,7 @@ case class ParquetRelation2(path: String)(@transient val sqlContext: SQLContext)
     val baseRDD =
       new org.apache.spark.rdd.NewHadoopRDD(
           sparkContext,
-          classOf[FilteringParquetRowInputFormat],
+          classOf[ParquetRowInputFormat],
           classOf[Void],
           classOf[Row],
           jobConf) {
@@ -232,11 +232,11 @@ case class ParquetRelation2(path: String)(@transient val sqlContext: SQLContext)
         override def getPartitions: Array[SparkPartition] = {
           val inputFormat =
             if (cacheMetadata) {
-              new FilteringParquetRowInputFormat {
+              new ParquetRowInputFormat {
                 override def listStatus(jobContext: JobContext): JList[FileStatus] = cachedStatus
               }
             } else {
-              new FilteringParquetRowInputFormat
+              new ParquetRowInputFormat
             }
 
           inputFormat match {
