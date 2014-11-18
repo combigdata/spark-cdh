@@ -120,7 +120,7 @@ private[sql] case class ParquetTableScan(
     val baseRDD =
       new org.apache.spark.rdd.NewHadoopRDD(
         sc,
-        classOf[FilteringParquetRowInputFormat],
+        classOf[ParquetRowInputFormat],
         classOf[Void],
         classOf[Row],
         conf)
@@ -405,10 +405,26 @@ private[parquet] class AppendingParquetOutputFormat(offset: Int)
   }
 }
 
+private[parquet] class ParquetRowInputFormat extends parquet.hadoop.ParquetInputFormat[Row] {
+
+  override def getSplits(
+      configuration: Configuration,
+      footers: JList[Footer]): JList[ParquetInputSplit] = {
+    if (footers != null && !footers.isEmpty()) {
+      super.getSplits(configuration, footers)
+    } else {
+      Nil
+    }
+  }
+
+}
+
+
 /**
  * We extend ParquetInputFormat in order to have more control over which
  * RecordFilter we want to use.
  */
+/*
 private[parquet] class FilteringParquetRowInputFormat
   extends parquet.hadoop.ParquetInputFormat[Row] with Logging {
 
@@ -627,6 +643,7 @@ private[parquet] object FilteringParquetRowInputFormat {
     .expireAfterWrite(15, TimeUnit.MINUTES)  // Expire locations since HDFS files might move
     .build[FileStatus, Array[BlockLocation]]()
 }
+*/
 
 private[parquet] object FileSystemHelper {
   def listFiles(pathStr: String, conf: Configuration): Seq[Path] = {

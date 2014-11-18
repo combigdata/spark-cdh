@@ -446,7 +446,7 @@ private[sql] case class ParquetRelation2(
     val baseRDD =
       new NewHadoopRDD(
           sparkContext,
-          classOf[FilteringParquetRowInputFormat],
+          classOf[ParquetRowInputFormat],
           classOf[Void],
           classOf[Row],
           jobConf) {
@@ -461,13 +461,13 @@ private[sql] case class ParquetRelation2(
         // Overridden so we can inject our own cached files statuses.
         override def getPartitions: Array[SparkPartition] = {
           val inputFormat = if (cacheMetadata) {
-            new FilteringParquetRowInputFormat {
+            new ParquetRowInputFormat {
               override def listStatus(jobContext: JobContext): JList[FileStatus] = cachedStatus
 
               override def getFooters(jobContext: JobContext): JList[Footer] = cachedFooters
             }
           } else {
-            new FilteringParquetRowInputFormat
+            new ParquetRowInputFormat
           }
 
           val jobContext = newJobContext(getConf, jobId)
