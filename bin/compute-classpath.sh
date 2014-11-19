@@ -156,6 +156,14 @@ fi
 # append it to tbe final classpath.
 if [ -n "$SPARK_DIST_CLASSPATH" ]; then
   CLASSPATH="$CLASSPATH:$SPARK_DIST_CLASSPATH"
+else
+  # Workaround for pre-5.3 CM, which does not set SPARK_DIST_CLASSPATH.
+  if [ -n "$HADOOP_CONF_DIR" -o -n "$YARN_CONF_DIR" ]; then
+    HADOOP_CLASSPATH="$(hadoop --config ${HADOOP_CONF_DIR:-$YARN_CONF_DIR} classpath)"
+  else
+    HADOOP_CLASSPATH="$(hadoop classpath)"
+  fi
+  CLASSPATH="$CLASSPATH:$HADOOP_CLASSPATH"
 fi
 
 echo "$CLASSPATH"
