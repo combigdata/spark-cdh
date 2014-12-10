@@ -57,7 +57,7 @@ class HiveFunctionWrapper(var functionClassName: String) extends java.io.Externa
   def this() = this(null)
 
   import java.io.{OutputStream, InputStream}
-  import com.esotericsoftware.kryo.Kryo
+  import org.apache.hive.com.esotericsoftware.kryo.Kryo
   import org.apache.spark.util.Utils._
   import org.apache.hadoop.hive.ql.exec.Utilities
   import org.apache.hadoop.hive.ql.exec.UDF
