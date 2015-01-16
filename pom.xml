@@ -1752,5 +1752,31 @@
     <profile>
       <id>parquet-provided</id>
     </profile>
+
+    <profile>
+      <id>cdh.build</id>
+      <activation>
+        <property>
+          <name>cdh.build</name>
+          <value>true</value>
+        </property>
+      </activation>
+      <build>
+        <pluginManagement>
+          <plugins>
+            <plugin>
+              <groupId>net.alchim31.maven</groupId>
+              <artifactId>scala-maven-plugin</artifactId>
+              <version>3.2.0</version>
+              <configuration>
+                <scalaVersion>${scala.version}</scalaVersion>
+                <recompileMode>all</recompileMode>
+                <fork>true</fork>
+              </configuration>
+            </plugin>
+          </plugins>
+        </pluginManagement>
+      </build>
+    </profile>
   </profiles>
 </project>
