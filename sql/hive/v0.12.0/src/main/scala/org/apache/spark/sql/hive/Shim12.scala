@@ -18,18 +18,20 @@
 package org.apache.spark.sql.hive
 
 import java.net.URI
-import java.util.{ArrayList => JArrayList, Properties}
+import java.util.{ArrayList => JArrayList, Map => JMap, Properties}
 
 import scala.collection.JavaConversions._
 import scala.language.implicitConversions
 
-import org.apache.hadoop.{io => hadoopIo}
+import com.google.common.base.Preconditions
 import org.apache.hadoop.conf.Configuration
+import org.apache.hadoop.{io => hadoopIo}
 import org.apache.hadoop.fs.Path
 import org.apache.hadoop.hive.common.`type`.HiveDecimal
 import org.apache.hadoop.hive.conf.HiveConf
 import org.apache.hadoop.hive.ql.Context
 import org.apache.hadoop.hive.ql.metadata.{Hive, Partition, Table}
+import org.apache.hadoop.hive.ql.parse.{ASTNode, QB, SemanticAnalyzer}
 import org.apache.hadoop.hive.ql.plan.{CreateTableDesc, FileSinkDesc, TableDesc}
 import org.apache.hadoop.hive.ql.processors._
 import org.apache.hadoop.hive.ql.stats.StatsSetupConst
@@ -249,6 +251,68 @@ private[hive] object HiveShim {
   }
 
   def setTblNullFormat(crtTbl: CreateTableDesc, tbl: Table) = {}
+
+  def loadDynamicPartitions(
+      db: Hive,
+      loadPath: Path,
+      tableName: String,
+      partSpec: JMap[String, String],
+      replace: Boolean,
+      numDP: Int,
+      holdDDLTime: Boolean,
+      listBucketingEnabled: Boolean,
+      isAcid: Boolean): Unit = {
+    Preconditions.checkArgument(!isAcid)
+    db.loadDynamicPartitions(loadPath, tableName, partSpec, replace, numDP, holdDDLTime,
+      listBucketingEnabled);
+  }
+
+  def loadPartition(
+      db: Hive,
+      loadPath: Path,
+      tblName: String,
+      partSpec: JMap[String, String],
+      replace: Boolean,
+      holdDDLTime: Boolean,
+      inheritTableSpecs: Boolean,
+      isSkewedStoreAsSubdir: Boolean,
+      isSrcLocal: Boolean,
+      isAcid: Boolean): Unit = {
+    Preconditions.checkArgument(!isSrcLocal)
+    Preconditions.checkArgument(!isAcid)
+    db.loadPartition(loadPath, tblName, partSpec, replace, holdDDLTime,
+      inheritTableSpecs, isSkewedStoreAsSubdir)
+  }
+
+  def loadTable(
+      db: Hive,
+      loadPath: Path,
+      tableName: String,
+      replace: Boolean,
+      holdDDLTime: Boolean,
+      isSrcLocal: Boolean,
+      isSkewedStoreAsSubdir: Boolean,
+      isAcid: Boolean): Unit = {
+    Preconditions.checkArgument(!isSrcLocal)
+    Preconditions.checkArgument(!isSkewedStoreAsSubdir)
+    Preconditions.checkArgument(!isAcid)
+    db.loadTable(loadPath, tableName, replace, holdDDLTime)
+  }
+
+  def dropIndex(
+      db: Hive,
+      dbName: String,
+      tableName: String,
+      indexName: String,
+      throwException: Boolean,
+      deleteData: Boolean): Boolean = {
+    db.dropIndex(dbName, tableName, indexName, deleteData)
+  }
+
+  def getDefaultVal(confVar: HiveConf.ConfVars): String = {
+    confVar.defaultVal
+  }
+
 }
 
 private[hive] class ShimFileSinkDesc(
@@ -256,4 +320,17 @@ private[hive] class ShimFileSinkDesc(
     var tableInfo: TableDesc,
     var compressed: Boolean)
   extends FileSinkDesc(dir, tableInfo, compressed) {
+}
+
+class SparkSemanticAnalyzer(conf: HiveConf) extends SemanticAnalyzer(conf) {
+
+  override def analyzeInternal(ast: ASTNode): Unit = {
+    // A hack to intercept the SemanticAnalyzer.analyzeInternal,
+    // to ignore the SELECT clause of the CTAS.
+    val method = classOf[SemanticAnalyzer].getDeclaredMethod(
+      "analyzeCreateTable", classOf[ASTNode], classOf[QB])
+    method.setAccessible(true)
+    method.invoke(this, ast, getQB())
+  }
+
 }

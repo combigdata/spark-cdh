@@ -181,11 +181,6 @@
     </profile>
     <profile>
       <id>hive-thriftserver</id>
-      <activation>
-        <property>
-          <name>cdh.build</name>
-        </property>
-      </activation>
       <dependencies>
         <dependency>
           <groupId>org.apache.spark</groupId>

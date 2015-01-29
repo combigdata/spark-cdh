@@ -207,31 +207,40 @@ case class InsertIntoHiveTable(
       // TODO: Correctly set isSkewedStoreAsSubdir.
       val isSkewedStoreAsSubdir = false
       if (numDynamicPartitions > 0) {
-        db.loadDynamicPartitions(
+        HiveShim.loadDynamicPartitions(
+          db,
           outputPath,
           qualifiedTableName,
           orderedPartitionSpec,
           overwrite,
           numDynamicPartitions,
           holdDDLTime,
-          isSkewedStoreAsSubdir
+          isSkewedStoreAsSubdir,
+          false
         )
       } else {
-        db.loadPartition(
+        HiveShim.loadPartition(
+          db,
           outputPath,
           qualifiedTableName,
           orderedPartitionSpec,
           overwrite,
           holdDDLTime,
           inheritTableSpecs,
-          isSkewedStoreAsSubdir)
+          isSkewedStoreAsSubdir,
+          false,
+          false)
       }
     } else {
-      db.loadTable(
+      HiveShim.loadTable(
+        db,
         outputPath,
         qualifiedTableName,
         overwrite,
-        holdDDLTime)
+        holdDDLTime,
+        false,
+        false,
+        false)
     }
 
     // Invalidate the cache.

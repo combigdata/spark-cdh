@@ -519,7 +519,7 @@ private[hive] class HiveMetastoreCatalog(hive: HiveContext) extends Catalog with
    */
   object CreateTables extends Rule[LogicalPlan] {
     import org.apache.hadoop.hive.ql.Context
-    import org.apache.hadoop.hive.ql.parse.{ASTNode, QB, SemanticAnalyzer}
+    import org.apache.hadoop.hive.ql.parse.ASTNode
 
     def apply(plan: LogicalPlan): LogicalPlan = plan transform {
       // Wait until children are resolved.
@@ -535,17 +535,7 @@ private[hive] class HiveMetastoreCatalog(hive: HiveContext) extends Catalog with
         val desc: Option[CreateTableDesc] = if (tableExists(Seq(databaseName, tblName))) {
           None
         } else {
-          val sa = new SemanticAnalyzer(hive.hiveconf) {
-            override def analyzeInternal(ast: ASTNode) {
-              // A hack to intercept the SemanticAnalyzer.analyzeInternal,
-              // to ignore the SELECT clause of the CTAS
-              val method = classOf[SemanticAnalyzer].getDeclaredMethod(
-                "analyzeCreateTable", classOf[ASTNode], classOf[QB])
-              method.setAccessible(true)
-              method.invoke(this, ast, this.getQB)
-            }
-          }
-
+          val sa = new SparkSemanticAnalyzer(hive.hiveconf)
           sa.analyze(extra, new Context(hive.hiveconf))
           Some(sa.getQB().getTableDesc)
         }

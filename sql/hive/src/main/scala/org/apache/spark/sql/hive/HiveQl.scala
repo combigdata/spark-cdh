@@ -88,6 +88,7 @@ private[hive] object HiveQl {
     "TOK_ALTERDATABASE_OWNER",
     "TOK_ALTERINDEX_PROPERTIES",
     "TOK_ALTERINDEX_REBUILD",
+    "TOK_ALTERTABLE",
     "TOK_ALTERTABLE_ADDCOLS",
     "TOK_ALTERTABLE_ADDPARTS",
     "TOK_ALTERTABLE_ALTERPARTS",
@@ -792,7 +793,7 @@ https://cwiki.apache.org/confluence/display/Hive/Enhanced+Aggregation%2C+Cube%2C
     case Token("TOK_UNION", left :: right :: Nil) => Union(nodeToPlan(left), nodeToPlan(right))
 
     case a: ASTNode =>
-      throw new NotImplementedError(s"No parse rules for:\n ${dumpTree(a).toString} ")
+      throw new NotImplementedError(s"No parse rules for $node:\n ${dumpTree(a).toString} ")
   }
 
   val allJoinTokens = "(TOK_.*JOIN)".r

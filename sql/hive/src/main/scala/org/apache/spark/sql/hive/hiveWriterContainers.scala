@@ -179,7 +179,7 @@ private[spark] class SparkHiveDynamicPartitionWriterContainer(
   import SparkHiveDynamicPartitionWriterContainer._
 
   private val defaultPartName = jobConf.get(
-    ConfVars.DEFAULTPARTITIONNAME.varname, ConfVars.DEFAULTPARTITIONNAME.defaultVal)
+    ConfVars.DEFAULTPARTITIONNAME.varname, HiveShim.getDefaultVal(ConfVars.DEFAULTPARTITIONNAME))
 
   @transient private var writers: mutable.HashMap[String, FileSinkOperator.RecordWriter] = _
 

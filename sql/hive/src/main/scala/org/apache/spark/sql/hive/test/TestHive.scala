@@ -405,7 +405,7 @@ class TestHiveContext(sc: SparkContext) extends HiveContext(sc) {
         val table = catalog.client.getTable("default", t)
 
         catalog.client.getIndexes("default", t, 255).foreach { index =>
-          catalog.client.dropIndex("default", t, index.getIndexName, true)
+          HiveShim.dropIndex(catalog.client, "default", t, index.getIndexName, true, true)
         }
 
         if (!table.isIndexTable) {
