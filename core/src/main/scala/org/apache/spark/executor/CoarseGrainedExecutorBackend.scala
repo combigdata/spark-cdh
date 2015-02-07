@@ -23,7 +23,7 @@ import java.nio.ByteBuffer
 import scala.collection.mutable
 import scala.concurrent.Await
 
-import akka.actor.{Actor, ActorSelection, Props}
+import akka.actor.{Actor, ActorRef, ActorSelection, Props}
 import akka.pattern.Patterns
 import akka.remote.{RemotingLifecycleEvent, DisassociatedEvent}
 
@@ -93,7 +93,18 @@ private[spark] class CoarseGrainedExecutorBackend(
       }
 
     case x: DisassociatedEvent =>
-      if (x.remoteAddress == driver.anchorPath.address) {
+      val isDriver =
+        try {
+          val method = driver.getClass().getMethod("anchor")
+          val driverAddr = method.invoke(driver).asInstanceOf[ActorRef].path.address
+          x.remoteAddress == driverAddr
+        } catch {
+          // Just assume the worst if an error occurs.
+          case e: Exception =>
+            logWarning("Error checking remote address.", e)
+            true
+        }
+      if (isDriver) {
         logError(s"Driver $x disassociated! Shutting down.")
         System.exit(1)
       } else {

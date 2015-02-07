@@ -69,7 +69,7 @@ class CachedTableSuite extends QueryTest {
     checkAnswer(
       sql("SELECT * FROM src s"),
       preCacheResults)
-    
+
     uncacheTable("src")
     assertCached(sql("SELECT * FROM src"), 0)
   }
@@ -165,7 +165,7 @@ class CachedTableSuite extends QueryTest {
     assert(!isMaterialized(rddId), "Uncached in-memory table should have been unpersisted")
   }
 
-  test("CACHE TABLE with Hive UDF") {
+  ignore("CACHE TABLE with Hive UDF") {
     sql("CACHE TABLE udfTest AS SELECT * FROM src WHERE floor(key) = 1")
     assertCached(table("udfTest"))
     uncacheTable("udfTest")

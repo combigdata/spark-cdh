@@ -382,7 +382,7 @@ class SQLQuerySuite extends QueryTest {
     dropTempTable("testTable")
   }
 
-  test("SPARK-4296 Grouping field with Hive UDF as sub expression") {
+  ignore("SPARK-4296 Grouping field with Hive UDF as sub expression") {
     val rdd = sparkContext.makeRDD( """{"a": "str", "b":"1", "c":"1970-01-01 00:00:00"}""" :: Nil)
     jsonRDD(rdd).registerTempTable("data")
     checkAnswer(

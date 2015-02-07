@@ -270,12 +270,11 @@ private[sql] case class ParquetRelation2(
 
       dataStatuses = leaves.filterNot(f => isSummaryFile(f.getPath))
       metadataStatuses = leaves.filter(_.getPath.getName == ParquetFileWriter.PARQUET_METADATA_FILE)
-      commonMetadataStatuses =
-        leaves.filter(_.getPath.getName == ParquetFileWriter.PARQUET_COMMON_METADATA_FILE)
+      commonMetadataStatuses = Nil.toArray
 
       footers = (dataStatuses ++ metadataStatuses ++ commonMetadataStatuses).par.map { f =>
         val parquetMetadata = ParquetFileReader.readFooter(
-          sparkContext.hadoopConfiguration, f, ParquetMetadataConverter.NO_FILTER)
+          sparkContext.hadoopConfiguration, f)
         f -> new Footer(f.getPath, parquetMetadata)
       }.seq.toMap
 
@@ -384,8 +383,7 @@ private[sql] case class ParquetRelation2(
   override def schema = metadataCache.schema
 
   private def isSummaryFile(file: Path): Boolean = {
-    file.getName == ParquetFileWriter.PARQUET_COMMON_METADATA_FILE ||
-      file.getName == ParquetFileWriter.PARQUET_METADATA_FILE
+    file.getName == ParquetFileWriter.PARQUET_METADATA_FILE
   }
 
   // TODO Should calculate per scan size

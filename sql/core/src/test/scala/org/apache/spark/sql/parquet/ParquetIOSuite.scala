@@ -280,7 +280,6 @@ class ParquetIOSuiteBase extends QueryTest with ParquetTest {
       val attributes = ScalaReflection.attributesFor[(Int, String)]
       ParquetTypesConverter.writeMetaData(attributes, path, configuration)
 
-      assert(fs.exists(new Path(path, ParquetFileWriter.PARQUET_COMMON_METADATA_FILE)))
       assert(fs.exists(new Path(path, ParquetFileWriter.PARQUET_METADATA_FILE)))
 
       val metaData = ParquetTypesConverter.readMetaData(path, Some(configuration))
