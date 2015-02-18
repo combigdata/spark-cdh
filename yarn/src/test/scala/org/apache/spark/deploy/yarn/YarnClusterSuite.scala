@@ -164,11 +164,11 @@ class YarnClusterSuite extends FunSuite with BeforeAndAfterAll with Matchers wit
     checkResult(result)
   }
 
-  test("user class path first in client mode") {
+  ignore("user class path first in client mode") {
     testUseClassPathFirst(true)
   }
 
-  test("user class path first in cluster mode") {
+  ignore("user class path first in cluster mode") {
     testUseClassPathFirst(false)
   }
 
