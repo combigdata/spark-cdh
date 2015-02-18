@@ -98,11 +98,11 @@ class YarnClusterSuite extends BaseYarnClusterSuite {
     testPySpark(false)
   }
 
-  test("user class path first in client mode") {
+  ignore("user class path first in client mode") {
     testUseClassPathFirst(true)
   }
 
-  test("user class path first in cluster mode") {
+  ignore("user class path first in cluster mode") {
     testUseClassPathFirst(false)
   }
 
