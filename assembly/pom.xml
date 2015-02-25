@@ -29,13 +29,13 @@
   <artifactId>spark-assembly_2.10</artifactId>
   <name>Spark Project Assembly</name>
   <url>http://spark.apache.org/</url>
-  <packaging>pom</packaging>
+  <packaging>jar</packaging>
 
   <properties>
     <sbt.project.name>assembly</sbt.project.name>
-    <spark.jar.dir>scala-${scala.binary.version}</spark.jar.dir>
+    <spark.jar.dir>${project.build.directory}/scala-${scala.binary.version}</spark.jar.dir>
     <spark.jar.basename>spark-assembly-${project.version}-hadoop${hadoop.version}.jar</spark.jar.basename>
-    <spark.jar>${project.build.directory}/${spark.jar.dir}/${spark.jar.basename}</spark.jar>
+    <spark.jar>${spark.jar.dir}/${spark.jar.basename}</spark.jar>
   </properties>
 
   <dependencies>
@@ -82,44 +82,22 @@
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-deploy-plugin</artifactId>
         <configuration>
-          <skip>true</skip>
+          <skip>false</skip>
         </configuration>
       </plugin>
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-install-plugin</artifactId>
         <configuration>
-          <skip>true</skip>
+          <skip>false</skip>
         </configuration>
       </plugin>
-        <!-- zip pyspark archives to run python application on yarn mode -->
-        <plugin>
-          <groupId>org.apache.maven.plugins</groupId>
-            <artifactId>maven-antrun-plugin</artifactId>
-            <executions>
-              <execution>
-                <phase>package</phase>
-                  <goals>
-                    <goal>run</goal>
-                  </goals>
-              </execution>
-            </executions>
-            <configuration>
-              <target>
-                <delete dir="${basedir}/../python/lib/pyspark.zip"/>
-                <zip destfile="${basedir}/../python/lib/pyspark.zip">
-                  <fileset dir="${basedir}/../python/" includes="pyspark/**/*"/>
-                </zip>
-              </target>
-            </configuration>
-        </plugin>
       <!-- Use the shade plugin to create a big JAR with all the dependencies -->
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-shade-plugin</artifactId>
         <configuration>
           <shadedArtifactAttached>false</shadedArtifactAttached>
-          <outputFile>${spark.jar}</outputFile>
           <artifactSet>
             <includes>
               <include>*:*</include>
@@ -158,6 +136,43 @@
                 <transformer implementation="org.apache.maven.plugins.shade.resource.ApacheLicenseResourceTransformer"/>
                 <transformer implementation="org.apache.maven.plugins.shade.resource.ApacheNoticeResourceTransformer"/>
               </transformers>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-antrun-plugin</artifactId>
+        <executions>
+          <!-- zip pyspark archives to run python application on yarn mode -->
+          <execution>
+            <id>package-pyspark</id>
+            <phase>package</phase>
+              <goals>
+                <goal>run</goal>
+              </goals>
+              <configuration>
+                <target>
+                  <delete dir="${basedir}/../python/lib/pyspark.zip"/>
+                  <zip destfile="${basedir}/../python/lib/pyspark.zip">
+                    <fileset dir="${basedir}/../python/" includes="pyspark/**/*"/>
+                  </zip>
+                </target>
+              </configuration>
+          </execution>
+          <!-- copy the assembly to the "scala-2.10" directory since lots of places expect that. -->
+          <execution>
+            <id>copy-assembly</id>
+            <phase>package</phase>
+            <goals>
+              <goal>run</goal>
+            </goals>
+            <configuration>
+              <target name="rename assembly jar">
+                <mkdir dir="${spark.jar.dir}" />
+                <copy file="${project.build.directory}/${project.artifactId}-${project.version}.jar"
+                  tofile="${spark.jar}" overwrite="true" />
+              </target>
             </configuration>
           </execution>
         </executions>
