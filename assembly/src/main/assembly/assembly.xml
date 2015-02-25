@@ -57,7 +57,7 @@
     </fileSet>
     <fileSet>
       <directory>
-        ${project.parent.basedir}/assembly/target/${spark.jar.dir}
+        ${spark.jar.dir}
       </directory>
       <outputDirectory>/</outputDirectory>
       <includes>
@@ -72,7 +72,7 @@
         <include>org.apache.spark:*:jar</include>
       </includes>
       <excludes>
-        <exclude>org.apache.spark:spark-assembly:jar</exclude>
+        <exclude>org.apache.spark:spark-assembly_${scala.binary.version}:jar</exclude>
       </excludes>
     </dependencySet>
     <dependencySet>
