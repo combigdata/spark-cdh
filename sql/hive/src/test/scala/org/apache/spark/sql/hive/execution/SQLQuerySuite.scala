@@ -55,7 +55,7 @@ class SQLQuerySuite extends QueryTest {
     )
   }
 
-  test("CTAS without serde") {
+  ignore("CTAS without serde") {
     def checkRelation(tableName: String, isDataSourceParquet: Boolean): Unit = {
       val relation = EliminateSubQueries(catalog.lookupRelation(Seq(tableName)))
       relation match {
@@ -122,7 +122,7 @@ class SQLQuerySuite extends QueryTest {
     setConf("spark.sql.hive.convertCTAS", originalConf)
   }
 
-  test("CTAS with serde") {
+  ignore("CTAS with serde") {
     sql("CREATE TABLE ctas1 AS SELECT key k, value FROM src ORDER BY k, value").collect()
     sql(
       """CREATE TABLE ctas2
