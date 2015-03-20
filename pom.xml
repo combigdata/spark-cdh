@@ -154,7 +154,7 @@
     <jline.groupid>org.scala-lang</jline.groupid>
     <jodd.version>3.6.3</jodd.version>
     <codehaus.jackson.version>${cdh.jackson.version}</codehaus.jackson.version>
-    <fasterxml.jackson.version>2.4.4</fasterxml.jackson.version>
+    <fasterxml.jackson.version>2.2.3</fasterxml.jackson.version>
     <snappy.version>${cdh.hadoop-snappy.version}</snappy.version>
 
     <!--
@@ -601,6 +601,7 @@
         <groupId>com.fasterxml.jackson.core</groupId>
         <artifactId>jackson-databind</artifactId>
         <version>${fasterxml.jackson.version}</version>
+        <scope>${hadoop.deps.scope}</scope>
       </dependency>
       <!-- Guava is excluded because of SPARK-6149.  The Guava version referenced in this module is
            15.0, which causes runtime incompatibility issues. -->
@@ -608,6 +609,7 @@
         <groupId>com.fasterxml.jackson.module</groupId>
         <artifactId>jackson-module-scala_2.10</artifactId>
         <version>${fasterxml.jackson.version}</version>
+        <scope>${hadoop.deps.scope}</scope>
         <exclusions>
           <exclusion>
             <groupId>com.google.guava</groupId>
