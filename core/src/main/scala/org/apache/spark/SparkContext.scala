@@ -1377,6 +1377,7 @@ class SparkContext(config: SparkConf) extends Logging with ExecutorAllocationCli
         metadataCleaner.cancel()
         env.actorSystem.stop(heartbeatReceiver)
         cleaner.foreach(_.stop())
+        executorAllocationManager.foreach(_.stop())
         dagScheduler.stop()
         dagScheduler = null
         progressBar.foreach(_.stop())
