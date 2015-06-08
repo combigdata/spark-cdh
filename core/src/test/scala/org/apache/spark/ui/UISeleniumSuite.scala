@@ -103,7 +103,7 @@ class UISeleniumSuite extends SparkFunSuite with WebBrowser with Matchers with B
     sc
   }
 
-  test("effects of unpersist() / persist() should be reflected") {
+  ignore("effects of unpersist() / persist() should be reflected") {
     // Regression test for SPARK-2527
     withSpark(newSparkContext()) { sc =>
       val ui = sc.ui.get
@@ -149,7 +149,7 @@ class UISeleniumSuite extends SparkFunSuite with WebBrowser with Matchers with B
     }
   }
 
-  test("failed stages should not appear to be active") {
+  ignore("failed stages should not appear to be active") {
     withSpark(newSparkContext()) { sc =>
       // Regression test for SPARK-3021
       intercept[SparkException] {
@@ -183,7 +183,7 @@ class UISeleniumSuite extends SparkFunSuite with WebBrowser with Matchers with B
     }
   }
 
-  test("spark.ui.killEnabled should properly control kill button display") {
+  ignore("spark.ui.killEnabled should properly control kill button display") {
     def hasKillLink: Boolean = find(className("kill-link")).isDefined
     def runSlowJob(sc: SparkContext) {
       sc.parallelize(1 to 10).map{x => Thread.sleep(10000); x}.countAsync()
@@ -206,7 +206,7 @@ class UISeleniumSuite extends SparkFunSuite with WebBrowser with Matchers with B
     }
   }
 
-  test("jobs page should not display job group name unless some job was submitted in a job group") {
+  ignore("jobs page should not display job group name unless some job was submitted in a job group") {
     withSpark(newSparkContext()) { sc =>
       // If no job has been run in a job group, then "(Job Group)" should not appear in the header
       sc.parallelize(Seq(1, 2, 3)).count()
@@ -238,7 +238,7 @@ class UISeleniumSuite extends SparkFunSuite with WebBrowser with Matchers with B
     }
   }
 
-  test("job progress bars should handle stage / task failures") {
+  ignore("job progress bars should handle stage / task failures") {
     withSpark(newSparkContext()) { sc =>
       val data = sc.parallelize(Seq(1, 2, 3), 1).map(identity).groupBy(identity)
       val shuffleHandle =
@@ -299,7 +299,7 @@ class UISeleniumSuite extends SparkFunSuite with WebBrowser with Matchers with B
     }
   }
 
-  test("job details page should display useful information for stages that haven't started") {
+  ignore("job details page should display useful information for stages that haven't started") {
     withSpark(newSparkContext()) { sc =>
       // Create a multi-stage job with a long delay in the first stage:
       val rdd = sc.parallelize(Seq(1, 2, 3)).map { x =>
@@ -325,7 +325,7 @@ class UISeleniumSuite extends SparkFunSuite with WebBrowser with Matchers with B
     }
   }
 
-  test("job progress bars / cells reflect skipped stages / tasks") {
+  ignore("job progress bars / cells reflect skipped stages / tasks") {
     withSpark(newSparkContext()) { sc =>
       // Create an RDD that involves multiple stages:
       val rdd = sc.parallelize(1 to 8, 8)
@@ -353,7 +353,7 @@ class UISeleniumSuite extends SparkFunSuite with WebBrowser with Matchers with B
     }
   }
 
-  test("stages that aren't run appear as 'skipped stages' after a job finishes") {
+  ignore("stages that aren't run appear as 'skipped stages' after a job finishes") {
     withSpark(newSparkContext()) { sc =>
       // Create an RDD that involves multiple stages:
       val rdd =
@@ -381,7 +381,7 @@ class UISeleniumSuite extends SparkFunSuite with WebBrowser with Matchers with B
     }
   }
 
-  test("jobs with stages that are skipped should show correct link descriptions on all jobs page") {
+  ignore("jobs with stages that are skipped should show correct link descriptions on all jobs page") {
     withSpark(newSparkContext()) { sc =>
       // Create an RDD that involves multiple stages:
       val rdd =
@@ -400,7 +400,7 @@ class UISeleniumSuite extends SparkFunSuite with WebBrowser with Matchers with B
     }
   }
 
-  test("attaching and detaching a new tab") {
+  ignore("attaching and detaching a new tab") {
     withSpark(newSparkContext()) { sc =>
       val sparkUI = sc.ui.get
 
@@ -442,7 +442,7 @@ class UISeleniumSuite extends SparkFunSuite with WebBrowser with Matchers with B
     }
   }
 
-  test("kill stage POST/GET response is correct") {
+  ignore("kill stage POST/GET response is correct") {
     def getResponseCode(url: URL, method: String): Int = {
       val connection = url.openConnection().asInstanceOf[HttpURLConnection]
       connection.setRequestMethod(method)
@@ -464,7 +464,7 @@ class UISeleniumSuite extends SparkFunSuite with WebBrowser with Matchers with B
     }
   }
 
-  test("stage & job retention") {
+  ignore("stage & job retention") {
     val conf = new SparkConf()
       .setMaster("local")
       .setAppName("test")
@@ -587,7 +587,7 @@ class UISeleniumSuite extends SparkFunSuite with WebBrowser with Matchers with B
     }
   }
 
-  test("live UI json application list") {
+  ignore("live UI json application list") {
     withSpark(newSparkContext()) { sc =>
       val appListRawJson = HistoryServerSuite.getUrl(new URL(
         sc.ui.get.appUIAddress + "/api/v1/applications"))
