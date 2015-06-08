@@ -115,7 +115,7 @@ private[spark] class AkkaRpcEnv private[akka] (
             endpoint.onDisconnected(akkaAddressToRpcAddress(remoteAddress))
           }
 
-        case AssociationErrorEvent(cause, localAddress, remoteAddress, inbound, _) =>
+        case AssociationErrorEvent(cause, localAddress, remoteAddress, inbound) =>
           safelyCall(endpoint) {
             endpoint.onNetworkError(cause, akkaAddressToRpcAddress(remoteAddress))
           }
