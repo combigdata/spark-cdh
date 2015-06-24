@@ -237,14 +237,18 @@ case class InsertIntoHiveTable(
           overwrite,
           holdDDLTime,
           inheritTableSpecs,
-          isSkewedStoreAsSubdir)
+          isSkewedStoreAsSubdir,
+          false // HIVE-6024 added another arg, since this is a non-public api we just patch in cdh
+        )
       }
     } else {
       db.loadTable(
         outputPath,
         qualifiedTableName,
         overwrite,
-        holdDDLTime)
+        holdDDLTime,
+        false // HIVE-6024 added another arg, since this is a non-public api we just patch in cdh
+      )
     }
 
     // Invalidate the cache.
