@@ -20,10 +20,10 @@ package org.apache.spark.sql.execution.datasources.parquet
 import scala.collection.JavaConversions._
 
 import org.apache.hadoop.conf.Configuration
-import org.apache.parquet.schema.OriginalType._
-import org.apache.parquet.schema.PrimitiveType.PrimitiveTypeName._
-import org.apache.parquet.schema.Type.Repetition._
-import org.apache.parquet.schema._
+import parquet.schema.OriginalType._
+import parquet.schema.PrimitiveType.PrimitiveTypeName._
+import parquet.schema.Type.Repetition._
+import parquet.schema._
 
 import org.apache.spark.sql.execution.datasources.parquet.CatalystSchemaConverter.{MAX_PRECISION_FOR_INT32, MAX_PRECISION_FOR_INT64, maxPrecisionForBytes}
 import org.apache.spark.sql.types._

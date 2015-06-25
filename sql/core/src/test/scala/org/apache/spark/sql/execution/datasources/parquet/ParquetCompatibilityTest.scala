@@ -20,8 +20,8 @@ package org.apache.spark.sql.execution.datasources.parquet
 import scala.collection.JavaConversions._
 
 import org.apache.hadoop.fs.{Path, PathFilter}
-import org.apache.parquet.hadoop.ParquetFileReader
-import org.apache.parquet.schema.MessageType
+import parquet.hadoop.ParquetFileReader
+import parquet.schema.MessageType
 
 import org.apache.spark.sql.QueryTest
 

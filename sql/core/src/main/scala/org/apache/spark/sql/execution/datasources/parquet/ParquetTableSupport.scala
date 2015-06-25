@@ -22,10 +22,10 @@ import java.nio.{ByteBuffer, ByteOrder}
 import java.util.{HashMap => JHashMap}
 
 import org.apache.hadoop.conf.Configuration
-import org.apache.parquet.column.ParquetProperties
-import org.apache.parquet.hadoop.ParquetOutputFormat
-import org.apache.parquet.hadoop.api.WriteSupport
-import org.apache.parquet.io.api._
+import parquet.column.ParquetProperties
+import parquet.hadoop.ParquetOutputFormat
+import parquet.hadoop.api.WriteSupport
+import parquet.io.api._
 
 import org.apache.spark.Logging
 import org.apache.spark.sql.catalyst.InternalRow

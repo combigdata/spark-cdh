@@ -20,7 +20,7 @@ package org.apache.spark.sql.execution.datasources.parquet
 import scala.reflect.ClassTag
 import scala.reflect.runtime.universe.TypeTag
 
-import org.apache.parquet.schema.MessageTypeParser
+import parquet.schema.MessageTypeParser
 
 import org.apache.spark.sql.catalyst.ScalaReflection
 import org.apache.spark.sql.test.SharedSQLContext

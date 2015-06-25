@@ -22,11 +22,11 @@ import java.nio.ByteBuffer
 
 import com.google.common.io.BaseEncoding
 import org.apache.hadoop.conf.Configuration
-import org.apache.parquet.filter2.predicate.FilterApi._
-import org.apache.parquet.filter2.predicate._
-import org.apache.parquet.io.api.Binary
-import org.apache.parquet.schema.OriginalType
-import org.apache.parquet.schema.PrimitiveType.PrimitiveTypeName
+import parquet.filter2.predicate.FilterApi._
+import parquet.filter2.predicate._
+import parquet.io.api.Binary
+import parquet.schema.OriginalType
+import parquet.schema.PrimitiveType.PrimitiveTypeName
 
 import org.apache.spark.SparkEnv
 import org.apache.spark.sql.catalyst.expressions._

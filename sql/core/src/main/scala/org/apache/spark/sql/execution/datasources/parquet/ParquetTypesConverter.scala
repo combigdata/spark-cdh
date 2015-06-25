@@ -25,11 +25,11 @@ import scala.util.Try
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.{FileSystem, Path}
 import org.apache.hadoop.mapreduce.Job
-import org.apache.parquet.format.converter.ParquetMetadataConverter
-import org.apache.parquet.hadoop.metadata.{FileMetaData, ParquetMetadata}
-import org.apache.parquet.hadoop.util.ContextUtil
-import org.apache.parquet.hadoop.{Footer, ParquetFileReader, ParquetFileWriter}
-import org.apache.parquet.schema.MessageType
+import parquet.format.converter.ParquetMetadataConverter
+import parquet.hadoop.metadata.{FileMetaData, ParquetMetadata}
+import parquet.hadoop.util.ContextUtil
+import parquet.hadoop.{Footer, ParquetFileReader, ParquetFileWriter}
+import parquet.schema.MessageType
 
 import org.apache.spark.Logging
 import org.apache.spark.sql.catalyst.expressions.Attribute
