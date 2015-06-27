@@ -738,6 +738,21 @@ class DAGSchedulerSuite extends TestKit(ActorSystem("DAGSchedulerSuite")) with F
     assert(scheduler.sc.dagScheduler === null)
   }
 
+  test("getPartitions exceptions should not crash DAGScheduler and SparkContext (SPARK-8606)") {
+    val e1 = intercept[DAGSchedulerSuiteDummyException] {
+      val rdd = new MyRDD(sc, 2, Nil) {
+        override def getPartitions: Array[Partition] = {
+          throw new DAGSchedulerSuiteDummyException
+        }
+      }
+      rdd.reduceByKey(_ + _, 1).count()
+    }
+
+    // Make sure we can still run local commands as well as cluster commands.
+    assert(sc.parallelize(1 to 10, 2).count() === 10)
+    assert(sc.parallelize(1 to 10, 2).first() === 1)
+  }
+
   test("accumulator not calculated for resubmitted result stage") {
     //just for register
     val accum = new Accumulator[Int](0, SparkContext.IntAccumulatorParam)
