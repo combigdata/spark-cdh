@@ -134,7 +134,7 @@ class MasterSuite extends SparkFunSuite
     CustomRecoveryModeFactory.instantiationAttempts should be > instantiationAttempts
   }
 
-  test("master/worker web ui available") {
+  ignore("master/worker web ui available") {
     implicit val formats = org.json4s.DefaultFormats
     val conf = new SparkConf()
     val localCluster = new LocalSparkCluster(2, 2, 512, conf)
