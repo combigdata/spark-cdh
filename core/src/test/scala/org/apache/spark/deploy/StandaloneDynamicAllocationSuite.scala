@@ -87,7 +87,7 @@ class StandaloneDynamicAllocationSuite
     }
   }
 
-  test("dynamic allocation default behavior") {
+  ignore("dynamic allocation default behavior") {
     sc = new SparkContext(appConf)
     val appId = sc.applicationId
     eventually(timeout(10.seconds), interval(10.millis)) {
@@ -134,7 +134,7 @@ class StandaloneDynamicAllocationSuite
     assert(apps.head.getExecutorLimit === 1000)
   }
 
-  test("dynamic allocation with max cores <= cores per worker") {
+  ignore("dynamic allocation with max cores <= cores per worker") {
     sc = new SparkContext(appConf.set("spark.cores.max", "8"))
     val appId = sc.applicationId
     eventually(timeout(10.seconds), interval(10.millis)) {
@@ -189,7 +189,7 @@ class StandaloneDynamicAllocationSuite
     assert(apps.head.getExecutorLimit === 1000)
   }
 
-  test("dynamic allocation with max cores > cores per worker") {
+  ignore("dynamic allocation with max cores > cores per worker") {
     sc = new SparkContext(appConf.set("spark.cores.max", "16"))
     val appId = sc.applicationId
     eventually(timeout(10.seconds), interval(10.millis)) {
@@ -242,7 +242,7 @@ class StandaloneDynamicAllocationSuite
     assert(apps.head.getExecutorLimit === 1000)
   }
 
-  test("dynamic allocation with cores per executor") {
+  ignore("dynamic allocation with cores per executor") {
     sc = new SparkContext(appConf.set("spark.executor.cores", "2"))
     val appId = sc.applicationId
     eventually(timeout(10.seconds), interval(10.millis)) {
@@ -294,7 +294,7 @@ class StandaloneDynamicAllocationSuite
     assert(apps.head.getExecutorLimit === 1000)
   }
 
-  test("dynamic allocation with cores per executor AND max cores") {
+  ignore("dynamic allocation with cores per executor AND max cores") {
     sc = new SparkContext(appConf
       .set("spark.executor.cores", "2")
       .set("spark.cores.max", "8"))
@@ -353,7 +353,7 @@ class StandaloneDynamicAllocationSuite
     assert(apps.head.getExecutorLimit === 1000)
   }
 
-  test("kill the same executor twice (SPARK-9795)") {
+  ignore("kill the same executor twice (SPARK-9795)") {
     sc = new SparkContext(appConf)
     val appId = sc.applicationId
     sc.requestExecutors(2)
