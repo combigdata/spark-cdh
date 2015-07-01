@@ -141,11 +141,11 @@ class BroadcastSuite extends SparkFunSuite with LocalSparkContext {
     testUnpersistHttpBroadcast(distributed = false, removeFromDriver = true)
   }
 
-  test("Unpersisting HttpBroadcast on executors only in distributed mode") {
+  ignore("Unpersisting HttpBroadcast on executors only in distributed mode") {
     testUnpersistHttpBroadcast(distributed = true, removeFromDriver = false)
   }
 
-  test("Unpersisting HttpBroadcast on executors and driver in distributed mode") {
+  ignore("Unpersisting HttpBroadcast on executors and driver in distributed mode") {
     testUnpersistHttpBroadcast(distributed = true, removeFromDriver = true)
   }
 
@@ -157,11 +157,11 @@ class BroadcastSuite extends SparkFunSuite with LocalSparkContext {
     testUnpersistTorrentBroadcast(distributed = false, removeFromDriver = true)
   }
 
-  test("Unpersisting TorrentBroadcast on executors only in distributed mode") {
+  ignore("Unpersisting TorrentBroadcast on executors only in distributed mode") {
     testUnpersistTorrentBroadcast(distributed = true, removeFromDriver = false)
   }
 
-  test("Unpersisting TorrentBroadcast on executors and driver in distributed mode") {
+  ignore("Unpersisting TorrentBroadcast on executors and driver in distributed mode") {
     testUnpersistTorrentBroadcast(distributed = true, removeFromDriver = true)
   }
 
