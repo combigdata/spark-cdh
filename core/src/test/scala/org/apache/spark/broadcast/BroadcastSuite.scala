@@ -113,11 +113,11 @@ class BroadcastSuite extends SparkFunSuite with LocalSparkContext with Encryptio
     testUnpersistTorrentBroadcast(distributed = false, removeFromDriver = true)
   }
 
-  test("Unpersisting TorrentBroadcast on executors only in distributed mode") {
+  ignore("Unpersisting TorrentBroadcast on executors only in distributed mode") {
     testUnpersistTorrentBroadcast(distributed = true, removeFromDriver = false)
   }
 
-  test("Unpersisting TorrentBroadcast on executors and driver in distributed mode") {
+  ignore("Unpersisting TorrentBroadcast on executors and driver in distributed mode") {
     testUnpersistTorrentBroadcast(distributed = true, removeFromDriver = true)
   }
 
