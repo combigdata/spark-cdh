@@ -213,7 +213,7 @@ class MasterSuite extends SparkFunSuite
     }
   }
 
-  test("master/worker web ui available") {
+  ignore("master/worker web ui available") {
     implicit val formats = org.json4s.DefaultFormats
     val conf = new SparkConf()
     val localCluster = new LocalSparkCluster(2, 2, 512, conf)
