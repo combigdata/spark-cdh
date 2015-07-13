@@ -62,8 +62,10 @@ class FlumeUtils(object):
             helper = helperClass.newInstance()
             jstream = helper.createStream(ssc._jssc, hostname, port, jlevel, enableDecompression)
         except Py4JJavaError as e:
-            if 'ClassNotFoundException' in str(e.java_exception):
-                FlumeUtils._printErrorMsg(ssc.sparkContext)
+            # spark-streaming-flume is in CDH's assembly so this should never happen. Just
+            # let the exception bubble up.
+            #if 'ClassNotFoundException' in str(e.java_exception):
+            #    FlumeUtils._printErrorMsg(ssc.sparkContext)
             raise e
 
         return FlumeUtils._toPythonDStream(ssc, jstream, bodyDecoder)

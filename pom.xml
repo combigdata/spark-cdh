@@ -102,7 +102,9 @@
     <module>external/twitter</module>
     <module>external/flume</module>
     <module>external/flume-sink</module>
+    <!-- Disabled in CDH.
     <module>external/flume-assembly</module>
+    -->
     <module>external/mqtt</module>
     <module>external/mqtt-assembly</module>
     <module>external/zeromq</module>
