@@ -103,7 +103,9 @@
     <module>assembly</module>
     <module>external/flume</module>
     <module>external/flume-sink</module>
+    <!-- Disabled in CDH.
     <module>external/flume-assembly</module>
+    -->
     <module>examples</module>
     <module>repl</module>
     <module>launcher</module>
