@@ -2653,7 +2653,9 @@
       <modules>
         <module>external/flume</module>
         <module>external/flume-sink</module>
+        <!-- Disabled in CDH.
         <module>external/flume-assembly</module>
+        -->
       </modules>
     </profile>
 
