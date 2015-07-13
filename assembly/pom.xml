@@ -61,6 +61,11 @@
     </dependency>
     <dependency>
       <groupId>org.apache.spark</groupId>
+      <artifactId>spark-streaming-flume_${scala.binary.version}</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.spark</groupId>
       <artifactId>spark-graphx_${scala.binary.version}</artifactId>
       <version>${project.version}</version>
     </dependency>
@@ -255,6 +260,12 @@
       <id>parquet-provided</id>
       <properties>
         <parquet.deps.scope>provided</parquet.deps.scope>
+      </properties>
+    </profile>
+    <profile>
+      <id>flume-provided</id>
+      <properties>
+        <flume.deps.scope>provided</flume.deps.scope>
       </properties>
     </profile>
 
