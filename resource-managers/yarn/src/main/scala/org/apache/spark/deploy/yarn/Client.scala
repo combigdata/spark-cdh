@@ -680,7 +680,7 @@ private[spark] class Client(
 
     if (sparkConf.getBoolean("spark.yarn.localizeConfig", true)) {
       Seq("HADOOP_CONF_DIR", "YARN_CONF_DIR").foreach { envKey =>
-        sys.env.get(envKey).foreach { path =>
+        sys.env.get(envKey).toSeq.flatMap(_.split(File.pathSeparator)).foreach { path =>
           val dir = new File(path)
           if (dir.isDirectory()) {
             val files = dir.listFiles()
