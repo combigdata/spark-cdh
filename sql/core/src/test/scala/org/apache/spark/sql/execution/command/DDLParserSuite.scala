@@ -1457,7 +1457,7 @@ class DDLParserSuite extends PlanTest with SharedSQLContext {
     }
   }
 
-  test("Invalid interval term should throw AnalysisException") {
+  ignore("Invalid interval term should throw AnalysisException") {
     def assertError(sql: String, errorMessage: String): Unit = {
       val e = intercept[AnalysisException] {
         parser.parsePlan(sql)
