@@ -86,7 +86,8 @@ class VersionsSuite extends SparkFunSuite with Logging {
     assert(getNestedMessages(e) contains "Unknown column 'A0.OWNER_NAME' in 'field list'")
   }
 
-  private val versions = Seq("0.12", "0.13", "0.14", "1.0", "1.1", "1.2")
+  // private val versions = Seq("12", "13", "14", "1.0.0", "1.1.0", "1.2.0")
+  private val versions = Seq("1.1.0")
 
   private var client: HiveClient = null
 
@@ -212,7 +213,7 @@ class VersionsSuite extends SparkFunSuite with Logging {
     }
 
     test(s"$version: dropTable") {
-      val versionsWithoutPurge = versions.takeWhile(_ != "0.14")
+      val versionsWithoutPurge = versions.takeWhile(_ != "1.1.0")
       // First try with the purge option set. This should fail if the version is < 0.14, in which
       // case we check the version and try without it.
       try {
