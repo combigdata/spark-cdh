@@ -1860,6 +1860,16 @@
         <version>${datanucleus-core.version}</version>
       </dependency>
       <dependency>
+        <groupId>org.datanucleus</groupId>
+        <artifactId>datanucleus-api-jdo</artifactId>
+        <version>3.2.6</version>
+      </dependency>
+      <dependency>
+        <groupId>org.datanucleus</groupId>
+        <artifactId>datanucleus-rdbms</artifactId>
+        <version>3.2.9</version>
+      </dependency>
+      <dependency>
         <groupId>org.apache.thrift</groupId>
         <artifactId>libthrift</artifactId>
         <version>${libthrift.version}</version>
@@ -2588,11 +2598,6 @@
 
     <profile>
       <id>hive-thriftserver</id>
-      <activation>
-        <property>
-          <name>cdh.build</name>
-        </property>
-      </activation>
       <modules>
         <module>sql/hive-thriftserver</module>
       </modules>
