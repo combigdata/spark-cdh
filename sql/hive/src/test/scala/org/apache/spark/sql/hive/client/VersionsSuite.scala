@@ -122,7 +122,8 @@ class VersionsSuite extends SparkFunSuite with Logging {
     assert(getNestedMessages(e) contains "Unknown column 'A0.OWNER_NAME' in 'field list'")
   }
 
-  private val versions = Seq("0.12", "0.13", "0.14", "1.0", "1.1", "1.2")
+  // private val versions = Seq("12", "13", "14", "1.0.0", "1.1.0", "1.2.0")
+  private val versions = Seq("1.1.0")
 
   private var client: HiveClient = null
 
