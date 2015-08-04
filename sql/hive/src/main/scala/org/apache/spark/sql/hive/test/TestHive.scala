@@ -42,7 +42,7 @@ import org.apache.spark.{SparkConf, SparkContext}
 object TestHive
   extends TestHiveContext(
     new SparkContext(
-      System.getProperty("spark.sql.test.master", "local[32]"),
+      System.getProperty("spark.sql.test.master", "local[4]"),
       "TestSQLContext",
       new SparkConf()
         .set("spark.sql.test", "")
