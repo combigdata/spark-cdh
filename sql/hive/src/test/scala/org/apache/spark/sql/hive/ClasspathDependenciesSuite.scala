@@ -72,7 +72,7 @@ class ClasspathDependenciesSuite extends SparkFunSuite {
   private val SPARK_HIVE = "org.apache.hive."
   private val SPARK_SHADED = "org.spark-project.hive.shaded."
 
-  test("shaded Protobuf") {
+  ignore("shaded Protobuf") {
     assertLoads(SPARK_SHADED + "com.google.protobuf.ServiceException")
   }
 
@@ -90,7 +90,7 @@ class ClasspathDependenciesSuite extends SparkFunSuite {
     assertLoads(KRYO, STD_INSTANTIATOR)
   }
 
-  test("Forbidden Dependencies") {
+  ignore("Forbidden Dependencies") {
     assertClassNotFound(
       SPARK_HIVE + KRYO,
       SPARK_SHADED + KRYO,

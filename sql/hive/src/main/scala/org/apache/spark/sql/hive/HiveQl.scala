@@ -1045,8 +1045,7 @@ https://cwiki.apache.org/confluence/display/Hive/Enhanced+Aggregation%2C+Cube%2C
       // return With plan if there is CTE
       cteRelations.map(With(query, _)).getOrElse(query)
 
-    // HIVE-9039 renamed TOK_UNION => TOK_UNIONALL while adding TOK_UNIONDISTINCT
-    case Token("TOK_UNIONALL", left :: right :: Nil) => Union(nodeToPlan(left), nodeToPlan(right))
+    case Token("TOK_UNION", left :: right :: Nil) => Union(nodeToPlan(left), nodeToPlan(right))
 
     case a: ASTNode =>
       throw new NotImplementedError(s"No parse rules for $node:\n ${dumpTree(a).toString} ")
@@ -1531,6 +1530,7 @@ https://cwiki.apache.org/confluence/display/Hive/Enhanced+Aggregation%2C+Cube%2C
     case ast: ASTNode if ast.getType == HiveParser.TOK_CHARSETLITERAL =>
       Literal(BaseSemanticAnalyzer.charSetString(ast.getChild(0).getText, ast.getChild(1).getText))
 
+    /*
     case ast: ASTNode if ast.getType == HiveParser.TOK_INTERVAL_YEAR_MONTH_LITERAL =>
       Literal(CalendarInterval.fromYearMonthString(ast.getText))
 
@@ -1554,6 +1554,7 @@ https://cwiki.apache.org/confluence/display/Hive/Enhanced+Aggregation%2C+Cube%2C
 
     case ast: ASTNode if ast.getType == HiveParser.TOK_INTERVAL_SECOND_LITERAL =>
       Literal(CalendarInterval.fromSingleUnitString("second", ast.getText))
+    */
 
     case a: ASTNode =>
       throw new NotImplementedError(

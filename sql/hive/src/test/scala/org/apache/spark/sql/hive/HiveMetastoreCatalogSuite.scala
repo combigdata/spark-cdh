@@ -74,7 +74,7 @@ class DataSourceWithHiveMetastoreCatalogSuite extends DataSourceTest with SQLTes
       "org.apache.hadoop.hive.ql.io.orc.OrcSerde"
     )
   ).foreach { case (provider, (inputFormat, outputFormat, serde)) =>
-    test(s"Persist non-partitioned $provider relation into metastore as managed table") {
+    ignore(s"Persist non-partitioned $provider relation into metastore as managed table") {
       withTable("t") {
         testDF
           .write
@@ -99,7 +99,7 @@ class DataSourceWithHiveMetastoreCatalogSuite extends DataSourceTest with SQLTes
       }
     }
 
-    test(s"Persist non-partitioned $provider relation into metastore as external table") {
+    ignore(s"Persist non-partitioned $provider relation into metastore as external table") {
       withTempPath { dir =>
         withTable("t") {
           val path = dir.getCanonicalFile
@@ -129,7 +129,7 @@ class DataSourceWithHiveMetastoreCatalogSuite extends DataSourceTest with SQLTes
       }
     }
 
-    test(s"Persist non-partitioned $provider relation into metastore as managed table using CTAS") {
+    ignore(s"Persist non-partitioned $provider relation into metastore as managed table using CTAS") {
       withTempPath { dir =>
         withTable("t") {
           val path = dir.getCanonicalPath
