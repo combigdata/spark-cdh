@@ -339,8 +339,10 @@ class KafkaRDD(RDD):
             helper = helperClass.newInstance()
             joffsetRanges = helper.offsetRangesOfKafkaRDD(self._jrdd.rdd())
         except Py4JJavaError as e:
-            if 'ClassNotFoundException' in str(e.java_exception):
-                KafkaUtils._printErrorMsg(self.ctx)
+            # spark-streaming-kafka is in CDH's assembly so this should never happen. Just
+            # let the exception bubble up.
+            #if 'ClassNotFoundException' in str(e.java_exception):
+            #    KafkaUtils._printErrorMsg(self.ctx)
             raise e
 
         ranges = [OffsetRange(o.topic(), o.partition(), o.fromOffset(), o.untilOffset())
