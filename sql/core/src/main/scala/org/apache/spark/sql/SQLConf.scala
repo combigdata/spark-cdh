@@ -235,7 +235,7 @@ private[spark] object SQLConf {
     isPublic = false)
 
   val UNSAFE_ENABLED = booleanConf("spark.sql.unsafe.enabled",
-    defaultValue = Some(true),  // use TUNGSTEN_ENABLED as default
+    defaultValue = Some(false),
     doc = "When true, use the new optimized Tungsten physical execution backend.",
     isPublic = false)
 
