@@ -37,6 +37,7 @@ MAKE_PIP=false
 MAKE_R=false
 NAME=none
 MVN="$SPARK_HOME/build/mvn"
+MVN_TARGET=package
 
 function exit_with_usage {
   echo "make-distribution.sh - tool for making binary distributions of Spark"
@@ -81,6 +82,10 @@ while (( "$#" )); do
       ;;
     --name)
       NAME="$2"
+      shift
+      ;;
+    --target)
+      MVN_TARGET="$2"
       shift
       ;;
     --help)
@@ -158,7 +163,7 @@ export MAVEN_OPTS="${MAVEN_OPTS:--Xmx2g -XX:MaxPermSize=512M -XX:ReservedCodeCac
 # Store the command as an array because $MVN variable might have spaces in it.
 # Normal quoting tricks don't work.
 # See: http://mywiki.wooledge.org/BashFAQ/050
-BUILD_COMMAND=("$MVN" -T 1C clean package -DskipTests $@)
+BUILD_COMMAND=("$MVN" clean "$MVN_TARGET" -DskipTests $@)
 
 # Actually build the jar
 echo -e "\nBuilding with..."
