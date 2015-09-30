@@ -535,13 +535,15 @@ private[spark] class Client(
       }
     }
 
-    Seq("HADOOP_CONF_DIR", "YARN_CONF_DIR").foreach { envKey =>
-      sys.env.get(envKey).toSeq.flatMap(_.split(File.pathSeparator)).foreach { path =>
-        val dir = new File(path)
-        if (dir.isDirectory()) {
-          dir.listFiles().foreach { file =>
-            if (file.isFile && !hadoopConfFiles.contains(file.getName())) {
-              hadoopConfFiles(file.getName()) = file
+    if (sparkConf.getBoolean("spark.yarn.localizeConfig", true)) {
+      Seq("HADOOP_CONF_DIR", "YARN_CONF_DIR").foreach { envKey =>
+        sys.env.get(envKey).toSeq.flatMap(_.split(File.pathSeparator)).foreach { path =>
+          val dir = new File(path)
+          if (dir.isDirectory()) {
+            dir.listFiles().foreach { file =>
+              if (file.isFile && !hadoopConfFiles.contains(file.getName())) {
+                hadoopConfFiles(file.getName()) = file
+              }
             }
           }
         }
