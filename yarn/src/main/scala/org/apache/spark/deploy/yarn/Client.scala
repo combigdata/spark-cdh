@@ -442,10 +442,11 @@ private[spark] class Client(
    */
   private def createConfArchive(): File = {
     val hadoopConfFiles = new HashMap[String, File]()
-    Seq("HADOOP_CONF_DIR", "YARN_CONF_DIR").foreach { envKey =>
-      sys.env.get(envKey).toSeq.flatMap(_.split(File.pathSeparator)).foreach { path =>
-        val dir = new File(path)
-        if (dir.isDirectory()) {
+    if (sparkConf.getBoolean("spark.yarn.localizeConfig", true)) {
+      Seq("HADOOP_CONF_DIR", "YARN_CONF_DIR").foreach { envKey =>
+        sys.env.get(envKey).toSeq.flatMap(_.split(File.pathSeparator)).foreach { path =>
+          val dir = new File(path)
+          require(dir.isDirectory() && dir.canRead(), s"Cannot read Hadoop config dir $path.")
           dir.listFiles().foreach { file =>
             if (file.isFile && !hadoopConfFiles.contains(file.getName())) {
               hadoopConfFiles(file.getName()) = file
