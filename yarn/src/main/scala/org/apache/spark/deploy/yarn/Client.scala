@@ -698,17 +698,19 @@ private[spark] class Client(
       hadoopConfFiles(prop) = new File(url.getPath)
     }
 
-    Seq("HADOOP_CONF_DIR", "YARN_CONF_DIR").foreach { envKey =>
-      sys.env.get(envKey).foreach { path =>
-        val dir = new File(path)
-        if (dir.isDirectory()) {
-          val files = dir.listFiles()
-          if (files == null) {
-            logWarning("Failed to list files under directory " + dir)
-          } else {
-            files.foreach { file =>
-              if (file.isFile && !hadoopConfFiles.contains(file.getName())) {
-                hadoopConfFiles(file.getName()) = file
+    if (sparkConf.getBoolean("spark.yarn.localizeConfig", true)) {
+      Seq("HADOOP_CONF_DIR", "YARN_CONF_DIR").foreach { envKey =>
+        sys.env.get(envKey).foreach { path =>
+          val dir = new File(path)
+          if (dir.isDirectory()) {
+            val files = dir.listFiles()
+            if (files == null) {
+              logWarning("Failed to list files under directory " + dir)
+            } else {
+              files.foreach { file =>
+                if (file.isFile && !hadoopConfFiles.contains(file.getName())) {
+                  hadoopConfFiles(file.getName()) = file
+                }
               }
             }
           }
