@@ -41,10 +41,11 @@ class StagePageSuite extends SparkFunSuite with LocalSparkContext {
     val conf2 = new SparkConf(false).set(unsafeConf, "false")
     val html2 = renderStagePage(conf2).toString().toLowerCase
     assert(!html2.contains(targetString))
-    // Avoid setting anything; it should be displayed by default
+    // CDH: we are turning tungsten off by default, so it should not be displayed
+    // Avoid setting anything; it should not be displayed by default
     val conf3 = new SparkConf(false)
     val html3 = renderStagePage(conf3).toString().toLowerCase
-    assert(html3.contains(targetString))
+    assert(!html3.contains(targetString))
   }
 
   /**
