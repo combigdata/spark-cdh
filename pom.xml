@@ -183,6 +183,7 @@
     <jodd.version>3.5.2</jodd.version>
     <jsr305.version>1.3.9</jsr305.version>
     <libthrift.version>${cdh.thrift.version}</libthrift.version>
+    <spark-avro.version>${cdh.spark-avro.version}</spark-avro.version>
 
     <test.java.home>${java.home}</test.java.home>
 
