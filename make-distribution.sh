@@ -228,6 +228,13 @@ if [ -d "$SPARK_HOME"/R/lib/SparkR ]; then
   cp "$SPARK_HOME/R/lib/sparkr.zip" "$DISTDIR"/R/lib
 fi
 
+# CDH: remove scripts for which the actual code is not included.
+rm "$DISTDIR/bin/spark-sql"
+rm "$DISTDIR/bin/beeline"
+rm "$DISTDIR/bin/sparkR"
+rm "$DISTDIR/sbin/start-thriftserver.sh"
+rm "$DISTDIR/sbin/stop-thriftserver.sh"
+
 # Download and copy in tachyon, if requested
 if [ "$SPARK_TACHYON" == "true" ]; then
   TMPD=`mktemp -d 2>/dev/null || mktemp -d -t 'disttmp'`
