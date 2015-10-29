@@ -20,6 +20,7 @@ package org.apache.spark.sql.hive
 import java.io.File
 
 import org.apache.spark.sql.columnar.{InMemoryColumnarTableScan, InMemoryRelation}
+import org.apache.spark.sql.execution.datasources.parquet.ParquetRelation
 import org.apache.spark.sql.hive.test.TestHive
 import org.apache.spark.sql.hive.test.TestHive._
 import org.apache.spark.sql.{SaveMode, AnalysisException, DataFrame, QueryTest}
@@ -202,5 +203,15 @@ class CachedTableSuite extends QueryTest {
 
     sql("DROP TABLE refreshTable")
     Utils.deleteRecursively(tempPath)
+  }
+
+  test("SPARK-11246 cache parquet table") {
+    sql("CREATE TABLE cachedTable STORED AS PARQUET AS SELECT 1")
+
+    cacheTable("cachedTable")
+    val sparkPlan = sql("SELECT * FROM cachedTable").queryExecution.sparkPlan
+    assert(sparkPlan.collect { case e: InMemoryColumnarTableScan => e }.size === 1)
+
+    sql("DROP TABLE cachedTable")
   }
 }
