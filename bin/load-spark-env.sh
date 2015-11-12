@@ -26,6 +26,9 @@ if [ -z "${SPARK_HOME}" ]; then
   source "$(dirname "$0")"/find-spark-home
 fi
 
+# Save SPARK_HOME in case the user's spark-env.sh overwrites it.
+ORIGINAL_SPARK_HOME="$SPARK_HOME"
+
 if [ -z "$SPARK_ENV_LOADED" ]; then
   export SPARK_ENV_LOADED=1
 
@@ -42,7 +45,7 @@ fi
 # Setting SPARK_SCALA_VERSION if not already set.
 
 if [ -z "$SPARK_SCALA_VERSION" ]; then
-
+  USER_SCALA_VERSION_SET=0
   ASSEMBLY_DIR2="${SPARK_HOME}/assembly/target/scala-2.11"
   ASSEMBLY_DIR1="${SPARK_HOME}/assembly/target/scala-2.12"
 
@@ -57,4 +60,19 @@ if [ -z "$SPARK_SCALA_VERSION" ]; then
   else
     export SPARK_SCALA_VERSION="2.12"
   fi
+else
+    USER_SCALA_VERSION_SET=1
+fi
+
+# Check that the user's SPARK_HOME and the expected SPARK_HOME match. If they don't, issue a
+# warning, and delegate execution to the user-defined SPARK_HOME.
+if [ "$SPARK_HOME" != "$ORIGINAL_SPARK_HOME" ]; then
+  SCRIPT=$(basename "$0")
+  echo "WARNING: User-defined SPARK_HOME ($SPARK_HOME) overrides detected ($ORIGINAL_SPARK_HOME)." 1>&2
+  echo "WARNING: Running $SCRIPT from user-defined location." 1>&2
+  if [ $USER_SCALA_VERSION_SET = 0 ]; then
+    unset SPARK_SCALA_VERSION
+  fi
+  unset SPARK_ENV_LOADED
+  exec "$SPARK_HOME/bin/$SCRIPT" "$@"
 fi
