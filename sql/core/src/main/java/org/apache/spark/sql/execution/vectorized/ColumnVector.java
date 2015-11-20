@@ -20,8 +20,8 @@ import java.math.BigDecimal;
 import java.math.BigInteger;
 
 import com.google.common.annotations.VisibleForTesting;
-import org.apache.parquet.column.Dictionary;
-import org.apache.parquet.io.api.Binary;
+import parquet.column.Dictionary;
+import parquet.io.api.Binary;
 
 import org.apache.spark.memory.MemoryMode;
 import org.apache.spark.sql.catalyst.InternalRow;

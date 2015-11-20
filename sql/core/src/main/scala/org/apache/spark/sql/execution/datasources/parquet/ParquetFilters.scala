@@ -17,9 +17,13 @@
 
 package org.apache.spark.sql.execution.datasources.parquet
 
-import org.apache.parquet.filter2.predicate._
-import org.apache.parquet.filter2.predicate.FilterApi._
-import org.apache.parquet.io.api.Binary
+import java.io.Serializable
+
+import parquet.filter2.predicate._
+import parquet.filter2.predicate.FilterApi._
+import parquet.io.api.Binary
+import parquet.schema.OriginalType
+import parquet.schema.PrimitiveType.PrimitiveTypeName
 
 import org.apache.spark.sql.sources
 import org.apache.spark.sql.types._

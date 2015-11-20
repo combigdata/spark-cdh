@@ -70,6 +70,7 @@ private[spark] class SparkUICssErrorHandler extends DefaultCssErrorHandler {
 /**
  * Selenium tests for the Spark Web UI.
  */
+@Ignore
 class UISeleniumSuite extends SparkFunSuite with WebBrowser with Matchers with BeforeAndAfterAll {
 
   implicit var webDriver: WebDriver = _
