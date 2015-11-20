@@ -23,7 +23,7 @@ import scala.collection.JavaConverters._
 
 import org.apache.hadoop.hive.ql.plan.TableDesc
 import org.apache.orc.OrcConf.COMPRESS
-import org.apache.parquet.hadoop.ParquetOutputFormat
+import parquet.hadoop.ParquetOutputFormat
 
 import org.apache.spark.sql.catalyst.util.CaseInsensitiveMap
 import org.apache.spark.sql.execution.datasources.orc.OrcOptions

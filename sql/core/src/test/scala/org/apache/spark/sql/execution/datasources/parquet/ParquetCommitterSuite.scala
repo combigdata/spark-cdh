@@ -23,7 +23,7 @@ import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.{FileStatus, Path}
 import org.apache.hadoop.mapreduce.{JobContext, TaskAttemptContext}
 import org.apache.hadoop.mapreduce.lib.output.FileOutputCommitter
-import org.apache.parquet.hadoop.{ParquetOutputCommitter, ParquetOutputFormat}
+import parquet.hadoop.{ParquetOutputCommitter, ParquetOutputFormat}
 
 import org.apache.spark.{LocalSparkContext, SparkFunSuite}
 import org.apache.spark.sql.SparkSession

@@ -24,13 +24,13 @@ import java.util.Locale
 
 import scala.collection.JavaConverters.asScalaBufferConverter
 
-import org.apache.parquet.filter2.predicate._
-import org.apache.parquet.filter2.predicate.FilterApi._
-import org.apache.parquet.io.api.Binary
-import org.apache.parquet.schema.{DecimalMetadata, MessageType, OriginalType, PrimitiveComparator}
-import org.apache.parquet.schema.OriginalType._
-import org.apache.parquet.schema.PrimitiveType.PrimitiveTypeName
-import org.apache.parquet.schema.PrimitiveType.PrimitiveTypeName._
+import parquet.filter2.predicate._
+import parquet.filter2.predicate.FilterApi._
+import parquet.io.api.Binary
+import parquet.schema.{DecimalMetadata, MessageType, OriginalType, PrimitiveComparator}
+import parquet.schema.OriginalType._
+import parquet.schema.PrimitiveType.PrimitiveTypeName
+import parquet.schema.PrimitiveType.PrimitiveTypeName._
 
 import org.apache.spark.sql.catalyst.util.{CaseInsensitiveMap, DateTimeUtils}
 import org.apache.spark.sql.catalyst.util.DateTimeUtils.SQLDate

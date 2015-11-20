@@ -21,7 +21,7 @@ import java.io.File
 import java.sql.Timestamp
 
 import org.apache.hadoop.fs.{FileSystem, Path}
-import org.apache.parquet.hadoop.ParquetOutputFormat
+import parquet.hadoop.ParquetOutputFormat
 
 import org.apache.spark.{DebugFilesystem, SparkException}
 import org.apache.spark.sql._

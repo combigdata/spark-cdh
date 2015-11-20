@@ -21,7 +21,7 @@ import java.io.{FileNotFoundException, IOException}
 
 import scala.collection.mutable
 
-import org.apache.parquet.io.ParquetDecodingException
+import parquet.io.ParquetDecodingException
 
 import org.apache.spark.{Partition => RDDPartition, TaskContext, TaskKilledException}
 import org.apache.spark.deploy.SparkHadoopUtil

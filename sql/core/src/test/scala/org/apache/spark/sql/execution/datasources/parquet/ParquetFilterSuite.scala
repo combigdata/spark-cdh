@@ -21,9 +21,9 @@ import java.math.{BigDecimal => JBigDecimal}
 import java.nio.charset.StandardCharsets
 import java.sql.{Date, Timestamp}
 
-import org.apache.parquet.filter2.predicate.{FilterApi, FilterPredicate, Operators}
-import org.apache.parquet.filter2.predicate.FilterApi._
-import org.apache.parquet.filter2.predicate.Operators.{Column => _, _}
+import parquet.filter2.predicate.{FilterApi, FilterPredicate, Operators}
+import parquet.filter2.predicate.FilterApi._
+import parquet.filter2.predicate.Operators.{Column => _, _}
 
 import org.apache.spark.SparkException
 import org.apache.spark.sql._

@@ -22,7 +22,7 @@ import java.io.File
 import scala.collection.JavaConverters._
 
 import org.apache.hadoop.fs.Path
-import org.apache.parquet.hadoop.ParquetOutputFormat
+import parquet.hadoop.ParquetOutputFormat
 
 import org.apache.spark.sql.internal.SQLConf
 import org.apache.spark.sql.test.SharedSQLContext

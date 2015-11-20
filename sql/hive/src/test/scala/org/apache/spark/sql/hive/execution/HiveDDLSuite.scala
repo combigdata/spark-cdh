@@ -24,9 +24,9 @@ import java.util.Date
 import scala.language.existentials
 
 import org.apache.hadoop.fs.Path
-import org.apache.parquet.format.converter.ParquetMetadataConverter.NO_FILTER
-import org.apache.parquet.hadoop.ParquetFileReader
 import org.scalatest.BeforeAndAfterEach
+import parquet.format.converter.ParquetMetadataConverter.NO_FILTER
+import parquet.hadoop.ParquetFileReader
 
 import org.apache.spark.SparkException
 import org.apache.spark.sql.{AnalysisException, QueryTest, Row, SaveMode}

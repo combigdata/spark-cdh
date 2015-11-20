@@ -26,6 +26,7 @@ import scala.collection.JavaConverters._
 import scala.collection.immutable
 import scala.util.matching.Regex
 
+// import _root_.parquet.hadoop.ParquetOutputCommitter
 import org.apache.hadoop.fs.Path
 import org.tukaani.xz.LZMA2Options
 
@@ -448,12 +449,13 @@ object SQLConf {
 
   val PARQUET_OUTPUT_COMMITTER_CLASS = buildConf("spark.sql.parquet.output.committer.class")
     .doc("The output committer class used by Parquet. The specified class needs to be a " +
-      "subclass of org.apache.hadoop.mapreduce.OutputCommitter. Typically, it's also a subclass " +
-      "of org.apache.parquet.hadoop.ParquetOutputCommitter. If it is not, then metadata summaries" +
-      "will never be created, irrespective of the value of parquet.summary.metadata.level")
-    .internal()
+      "subclass of org.apache.hadoop.mapreduce.OutputCommitter.  Typically, it's also a subclass " +
+      "of parquet.hadoop.ParquetOutputCommitter. If it is not, then metadata summaries will " +
+      "never be created, irrespective of the value of parquet.summary.metadata.level. NOTE: 1. " +
+      "Instead of SQLConf, this option must be set in Hadoop Configuration.  2. This option " +
+      "overrides \"spark.sql.sources.outputCommitterClass\".")
     .stringConf
-    .createWithDefault("org.apache.parquet.hadoop.ParquetOutputCommitter")
+    .createWithDefault("parquet.hadoop.ParquetOutputCommitter")
 
   val PARQUET_VECTORIZED_READER_ENABLED =
     buildConf("spark.sql.parquet.enableVectorizedReader")
