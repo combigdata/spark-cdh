@@ -23,11 +23,11 @@ import java.nio.ByteOrder
 import scala.collection.JavaConverters._
 import scala.collection.mutable.ArrayBuffer
 
-import org.apache.parquet.column.Dictionary
-import org.apache.parquet.io.api.{Binary, Converter, GroupConverter, PrimitiveConverter}
-import org.apache.parquet.schema.OriginalType.{INT_32, LIST, UTF8}
-import org.apache.parquet.schema.PrimitiveType.PrimitiveTypeName.{DOUBLE, INT32, INT64, BINARY, FIXED_LEN_BYTE_ARRAY}
-import org.apache.parquet.schema.{GroupType, MessageType, PrimitiveType, Type}
+import parquet.column.Dictionary
+import parquet.io.api.{Binary, Converter, GroupConverter, PrimitiveConverter}
+import parquet.schema.OriginalType.{INT_32, LIST, UTF8}
+import parquet.schema.PrimitiveType.PrimitiveTypeName.{DOUBLE, INT32, INT64, BINARY, FIXED_LEN_BYTE_ARRAY}
+import parquet.schema.{GroupType, MessageType, PrimitiveType, Type}
 
 import org.apache.spark.Logging
 import org.apache.spark.sql.catalyst.InternalRow

@@ -17,8 +17,8 @@
 
 package org.apache.spark.sql.execution.datasources.parquet
 
-import org.apache.parquet.filter2.predicate.Operators._
-import org.apache.parquet.filter2.predicate.{FilterPredicate, Operators}
+import parquet.filter2.predicate.Operators._
+import parquet.filter2.predicate.{FilterPredicate, Operators}
 
 import org.apache.spark.sql.{Column, DataFrame, QueryTest, Row, SQLConf}
 import org.apache.spark.sql.catalyst.dsl.expressions._

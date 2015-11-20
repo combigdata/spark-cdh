@@ -164,7 +164,7 @@ private[spark] class SqlNewHadoopRDD[V: ClassTag](
         * TODO: plumb this through a different way?
         */
       if (enableUnsafeRowParquetReader &&
-        format.getClass.getName == "org.apache.parquet.hadoop.ParquetInputFormat") {
+        format.getClass.getName == "parquet.hadoop.ParquetInputFormat") {
         val parquetReader: UnsafeRowParquetRecordReader = new UnsafeRowParquetRecordReader()
         if (!parquetReader.tryInitialize(
             split.serializableHadoopSplit.value, hadoopAttemptContext)) {

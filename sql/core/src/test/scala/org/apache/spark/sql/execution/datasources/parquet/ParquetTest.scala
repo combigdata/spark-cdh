@@ -19,17 +19,16 @@ package org.apache.spark.sql.execution.datasources.parquet
 
 import java.io.File
 
-import org.apache.parquet.schema.MessageType
-
 import scala.collection.JavaConverters._
 import scala.reflect.ClassTag
 import scala.reflect.runtime.universe.TypeTag
 
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.Path
-import org.apache.parquet.format.converter.ParquetMetadataConverter
-import org.apache.parquet.hadoop.metadata.{BlockMetaData, FileMetaData, ParquetMetadata}
-import org.apache.parquet.hadoop.{Footer, ParquetFileReader, ParquetFileWriter}
+import parquet.format.converter.ParquetMetadataConverter
+import parquet.hadoop.metadata.{BlockMetaData, FileMetaData, ParquetMetadata}
+import parquet.hadoop.{Footer, ParquetFileReader, ParquetFileWriter}
+import parquet.schema.MessageType
 
 import org.apache.spark.sql.test.SQLTestUtils
 import org.apache.spark.sql.types.StructType

@@ -1475,12 +1475,12 @@ Configuration of Parquet can be done using the `setConf` method on `SQLContext` 
 </tr>
 <tr>
   <td><code>spark.sql.parquet.output.committer.class</code></td>
-  <td><code>org.apache.parquet.hadoop.<br />ParquetOutputCommitter</code></td>
+  <td><code>parquet.hadoop.<br />ParquetOutputCommitter</code></td>
   <td>
     <p>
       The output committer class used by Parquet. The specified class needs to be a subclass of
       <code>org.apache.hadoop.<br />mapreduce.OutputCommitter</code>. Typically, it's also a
-      subclass of <code>org.apache.parquet.hadoop.ParquetOutputCommitter</code>.
+      subclass of <code>parquet.hadoop.ParquetOutputCommitter</code>.
     </p>
     <p>
       <b>Note:</b>

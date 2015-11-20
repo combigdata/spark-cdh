@@ -22,7 +22,7 @@ import java.util.Properties
 import scala.collection.immutable
 import scala.collection.JavaConverters._
 
-import org.apache.parquet.hadoop.ParquetOutputCommitter
+import _root_.parquet.hadoop.ParquetOutputCommitter
 
 import org.apache.spark.sql.catalyst.CatalystConf
 
@@ -319,7 +319,7 @@ private[spark] object SQLConf {
     defaultValue = Some(classOf[ParquetOutputCommitter].getName),
     doc = "The output committer class used by Parquet. The specified class needs to be a " +
       "subclass of org.apache.hadoop.mapreduce.OutputCommitter.  Typically, it's also a subclass " +
-      "of org.apache.parquet.hadoop.ParquetOutputCommitter.  NOTE: 1. Instead of SQLConf, this " +
+      "of parquet.hadoop.ParquetOutputCommitter.  NOTE: 1. Instead of SQLConf, this " +
       "option must be set in Hadoop Configuration.  2. This option overrides " +
       "\"spark.sql.sources.outputCommitterClass\".")
 

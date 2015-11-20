@@ -22,11 +22,11 @@ import java.util.{Map => JMap}
 import scala.collection.JavaConverters._
 
 import org.apache.hadoop.conf.Configuration
-import org.apache.parquet.hadoop.api.ReadSupport.ReadContext
-import org.apache.parquet.hadoop.api.{InitContext, ReadSupport}
-import org.apache.parquet.io.api.RecordMaterializer
-import org.apache.parquet.schema.Type.Repetition
-import org.apache.parquet.schema._
+import parquet.hadoop.api.ReadSupport.ReadContext
+import parquet.hadoop.api.{InitContext, ReadSupport}
+import parquet.io.api.RecordMaterializer
+import parquet.schema.Type.Repetition
+import parquet.schema._
 
 import org.apache.spark.Logging
 import org.apache.spark.deploy.SparkHadoopUtil

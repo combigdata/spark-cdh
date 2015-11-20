@@ -28,27 +28,27 @@ import org.apache.spark.sql.types.Decimal;
 import org.apache.spark.unsafe.Platform;
 import org.apache.spark.unsafe.types.UTF8String;
 
-import static org.apache.parquet.column.ValuesType.DEFINITION_LEVEL;
-import static org.apache.parquet.column.ValuesType.REPETITION_LEVEL;
-import static org.apache.parquet.column.ValuesType.VALUES;
+import static parquet.column.ValuesType.DEFINITION_LEVEL;
+import static parquet.column.ValuesType.REPETITION_LEVEL;
+import static parquet.column.ValuesType.VALUES;
 
 import org.apache.hadoop.mapreduce.InputSplit;
 import org.apache.hadoop.mapreduce.TaskAttemptContext;
-import org.apache.parquet.Preconditions;
-import org.apache.parquet.column.ColumnDescriptor;
-import org.apache.parquet.column.Dictionary;
-import org.apache.parquet.column.Encoding;
-import org.apache.parquet.column.page.DataPage;
-import org.apache.parquet.column.page.DataPageV1;
-import org.apache.parquet.column.page.DataPageV2;
-import org.apache.parquet.column.page.DictionaryPage;
-import org.apache.parquet.column.page.PageReadStore;
-import org.apache.parquet.column.page.PageReader;
-import org.apache.parquet.column.values.ValuesReader;
-import org.apache.parquet.io.api.Binary;
-import org.apache.parquet.schema.OriginalType;
-import org.apache.parquet.schema.PrimitiveType;
-import org.apache.parquet.schema.Type;
+import parquet.Preconditions;
+import parquet.column.ColumnDescriptor;
+import parquet.column.Dictionary;
+import parquet.column.Encoding;
+import parquet.column.page.DataPage;
+import parquet.column.page.DataPageV1;
+import parquet.column.page.DataPageV2;
+import parquet.column.page.DictionaryPage;
+import parquet.column.page.PageReadStore;
+import parquet.column.page.PageReader;
+import parquet.column.values.ValuesReader;
+import parquet.io.api.Binary;
+import parquet.schema.OriginalType;
+import parquet.schema.PrimitiveType;
+import parquet.schema.Type;
 
 /**
  * A specialized RecordReader that reads into UnsafeRows directly using the Parquet column APIs.
