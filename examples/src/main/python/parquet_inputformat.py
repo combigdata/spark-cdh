@@ -58,7 +58,7 @@ if __name__ == "__main__":
 
     parquet_rdd = sc.newAPIHadoopFile(
         path,
-        'org.apache.parquet.avro.AvroParquetInputFormat',
+        'parquet.avro.AvroParquetInputFormat',
         'java.lang.Void',
         'org.apache.avro.generic.IndexedRecord',
         valueConverter='org.apache.spark.examples.pythonconverters.IndexedRecordToJavaConverter')

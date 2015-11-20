@@ -497,8 +497,11 @@ class InMemoryColumnarQuerySuite extends QueryTest with SharedSQLContext {
           val inMemoryRelation = dfFromFile.queryExecution.optimizedPlan.collect {
             case plan: InMemoryRelation => plan
           }.head
+          // This size is the sum of all parquet file sizes created in workDir. As such it depends
+          // on the actual parquet version
+          val totalParquetSizeInBytes = 690
           // InMemoryRelation's stats is file size before the underlying RDD is materialized
-          assert(inMemoryRelation.computeStats().sizeInBytes === 740)
+          assert(inMemoryRelation.computeStats().sizeInBytes === totalParquetSizeInBytes)
 
           // InMemoryRelation's stats is updated after materializing RDD
           dfFromFile.collect()
@@ -511,7 +514,7 @@ class InMemoryColumnarQuerySuite extends QueryTest with SharedSQLContext {
 
           // Even CBO enabled, InMemoryRelation's stats keeps as the file size before table's stats
           // is calculated
-          assert(inMemoryRelation2.computeStats().sizeInBytes === 740)
+          assert(inMemoryRelation2.computeStats().sizeInBytes === totalParquetSizeInBytes)
 
           // InMemoryRelation's stats should be updated after calculating stats of the table
           // clear cache to simulate a fresh environment

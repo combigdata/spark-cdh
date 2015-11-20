@@ -23,8 +23,8 @@ import java.nio.ByteOrder;
 import org.apache.spark.sql.execution.vectorized.WritableColumnVector;
 import org.apache.spark.unsafe.Platform;
 
-import org.apache.parquet.column.values.ValuesReader;
-import org.apache.parquet.io.api.Binary;
+import parquet.column.values.ValuesReader;
+import parquet.io.api.Binary;
 
 /**
  * An implementation of the Parquet PLAIN decoder that supports the vectorized interface.

@@ -20,22 +20,22 @@ package org.apache.spark.sql.execution.datasources.parquet;
 import java.io.IOException;
 import java.util.TimeZone;
 
-import org.apache.parquet.bytes.BytesUtils;
-import org.apache.parquet.column.ColumnDescriptor;
-import org.apache.parquet.column.Dictionary;
-import org.apache.parquet.column.Encoding;
-import org.apache.parquet.column.page.*;
-import org.apache.parquet.column.values.ValuesReader;
-import org.apache.parquet.io.api.Binary;
-import org.apache.parquet.schema.OriginalType;
-import org.apache.parquet.schema.PrimitiveType;
+import parquet.bytes.BytesUtils;
+import parquet.column.ColumnDescriptor;
+import parquet.column.Dictionary;
+import parquet.column.Encoding;
+import parquet.column.page.*;
+import parquet.column.values.ValuesReader;
+import parquet.io.api.Binary;
+import parquet.schema.OriginalType;
+import parquet.schema.PrimitiveType;
 
 import org.apache.spark.sql.catalyst.util.DateTimeUtils;
 import org.apache.spark.sql.execution.vectorized.WritableColumnVector;
 import org.apache.spark.sql.types.DataTypes;
 import org.apache.spark.sql.types.DecimalType;
 
-import static org.apache.parquet.column.ValuesType.REPETITION_LEVEL;
+import static parquet.column.ValuesType.REPETITION_LEVEL;
 import static org.apache.spark.sql.execution.datasources.parquet.SpecificParquetRecordReaderBase.ValuesReaderIntIterator;
 import static org.apache.spark.sql.execution.datasources.parquet.SpecificParquetRecordReaderBase.createRLEIterator;
 
@@ -266,9 +266,9 @@ public class VectorizedColumnReader {
         break;
 
       case INT64:
+        // TIMESTAMP_MICROS is not supported because of old parquet library
         if (column.dataType() == DataTypes.LongType ||
-            DecimalType.is64BitDecimalType(column.dataType()) ||
-            originalType == OriginalType.TIMESTAMP_MICROS) {
+            DecimalType.is64BitDecimalType(column.dataType())) {
           for (int i = rowId; i < rowId + num; ++i) {
             if (!column.isNullAt(i)) {
               column.putLong(i, dictionary.decodeToLong(dictionaryIds.getDictId(i)));
@@ -400,9 +400,9 @@ public class VectorizedColumnReader {
 
   private void readLongBatch(int rowId, int num, WritableColumnVector column) {
     // This is where we implement support for the valid type conversions.
+    // TIMESTAMP_MICROS is not supported because of old parquet library
     if (column.dataType() == DataTypes.LongType ||
-        DecimalType.is64BitDecimalType(column.dataType()) ||
-        originalType == OriginalType.TIMESTAMP_MICROS) {
+        DecimalType.is64BitDecimalType(column.dataType())) {
       defColumn.readLongs(
         num, column, rowId, maxDefLevel, (VectorizedValuesReader) dataColumn);
     } else if (originalType == OriginalType.TIMESTAMP_MILLIS) {

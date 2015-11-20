@@ -27,15 +27,15 @@ import scala.reflect.runtime.universe.TypeTag
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.{FileSystem, Path}
 import org.apache.hadoop.mapreduce.{JobContext, TaskAttemptContext}
-import org.apache.parquet.column.{Encoding, ParquetProperties}
-import org.apache.parquet.example.data.{Group, GroupWriter}
-import org.apache.parquet.example.data.simple.SimpleGroup
-import org.apache.parquet.hadoop._
-import org.apache.parquet.hadoop.api.WriteSupport
-import org.apache.parquet.hadoop.api.WriteSupport.WriteContext
-import org.apache.parquet.hadoop.metadata.CompressionCodecName
-import org.apache.parquet.io.api.RecordConsumer
-import org.apache.parquet.schema.{MessageType, MessageTypeParser}
+import parquet.column.{Encoding, ParquetProperties}
+import parquet.example.data.{Group, GroupWriter}
+import parquet.example.data.simple.SimpleGroup
+import parquet.hadoop._
+import parquet.hadoop.api.WriteSupport
+import parquet.hadoop.api.WriteSupport.WriteContext
+import parquet.hadoop.metadata.CompressionCodecName
+import parquet.io.api.RecordConsumer
+import parquet.schema.{MessageType, MessageTypeParser}
 
 import org.apache.spark.SparkException
 import org.apache.spark.sql._
@@ -98,6 +98,7 @@ class ParquetIOSuite extends QueryTest with ParquetTest with SharedSQLContext {
   }
 
   test("SPARK-11694 Parquet logical types are not being tested properly") {
+    // TIMESTAMP_MICROS is not supported because of old parquet library
     val parquetSchema = MessageTypeParser.parseMessageType(
       """message root {
         |  required int32 a(INT_8);
@@ -110,13 +111,12 @@ class ParquetIOSuite extends QueryTest with ParquetTest with SharedSQLContext {
         |  required binary h(DECIMAL(32,0));
         |  required fixed_len_byte_array(32) i(DECIMAL(32,0));
         |  required int64 j(TIMESTAMP_MILLIS);
-        |  required int64 k(TIMESTAMP_MICROS);
         |}
       """.stripMargin)
 
     val expectedSparkTypes = Seq(ByteType, ShortType, DateType, DecimalType(1, 0),
       DecimalType(10, 0), StringType, StringType, DecimalType(32, 0), DecimalType(32, 0),
-      TimestampType, TimestampType)
+      TimestampType)
 
     withTempPath { location =>
       val path = new Path(location.getCanonicalPath)

@@ -23,8 +23,8 @@ import scala.collection.JavaConverters._
 
 import org.apache.hadoop.fs.Path
 import org.apache.orc.OrcConf.COMPRESS
-import org.apache.parquet.hadoop.ParquetOutputFormat
 import org.scalatest.BeforeAndAfterAll
+import parquet.hadoop.ParquetOutputFormat
 
 import org.apache.spark.sql.execution.datasources.orc.OrcOptions
 import org.apache.spark.sql.execution.datasources.parquet.{ParquetOptions, ParquetTest}

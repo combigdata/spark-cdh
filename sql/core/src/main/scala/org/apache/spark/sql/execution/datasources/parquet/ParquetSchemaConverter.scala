@@ -20,10 +20,10 @@ package org.apache.spark.sql.execution.datasources.parquet
 import scala.collection.JavaConverters._
 
 import org.apache.hadoop.conf.Configuration
-import org.apache.parquet.schema._
-import org.apache.parquet.schema.OriginalType._
-import org.apache.parquet.schema.PrimitiveType.PrimitiveTypeName._
-import org.apache.parquet.schema.Type.Repetition._
+import parquet.schema._
+import parquet.schema.OriginalType._
+import parquet.schema.PrimitiveType.PrimitiveTypeName._
+import parquet.schema.Type.Repetition._
 
 import org.apache.spark.sql.AnalysisException
 import org.apache.spark.sql.execution.datasources.parquet.ParquetSchemaConverter.maxPrecisionForBytes
@@ -147,7 +147,7 @@ class ParquetToSparkSchemaConverter(
           case INT_64 | null => LongType
           case DECIMAL => makeDecimalType(Decimal.MAX_LONG_DIGITS)
           case UINT_64 => typeNotSupported()
-          case TIMESTAMP_MICROS => TimestampType
+          // TIMESTAMP_MICROS is not supported because of old parquet library
           case TIMESTAMP_MILLIS => TimestampType
           case _ => illegalType()
         }
@@ -388,8 +388,7 @@ class SparkToParquetSchemaConverter(
         outputTimestampType match {
           case SQLConf.ParquetOutputTimestampType.INT96 =>
             Types.primitive(INT96, repetition).named(field.name)
-          case SQLConf.ParquetOutputTimestampType.TIMESTAMP_MICROS =>
-            Types.primitive(INT64, repetition).as(TIMESTAMP_MICROS).named(field.name)
+          // TIMESTAMP_MICROS is not supported because of old parquet library
           case SQLConf.ParquetOutputTimestampType.TIMESTAMP_MILLIS =>
             Types.primitive(INT64, repetition).as(TIMESTAMP_MILLIS).named(field.name)
         }

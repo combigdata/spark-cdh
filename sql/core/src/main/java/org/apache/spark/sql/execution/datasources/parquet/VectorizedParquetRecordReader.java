@@ -24,9 +24,9 @@ import java.util.TimeZone;
 
 import org.apache.hadoop.mapreduce.InputSplit;
 import org.apache.hadoop.mapreduce.TaskAttemptContext;
-import org.apache.parquet.column.ColumnDescriptor;
-import org.apache.parquet.column.page.PageReadStore;
-import org.apache.parquet.schema.Type;
+import parquet.column.ColumnDescriptor;
+import parquet.column.page.PageReadStore;
+import parquet.schema.Type;
 
 import org.apache.spark.memory.MemoryMode;
 import org.apache.spark.sql.catalyst.InternalRow;

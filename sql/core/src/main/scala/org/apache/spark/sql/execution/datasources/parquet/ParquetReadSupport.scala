@@ -22,11 +22,11 @@ import java.util.{Map => JMap, TimeZone}
 import scala.collection.JavaConverters._
 
 import org.apache.hadoop.conf.Configuration
-import org.apache.parquet.hadoop.api.{InitContext, ReadSupport}
-import org.apache.parquet.hadoop.api.ReadSupport.ReadContext
-import org.apache.parquet.io.api.RecordMaterializer
-import org.apache.parquet.schema._
-import org.apache.parquet.schema.Type.Repetition
+import parquet.hadoop.api.{InitContext, ReadSupport}
+import parquet.hadoop.api.ReadSupport.ReadContext
+import parquet.io.api.RecordMaterializer
+import parquet.schema._
+import parquet.schema.Type.Repetition
 
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql.catalyst.expressions.UnsafeRow

@@ -20,9 +20,9 @@ package org.apache.spark.sql.execution.datasources.parquet;
 import org.apache.spark.sql.execution.vectorized.Dictionary;
 
 public final class ParquetDictionary implements Dictionary {
-  private org.apache.parquet.column.Dictionary dictionary;
+  private parquet.column.Dictionary dictionary;
 
-  public ParquetDictionary(org.apache.parquet.column.Dictionary dictionary) {
+  public ParquetDictionary(parquet.column.Dictionary dictionary) {
     this.dictionary = dictionary;
   }
 
