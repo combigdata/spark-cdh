@@ -28,12 +28,14 @@ import org.apache.hadoop.fs.{FileStatus, Path}
 import org.apache.hadoop.mapreduce._
 import org.apache.hadoop.mapreduce.lib.input.FileSplit
 import org.apache.hadoop.mapreduce.task.TaskAttemptContextImpl
-import org.apache.parquet.filter2.compat.FilterCompat
-import org.apache.parquet.filter2.predicate.FilterApi
-import org.apache.parquet.hadoop._
-import org.apache.parquet.hadoop.codec.CodecConfig
-import org.apache.parquet.hadoop.util.ContextUtil
-import org.apache.parquet.schema.MessageType
+import org.slf4j.bridge.SLF4JBridgeHandler
+import parquet.{Log => ApacheParquetLog}
+import parquet.filter2.compat.FilterCompat
+import parquet.filter2.predicate.FilterApi
+import parquet.hadoop._
+import parquet.hadoop.codec.CodecConfig
+import parquet.hadoop.util.ContextUtil
+import parquet.schema.MessageType
 
 import org.apache.spark.{SparkException, TaskContext}
 import org.apache.spark.internal.Logging
@@ -42,11 +44,12 @@ import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.expressions._
 import org.apache.spark.sql.catalyst.expressions.codegen.GenerateUnsafeProjection
 import org.apache.spark.sql.catalyst.parser.LegacyTypeStringParser
-import org.apache.spark.sql.execution.datasources._
+import org.apache.spark.sql.execution.datasources.{parquet, _}
 import org.apache.spark.sql.internal.SQLConf
 import org.apache.spark.sql.sources._
 import org.apache.spark.sql.types._
 import org.apache.spark.util.SerializableConfiguration
+
 
 class ParquetFileFormat
   extends FileFormat
@@ -355,7 +358,7 @@ class ParquetFileFormat
         new FileSplit(new Path(new URI(file.filePath)), file.start, file.length, Array.empty)
 
       val split =
-        new org.apache.parquet.hadoop.ParquetInputSplit(
+        new _root_.parquet.hadoop.ParquetInputSplit(
           fileSplit.getPath,
           fileSplit.getStart,
           fileSplit.getStart + fileSplit.getLength,

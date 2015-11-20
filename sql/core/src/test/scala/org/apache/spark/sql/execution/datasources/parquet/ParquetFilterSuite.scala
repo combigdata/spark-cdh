@@ -19,9 +19,9 @@ package org.apache.spark.sql.execution.datasources.parquet
 
 import java.nio.charset.StandardCharsets
 
-import org.apache.parquet.filter2.predicate.{FilterPredicate, Operators}
-import org.apache.parquet.filter2.predicate.FilterApi._
-import org.apache.parquet.filter2.predicate.Operators.{Column => _, _}
+import parquet.filter2.predicate.{FilterPredicate, Operators}
+import parquet.filter2.predicate.FilterApi._
+import parquet.filter2.predicate.Operators.{Column => _, _}
 
 import org.apache.spark.sql._
 import org.apache.spark.sql.catalyst.dsl.expressions._

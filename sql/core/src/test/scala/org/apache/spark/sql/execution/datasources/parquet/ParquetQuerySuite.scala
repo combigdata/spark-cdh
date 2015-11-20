@@ -20,7 +20,7 @@ package org.apache.spark.sql.execution.datasources.parquet
 import java.io.File
 
 import org.apache.hadoop.fs.{FileSystem, Path}
-import org.apache.parquet.hadoop.ParquetOutputFormat
+import parquet.hadoop.ParquetOutputFormat
 
 import org.apache.spark.sql._
 import org.apache.spark.sql.catalyst.{InternalRow, TableIdentifier}

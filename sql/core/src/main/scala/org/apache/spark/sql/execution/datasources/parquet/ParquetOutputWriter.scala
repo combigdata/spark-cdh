@@ -19,7 +19,7 @@ package org.apache.spark.sql.execution.datasources.parquet
 
 import org.apache.hadoop.fs.Path
 import org.apache.hadoop.mapreduce._
-import org.apache.parquet.hadoop.ParquetOutputFormat
+import parquet.hadoop.ParquetOutputFormat
 
 import org.apache.spark.sql.Row
 import org.apache.spark.sql.catalyst.InternalRow

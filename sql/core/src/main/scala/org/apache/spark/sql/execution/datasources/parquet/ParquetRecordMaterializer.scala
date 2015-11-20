@@ -17,8 +17,8 @@
 
 package org.apache.spark.sql.execution.datasources.parquet
 
-import org.apache.parquet.io.api.{GroupConverter, RecordMaterializer}
-import org.apache.parquet.schema.MessageType
+import parquet.io.api.{GroupConverter, RecordMaterializer}
+import parquet.schema.MessageType
 
 import org.apache.spark.sql.catalyst.expressions.UnsafeRow
 import org.apache.spark.sql.types.StructType

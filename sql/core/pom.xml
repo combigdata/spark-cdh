@@ -75,11 +75,11 @@
       <artifactId>spark-tags_${scala.binary.version}</artifactId>
     </dependency>
     <dependency>
-      <groupId>org.apache.parquet</groupId>
+      <groupId>com.twitter</groupId>
       <artifactId>parquet-column</artifactId>
     </dependency>
     <dependency>
-      <groupId>org.apache.parquet</groupId>
+      <groupId>com.twitter</groupId>
       <artifactId>parquet-hadoop</artifactId>
     </dependency>
     <dependency>
@@ -113,7 +113,7 @@
       <scope>test</scope>
     </dependency>
     <dependency>
-      <groupId>org.apache.parquet</groupId>
+      <groupId>com.twitter</groupId>
       <artifactId>parquet-avro</artifactId>
       <scope>test</scope>
     </dependency>

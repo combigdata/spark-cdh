@@ -23,8 +23,8 @@ import java.util.concurrent.TimeUnit
 import scala.collection.JavaConverters._
 import scala.collection.immutable
 
+import _root_.parquet.hadoop.ParquetOutputCommitter
 import org.apache.hadoop.fs.Path
-import org.apache.parquet.hadoop.ParquetOutputCommitter
 
 import org.apache.spark.internal.Logging
 import org.apache.spark.internal.config._
@@ -237,8 +237,9 @@ object SQLConf {
   val PARQUET_OUTPUT_COMMITTER_CLASS = SQLConfigBuilder("spark.sql.parquet.output.committer.class")
     .doc("The output committer class used by Parquet. The specified class needs to be a " +
       "subclass of org.apache.hadoop.mapreduce.OutputCommitter.  Typically, it's also a subclass " +
-      "of org.apache.parquet.hadoop.ParquetOutputCommitter.")
-    .internal()
+      "of parquet.hadoop.ParquetOutputCommitter.  NOTE: 1. Instead of SQLConf, this " +
+      "option must be set in Hadoop Configuration.  2. This option overrides " +
+      "\"spark.sql.sources.outputCommitterClass\".")
     .stringConf
     .createWithDefault(classOf[ParquetOutputCommitter].getName)
 

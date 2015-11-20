@@ -17,13 +17,13 @@
 
 package org.apache.spark.sql.execution.datasources.parquet;
 
-import org.apache.parquet.Preconditions;
-import org.apache.parquet.bytes.BytesUtils;
-import org.apache.parquet.column.values.ValuesReader;
-import org.apache.parquet.column.values.bitpacking.BytePacker;
-import org.apache.parquet.column.values.bitpacking.Packer;
-import org.apache.parquet.io.ParquetDecodingException;
-import org.apache.parquet.io.api.Binary;
+import parquet.Preconditions;
+import parquet.bytes.BytesUtils;
+import parquet.column.values.ValuesReader;
+import parquet.column.values.bitpacking.BytePacker;
+import parquet.column.values.bitpacking.Packer;
+import parquet.io.ParquetDecodingException;
+import parquet.io.api.Binary;
 
 import org.apache.spark.sql.execution.vectorized.ColumnVector;
 
