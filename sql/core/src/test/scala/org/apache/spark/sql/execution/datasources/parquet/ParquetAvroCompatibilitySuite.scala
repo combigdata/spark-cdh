@@ -26,7 +26,7 @@ import scala.collection.JavaConverters._
 import org.apache.avro.Schema
 import org.apache.avro.generic.IndexedRecord
 import org.apache.hadoop.fs.Path
-import org.apache.parquet.avro.AvroParquetWriter
+import parquet.avro.AvroParquetWriter
 
 import org.apache.spark.sql.Row
 import org.apache.spark.sql.execution.datasources.parquet.test.avro._

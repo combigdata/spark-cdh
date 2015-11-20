@@ -29,13 +29,13 @@ import org.apache.hadoop.fs.{FileStatus, Path}
 import org.apache.hadoop.mapreduce._
 import org.apache.hadoop.mapreduce.lib.input.{FileInputFormat, FileSplit}
 import org.apache.hadoop.mapreduce.task.TaskAttemptContextImpl
-import org.apache.parquet.{Log => ApacheParquetLog}
-import org.apache.parquet.filter2.compat.FilterCompat
-import org.apache.parquet.filter2.predicate.FilterApi
-import org.apache.parquet.hadoop._
-import org.apache.parquet.hadoop.util.ContextUtil
-import org.apache.parquet.schema.MessageType
 import org.slf4j.bridge.SLF4JBridgeHandler
+import parquet.{Log => ApacheParquetLog}
+import parquet.filter2.compat.FilterCompat
+import parquet.filter2.predicate.FilterApi
+import parquet.hadoop._
+import parquet.hadoop.util.ContextUtil
+import parquet.schema.MessageType
 
 import org.apache.spark.SparkException
 import org.apache.spark.internal.Logging
@@ -343,7 +343,7 @@ private[sql] class ParquetFileFormat
         new FileSplit(new Path(new URI(file.filePath)), file.start, file.length, Array.empty)
 
       val split =
-        new org.apache.parquet.hadoop.ParquetInputSplit(
+        new _root_.parquet.hadoop.ParquetInputSplit(
           fileSplit.getPath,
           fileSplit.getStart,
           fileSplit.getStart + fileSplit.getLength,

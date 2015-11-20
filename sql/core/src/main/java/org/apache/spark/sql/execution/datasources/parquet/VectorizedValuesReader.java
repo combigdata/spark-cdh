@@ -17,9 +17,9 @@
 
 package org.apache.spark.sql.execution.datasources.parquet;
 
-import org.apache.spark.sql.execution.vectorized.ColumnVector;
+import parquet.io.api.Binary;
 
-import org.apache.parquet.io.api.Binary;
+import org.apache.spark.sql.execution.vectorized.ColumnVector;
 
 /**
  * Interface for value decoding that supports vectorized (aka batched) decoding.
