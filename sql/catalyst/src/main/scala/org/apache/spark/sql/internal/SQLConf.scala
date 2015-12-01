@@ -264,7 +264,7 @@ object SQLConf {
     .doc("Whether to follow Parquet's format specification when converting Parquet schema to " +
       "Spark SQL schema and vice versa.")
     .booleanConf
-    .createWithDefault(false)
+    .createWithDefault(true)
 
   val PARQUET_OUTPUT_COMMITTER_CLASS = buildConf("spark.sql.parquet.output.committer.class")
     .doc("The output committer class used by Parquet. The specified class needs to be a " +
