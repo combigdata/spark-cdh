@@ -80,8 +80,24 @@ fi
 # The launcher library will print arguments separated by a NULL character, to allow arguments with
 # characters that would be otherwise interpreted by the shell. Read that in a while loop, populating
 # an array that will be used to exec the final command.
+CP_INDEX=-1
+INDEX=0
 CMD=()
 while IFS= read -d '' -r ARG; do
+  if [ "$ARG" = "-cp" ]; then
+    CP_INDEX=$((INDEX+1))
+  fi
   CMD+=("$ARG")
+  (( INDEX++ ))
 done < <("$RUNNER" -cp "$LAUNCH_CLASSPATH" org.apache.spark.launcher.Main "$@")
+
+# Check for the required libraries before starting spark. Exit if any of the required libraries
+# are missing.
+if [[ ! "${CMD[$CP_INDEX]}" =~ "hadoop-common" ]]; then
+  echo "Required Hadoop libraries are missing in classpath." 1>&2
+  echo "This could happen if gateway roles are not setup on the node or configuration files are missing." 1>&2
+  echo "Please check Spark and Hadoop configurations, setup gateway roles on this node and try again." 1>&2
+  exit 1
+fi
+
 exec "${CMD[@]}"
