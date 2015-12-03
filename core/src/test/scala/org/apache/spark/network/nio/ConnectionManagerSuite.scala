@@ -91,7 +91,7 @@ class ConnectionManagerSuite extends SparkFunSuite {
     managerServer.stop()
   }
 
-  test("security mismatch password") {
+  ignore("security mismatch password") {
     val conf = new SparkConf
     conf.set("spark.authenticate", "true")
     conf.set("spark.app.id", "app-id")
