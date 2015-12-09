@@ -51,6 +51,9 @@ private[spark] abstract class YarnSchedulerBackend(
 
   private implicit val askTimeout = RpcUtils.askRpcTimeout(sc.conf)
 
+  // Flag to specify whether this schedulerBackend should be reset.
+  private var shouldResetOnAmRegister = false
+
   /**
    * Request executors from the ApplicationMaster by specifying the total number desired.
    * This includes executors already pending or running.
@@ -95,6 +98,16 @@ private[spark] abstract class YarnSchedulerBackend(
 
   override def createDriverEndpoint(properties: Seq[(String, String)]): DriverEndpoint = {
     new YarnDriverEndpoint(rpcEnv, properties)
+  }
+
+  /**
+   * Reset the state of SchedulerBackend to the initial state. This is happened when AM is failed
+   * and re-registered itself to driver after a failure. The stale state in driver should be
+   * cleaned.
+   */
+  override protected def reset(): Unit = {
+    super.reset()
+    sc.executorAllocationManager.foreach(_.reset())
   }
 
   /**
@@ -160,6 +173,8 @@ private[spark] abstract class YarnSchedulerBackend(
         case None =>
           logWarning("Attempted to check for an executor loss reason" +
             " before the AM has registered!")
+          driverEndpoint.askWithRetry[Boolean](
+            RemoveExecutor(executorId, SlaveLost("AM is not yet registered.")))
       }
     }
 
@@ -167,6 +182,13 @@ private[spark] abstract class YarnSchedulerBackend(
       case RegisterClusterManager(am) =>
         logInfo(s"ApplicationMaster registered as $am")
         amEndpoint = Option(am)
+        if (!shouldResetOnAmRegister) {
+          shouldResetOnAmRegister = true
+        } else {
+          // AM is already registered before, this potentially means that AM failed and
+          // a new one registered after the failure. This will only happen in yarn-client mode.
+          reset()
+        }
 
       case AddWebUIFilter(filterName, filterParams, proxyBase) =>
         addWebUIFilter(filterName, filterParams, proxyBase)
@@ -212,6 +234,7 @@ private[spark] abstract class YarnSchedulerBackend(
     override def onDisconnected(remoteAddress: RpcAddress): Unit = {
       if (amEndpoint.exists(_.address == remoteAddress)) {
         logWarning(s"ApplicationMaster has disassociated: $remoteAddress")
+        amEndpoint = None
       }
     }
 
