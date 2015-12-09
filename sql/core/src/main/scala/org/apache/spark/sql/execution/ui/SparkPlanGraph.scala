@@ -66,8 +66,8 @@ private[sql] object SparkPlanGraph {
         SQLMetrics.getMetricParam(metric.metricParam))
     }
     val node = SparkPlanGraphNode(
-      nodeIdGenerator.getAndIncrement(), planInfo.nodeName, planInfo.simpleString,
-      Map(), metrics)
+      nodeIdGenerator.getAndIncrement(), planInfo.nodeName,
+      planInfo.simpleString, planInfo.metadata, metrics)
 
     nodes += node
     val childrenNodes = planInfo.children.map(
