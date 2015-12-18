@@ -365,15 +365,14 @@ private[netty] class NettyRpcEnv(
     }
 
     override def read(dst: ByteBuffer): Int = {
-      val result = if (error == null) {
-        Try(source.read(dst))
-      } else {
-        Failure(error)
-      }
-
-      result match {
+      Try(source.read(dst)) match {
         case Success(bytesRead) => bytesRead
-        case Failure(error) => throw error
+        case Failure(readErr) =>
+          if (error != null) {
+            throw error
+          } else {
+            throw readErr
+          }
       }
     }
 
@@ -399,7 +398,7 @@ private[netty] class NettyRpcEnv(
     }
 
     override def onFailure(streamId: String, cause: Throwable): Unit = {
-      logError(s"Error downloading stream $streamId.", cause)
+      logDebug(s"Error downloading stream $streamId.", cause)
       source.setError(cause)
       sink.close()
     }
