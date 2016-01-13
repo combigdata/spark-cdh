@@ -55,12 +55,7 @@ private[netty] class NettyRpcEnv(
 
   private val streamManager = new NettyStreamManager(this)
 
-  private val _fileServer =
-    if (conf.getBoolean("spark.rpc.useNettyFileServer", false)) {
-      streamManager
-    } else {
-      new HttpBasedFileServer(conf, securityManager)
-    }
+  private val _fileServer = streamManager
 
   private val transportContext = new TransportContext(transportConf,
     new NettyRpcHandler(dispatcher, this, streamManager))
