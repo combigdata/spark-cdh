@@ -48,7 +48,8 @@ class HistoryServer(
     provider: ApplicationHistoryProvider,
     securityManager: SecurityManager,
     port: Int)
-  extends WebUI(securityManager, port, conf) with Logging with UIRoot {
+  extends WebUI(securityManager, securityManager.getSSLOptions("historyServer"), port, conf)
+  with Logging with UIRoot {
 
   // How many applications to retain
   private val retainedApplications = conf.getInt("spark.history.retainedApplications", 50)
@@ -222,7 +223,7 @@ object HistoryServer extends Logging {
 
   val UI_PATH_PREFIX = "/history"
 
-  def main(argStrings: Array[String]) {
+  def main(argStrings: Array[String]): Unit = {
     SignalLogger.register(log)
     new HistoryServerArguments(conf, argStrings)
     initSecurity()

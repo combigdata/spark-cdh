@@ -102,6 +102,7 @@ private[deploy] class Worker(
   private var activeMasterUrl: String = ""
   private[worker] var activeMasterWebUiUrl : String = ""
   private val workerUri = rpcEnv.uriOf(systemName, rpcEnv.address, endpointName)
+  private var workerWebUiUrl: String = ""
   private var registered = false
   private var connected = false
   private val workerId = generateWorkerId()
@@ -185,6 +186,9 @@ private[deploy] class Worker(
     shuffleService.startIfEnabled()
     webUi = new WorkerWebUI(this, workDir, webUiPort)
     webUi.bind()
+
+    val scheme = if (webUi.sslOptions.enabled) "https" else "http"
+    workerWebUiUrl = s"$scheme://$publicAddress:${webUi.boundPort}"
     registerWithMaster()
 
     metricsSystem.registerSource(workerSource)
@@ -339,7 +343,7 @@ private[deploy] class Worker(
 
   private def registerWithMaster(masterEndpoint: RpcEndpointRef): Unit = {
     masterEndpoint.ask[RegisterWorkerResponse](RegisterWorker(
-      workerId, host, port, self, cores, memory, webUi.boundPort, publicAddress))
+      workerId, host, port, self, cores, memory, workerWebUiUrl))
       .onComplete {
         // This is a very fast action so we can use "ThreadUtils.sameThread"
         case Success(msg) =>
