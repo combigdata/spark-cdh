@@ -23,7 +23,7 @@ import org.apache.hadoop.hive.metastore.api.hive_metastoreConstants._
 import org.apache.hadoop.hive.ql.exec.Utilities
 import org.apache.hadoop.hive.ql.metadata.{Partition => HivePartition, Table => HiveTable}
 import org.apache.hadoop.hive.ql.plan.{PlanUtils, TableDesc}
-import org.apache.hadoop.hive.serde2.Deserializer
+import org.apache.hadoop.hive.serde2.{Deserializer, SerDeUtils}
 import org.apache.hadoop.hive.serde2.objectinspector.primitive._
 import org.apache.hadoop.hive.serde2.objectinspector.{ObjectInspectorConverters, StructObjectInspector}
 import org.apache.hadoop.io.Writable
@@ -192,6 +192,7 @@ class HadoopTableReader(
       // Get partition field info
       val partSpec = partDesc.getPartSpec
       val partProps = partDesc.getProperties
+      val tableProps = partDesc.getTableDesc.getProperties
 
       val partColsDelimited: String = partProps.getProperty(META_TABLE_PARTITION_COLUMNS)
       // Partitioning columns are delimited by "/"
@@ -229,7 +230,8 @@ class HadoopTableReader(
       createHadoopRdd(tableDesc, inputPathStr, ifc).mapPartitions { iter =>
         val hconf = broadcastedHiveConf.value.value
         val deserializer = localDeserializer.newInstance()
-        deserializer.initialize(hconf, partProps)
+
+        SerDeUtils.initializeSerDe(deserializer, hconf, partProps, tableProps)
         // get the table deserializer
         val tableSerDe = tableDesc.getDeserializerClass.newInstance()
         tableSerDe.initialize(hconf, tableDesc.getProperties)
