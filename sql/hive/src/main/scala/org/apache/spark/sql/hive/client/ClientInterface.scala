@@ -93,6 +93,9 @@ private[hive] trait ClientInterface {
   /** Returns the configuration for the given key in the current session. */
   def getConf(key: String, defaultValue: String): String
 
+  /** Returns variables used for substitution in queries. */
+  def hiveVariables: JMap[String, String]
+
   /**
    * Runs a HiveQL command using Hive, returning the results as a list of strings.  Each row will
    * result in one string.

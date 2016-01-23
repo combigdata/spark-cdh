@@ -20,6 +20,7 @@ package org.apache.spark.sql.hive
 import java.io.File
 import java.net.{URL, URLClassLoader}
 import java.sql.Timestamp
+import java.util.{Map => JMap}
 import java.util.concurrent.TimeUnit
 import java.util.regex.Pattern
 
@@ -30,10 +31,9 @@ import scala.language.implicitConversions
 import org.apache.hadoop.fs.{FileSystem, Path}
 import org.apache.hadoop.hive.common.StatsSetupConst
 import org.apache.hadoop.hive.common.`type`.HiveDecimal
-import org.apache.hadoop.hive.conf.HiveConf
+import org.apache.hadoop.hive.conf.{HiveConf, HiveVariableSource, VariableSubstitution}
 import org.apache.hadoop.hive.conf.HiveConf.ConfVars
 import org.apache.hadoop.hive.ql.metadata.Table
-import org.apache.hadoop.hive.ql.parse.VariableSubstitution
 import org.apache.hadoop.hive.serde2.io.{DateWritable, TimestampWritable}
 import org.apache.hadoop.util.VersionInfo
 
@@ -195,7 +195,9 @@ class HiveContext private[hive](
     sc.conf.get("spark.sql.hive.thriftServer.singleSession", "false").toBoolean
 
   @transient
-  protected[sql] lazy val substitutor = new VariableSubstitution()
+  protected[sql] lazy val substitutor = new VariableSubstitution(new HiveVariableSource() {
+    override def getHiveVariable(): JMap[String, String] = metadataHive.hiveVariables
+  })
 
   /**
    * The copy of the hive client that is used for execution.  Currently this must always be

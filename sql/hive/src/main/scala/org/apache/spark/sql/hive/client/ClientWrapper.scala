@@ -204,6 +204,8 @@ private[hive] class ClientWrapper(
   /** Returns the configuration for the current session. */
   def conf: HiveConf = SessionState.get().getConf
 
+  override def hiveVariables: JMap[String, String] = SessionState.get().getHiveVariables()
+
   override def getConf(key: String, defaultValue: String): String = {
     conf.get(key, defaultValue)
   }
