@@ -20,7 +20,8 @@ package org.apache.spark.storage
 import java.io.{BufferedOutputStream, FileOutputStream, File, OutputStream}
 import java.nio.channels.FileChannel
 
-import org.apache.spark.Logging
+import org.apache.spark.{Logging, SparkConf}
+import org.apache.spark.crypto._
 import org.apache.spark.serializer.{SerializerInstance, SerializationStream}
 import org.apache.spark.executor.ShuffleWriteMetrics
 import org.apache.spark.util.Utils
@@ -42,9 +43,22 @@ private[spark] class DiskBlockObjectWriter(
     // These write metrics concurrently shared with other active DiskBlockObjectWriters who
     // are themselves performing writes. All updates must be relative.
     writeMetrics: ShuffleWriteMetrics,
-    val blockId: BlockId = null)
+    val blockId: BlockId = null,
+    val sparkConf: SparkConf = null)
   extends OutputStream
   with Logging {
+
+  def this(
+      file: File,
+      serializerInstance: SerializerInstance,
+      bufferSize: Int,
+      compressStream: OutputStream => OutputStream,
+      syncWrites: Boolean,
+      writeMetrics: ShuffleWriteMetrics,
+      blockId: BlockId) {
+    this(file, serializerInstance, bufferSize, compressStream, syncWrites, writeMetrics, blockId,
+      null)
+  }
 
   /** The file channel, used for repositioning / truncating the file. */
   private var channel: FileChannel = null
@@ -86,7 +100,12 @@ private[spark] class DiskBlockObjectWriter(
       throw new IllegalStateException("Writer already closed. Cannot be reopened.")
     }
     fos = new FileOutputStream(file, true)
-    ts = new TimeTrackingOutputStream(writeMetrics, fos)
+    if (CryptoConf.isShuffleEncryptionEnabled(sparkConf)) {
+      val cos = CryptoStreamUtils.createCryptoOutputStream(fos, sparkConf)
+      ts = new TimeTrackingOutputStream(writeMetrics, cos)
+    } else {
+      ts = new TimeTrackingOutputStream(writeMetrics, fos)
+    }
     channel = fos.getChannel()
     bs = compressStream(new BufferedOutputStream(ts, bufferSize))
     objOut = serializerInstance.serializeStream(bs)

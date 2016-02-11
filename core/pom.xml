@@ -356,6 +356,10 @@
       <groupId>org.apache.spark</groupId>
       <artifactId>spark-test-tags_${scala.binary.version}</artifactId>
     </dependency>
+    <dependency>
+      <groupId>com.intel.chimera</groupId>
+      <artifactId>chimera</artifactId>
+    </dependency>
   </dependencies>
   <build>
     <outputDirectory>target/scala-${scala.binary.version}/classes</outputDirectory>

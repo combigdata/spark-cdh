@@ -19,16 +19,15 @@ package org.apache.spark.deploy.yarn
 
 import java.io.{ByteArrayInputStream, DataInputStream, File, FileOutputStream, IOException,
   OutputStreamWriter}
-import java.net.{InetAddress, UnknownHostException, URI, URISyntaxException}
+import java.net.{InetAddress, UnknownHostException, URI}
 import java.nio.ByteBuffer
-import java.security.PrivilegedExceptionAction
 import java.util.{Properties, UUID}
 import java.util.zip.{ZipEntry, ZipOutputStream}
 
 import scala.collection.JavaConverters._
 import scala.collection.mutable.{ArrayBuffer, HashMap, HashSet, ListBuffer, Map}
 import scala.reflect.runtime.universe
-import scala.util.{Try, Success, Failure}
+import scala.util.{Failure, Success, Try}
 import scala.util.control.NonFatal
 
 import com.google.common.base.Charsets.UTF_8
@@ -55,6 +54,8 @@ import org.apache.hadoop.yarn.exceptions.ApplicationNotFoundException
 import org.apache.hadoop.yarn.util.Records
 
 import org.apache.spark.{Logging, SecurityManager, SparkConf, SparkContext, SparkException}
+import org.apache.spark.crypto.CryptoConf
+import org.apache.spark.deploy.SparkHadoopUtil
 import org.apache.spark.launcher.{LauncherBackend, SparkAppHandle, YarnCommandBuilderUtils}
 import org.apache.spark.deploy.SparkHadoopUtil
 import org.apache.spark.util.Utils
@@ -878,6 +879,10 @@ private[spark] class Client(
     val securityManager = new SecurityManager(sparkConf)
     amContainer.setApplicationACLs(
       YarnSparkHadoopUtil.getApplicationAclsForYarn(securityManager).asJava)
+
+    if (CryptoConf.isShuffleEncryptionEnabled(sparkConf)) {
+      CryptoConf.initSparkShuffleCredentials(sparkConf, credentials)
+    }
     setupSecurityToken(amContainer)
     UserGroupInformation.getCurrentUser().addCredentials(credentials)
 

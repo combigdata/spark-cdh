@@ -47,6 +47,7 @@ import org.apache.mesos.MesosNativeLibrary
 
 import org.apache.spark.annotation.DeveloperApi
 import org.apache.spark.broadcast.Broadcast
+import org.apache.spark.crypto.CryptoConf
 import org.apache.spark.deploy.{LocalSparkCluster, SparkHadoopUtil}
 import org.apache.spark.input.{StreamInputFormat, PortableDataStream, WholeTextFileInputFormat,
   FixedLengthBinaryInputFormat}
@@ -447,6 +448,10 @@ class SparkContext(config: SparkConf) extends Logging with ExecutorAllocationCli
     _conf.set("spark.externalBlockStore.folderName", externalBlockStoreFolderName)
 
     if (master == "yarn-client") System.setProperty("SPARK_YARN_MODE", "true")
+    if (CryptoConf.isShuffleEncryptionEnabled(_conf) && !SparkHadoopUtil.get.isYarnMode()) {
+      throw new SparkException("Shuffle file encryption is only supported in Yarn mode, please " +
+        "disable it by setting spark.shuffle.encryption.enabled to false")
+    }
 
     // "_jobProgressListener" should be set up before creating SparkEnv because when creating
     // "SparkEnv", some messages will be posted to "listenerBus" and we should not miss them.

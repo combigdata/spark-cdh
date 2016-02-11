@@ -18,6 +18,8 @@
 package org.apache.spark.shuffle
 
 import org.apache.spark._
+import org.apache.spark.crypto._
+import org.apache.spark.deploy.SparkHadoopUtil
 import org.apache.spark.serializer.Serializer
 import org.apache.spark.storage.{BlockManager, ShuffleBlockFetcherIterator}
 import org.apache.spark.util.CompletionIterator
@@ -48,13 +50,19 @@ private[spark] class BlockStoreShuffleReader[K, C](
       // Note: we use getSizeAsMb when no suffix is provided for backwards compatibility
       SparkEnv.get.conf.getSizeAsMb("spark.reducer.maxSizeInFlight", "48m") * 1024 * 1024)
 
-    // Wrap the streams for compression based on configuration
-    val wrappedStreams = blockFetcherItr.map { case (blockId, inputStream) =>
-      blockManager.wrapForCompression(blockId, inputStream)
-    }
-
     val ser = Serializer.getSerializer(dep.serializer)
     val serializerInstance = ser.newInstance()
+
+    // Wrap the streams for compression and encryption based on configuration
+    val wrappedStreams = blockFetcherItr.map { case (blockId, inputStream) =>
+      val sparkConf = blockManager.conf
+      if (CryptoConf.isShuffleEncryptionEnabled(sparkConf)) {
+        val cis = CryptoStreamUtils.createCryptoInputStream(inputStream, sparkConf)
+        blockManager.wrapForCompression(blockId, cis)
+      } else {
+        blockManager.wrapForCompression(blockId, inputStream)
+      }
+    }
 
     // Create a key/value iterator for each stream
     val recordIter = wrappedStreams.flatMap { wrappedStream =>

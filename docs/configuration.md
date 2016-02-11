@@ -477,6 +477,57 @@ Apart from these, the following properties are also available, and may be useful
     <code>spark.io.compression.codec</code>.
   </td>
 </tr>
+<tr>
+  <td><code>spark.shuffle.encryption.enabled</code></td>
+  <td>false</td>
+  <td>
+    Enable shuffle file encryption.
+  </td>
+</tr>
+<tr>
+  <td><code>spark.shuffle.encryption.keySizeBits</code></td>
+  <td>128</td>
+  <td>
+    Shuffle file encryption key size in bits. The valid number includes 128, 192 and 256.
+  </td>
+</tr>
+<tr>
+  <td><code>spark.shuffle.encryption.keygen.algorithm</code></td>
+  <td>HmacSHA1</td>
+  <td>
+    The algorithm to generate the key used by shuffle file encryption. The supported algorithms are
+    described in the KeyGenerator section of the Java Cryptography Architecture Standard Algorithm
+    Name Documentation.
+  </td>
+</tr>
+<tr>
+  <td><code>spark.shuffle.crypto.cipher.transformation</code></td>
+  <td>AES/CTR/NoPadding</td>
+  <td>
+    Cipher transformation for shuffle file encryption. The cipher transformation name is
+    identical to the transformations described in the Cipher section of the Java Cryptography
+    Architecture Standard Algorithm Name Documentation. Currently only "AES/CTR/NoPadding"
+    algorithm is supported.
+  </td>
+</tr>
+<tr>
+  <td><code>spark.shuffle.crypto.cipher.classes</code></td>
+  <td>com.intel.chimera.cipher.OpensslCipher,com.intel.chimera.cipher.JceCipher</td>
+  <td>
+    Comma-separated list of crypto cipher classes which implement cipher algorithm of
+    "AES/CTR/NoPadding". A crypto cipher implementation encapsulates the encryption and decryption
+    details. The first available implementation appearing in this list will be used.
+  </td>
+</tr>
+<tr>
+  <td><code>spark.shuffle.crypto.secure.random.classes</code></td>
+  <td>com.intel.chimera.random.OpensslSecureRandom,com.intel.chimera.random.OsSecureRandom,com.intel.chimera.random.JavaSecureRandom</td>
+  <td>
+    Comma-separated list of secure random classes which implement secure random algorithm. It's
+    used when generating the Initialization Vector for crypto input/output streams. The first
+    available implementation appearing in this list will be used.
+  </td>
+</tr>
 </table>
 
 #### Spark UI

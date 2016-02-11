@@ -96,7 +96,8 @@ class BypassMergeSortShuffleWriterSuite extends SparkFunSuite with BeforeAndAfte
           compressStream = identity,
           syncWrites = false,
           args(4).asInstanceOf[ShuffleWriteMetrics],
-          blockId = args(0).asInstanceOf[BlockId]
+          blockId = args(0).asInstanceOf[BlockId],
+          conf
         )
       }
     })
