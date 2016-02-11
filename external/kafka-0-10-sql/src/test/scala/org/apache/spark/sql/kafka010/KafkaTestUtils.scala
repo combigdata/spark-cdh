@@ -37,7 +37,9 @@ import org.apache.kafka.clients.admin.{AdminClient, CreatePartitionsOptions, New
 import org.apache.kafka.clients.consumer.KafkaConsumer
 import org.apache.kafka.clients.producer._
 import org.apache.kafka.common.TopicPartition
+import org.apache.kafka.common.errors.TopicExistsException
 import org.apache.kafka.common.network.ListenerName
+import org.apache.kafka.common.protocol.SecurityProtocol
 import org.apache.kafka.common.serialization.{StringDeserializer, StringSerializer}
 import org.apache.zookeeper.server.{NIOServerCnxnFactory, ZooKeeperServer}
 import org.scalatest.concurrent.Eventually._
@@ -70,6 +72,7 @@ class KafkaTestUtils(withBrokerProps: Map[String, Object] = Map.empty) extends L
   private val brokerHost = "127.0.0.1"
   private var brokerPort = 0
   private var brokerConf: KafkaConfig = _
+  private var securityProtocol: SecurityProtocol = SecurityProtocol.PLAINTEXT
 
   // Kafka broker server
   private var server: KafkaServer = _
@@ -118,7 +121,7 @@ class KafkaTestUtils(withBrokerProps: Map[String, Object] = Map.empty) extends L
       brokerConf = new KafkaConfig(brokerConfiguration, doLog = false)
       server = new KafkaServer(brokerConf)
       server.startup()
-      brokerPort = server.boundPort(new ListenerName("PLAINTEXT"))
+      brokerPort = server.boundPort(ListenerName.forSecurityProtocol(securityProtocol))
       (server, brokerPort)
     }, new SparkConf(), "KafkaBroker")
 
@@ -198,10 +201,7 @@ class KafkaTestUtils(withBrokerProps: Map[String, Object] = Map.empty) extends L
         AdminUtils.createTopic(zkUtils, topic, partitions, 1)
         created = true
       } catch {
-        // Workaround fact that TopicExistsException is in kafka.common in 0.10.0 and
-        // org.apache.kafka.common.errors in 0.10.1 (!)
-        case e: Exception if (e.getClass.getSimpleName == "TopicExistsException") && overwrite =>
-          deleteTopic(topic)
+        case e: TopicExistsException if overwrite => deleteTopic(topic)
       }
     }
     // wait until metadata is propagated
@@ -393,7 +393,7 @@ class KafkaTestUtils(withBrokerProps: Map[String, Object] = Map.empty) extends L
       s"topic $topic still exists in log mananger")
     // ensure that topic is removed from all cleaner offsets
     assert(servers.forall(server => topicAndPartitions.forall { tp =>
-      val checkpoints = server.getLogManager().liveLogDirs.map { logDir =>
+      val checkpoints = server.getLogManager().logDirs.map { logDir =>
         new OffsetCheckpointFile(new File(logDir, "cleaner-offset-checkpoint")).read()
       }
       checkpoints.forall(checkpointsPerLogDir => !checkpointsPerLogDir.contains(tp))

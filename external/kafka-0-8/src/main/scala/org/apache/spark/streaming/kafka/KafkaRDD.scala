@@ -177,7 +177,7 @@ class KafkaRDD[
 
     private def handleFetchErr(resp: FetchResponse) {
       if (resp.hasError) {
-        val err = resp.errorCode(part.topic, part.partition)
+        val err = resp.error(part.topic, part.partition).code()
         if (err == ErrorMapping.LeaderNotAvailableCode ||
           err == ErrorMapping.NotLeaderForPartitionCode) {
           logError(s"Lost leader for topic ${part.topic} partition ${part.partition}, " +

@@ -33,6 +33,7 @@ import kafka.server.{KafkaConfig, KafkaServer}
 import kafka.utils.ZkUtils
 import org.apache.kafka.clients.producer.{KafkaProducer, ProducerRecord}
 import org.apache.kafka.common.network.ListenerName
+import org.apache.kafka.common.protocol.SecurityProtocol
 import org.apache.kafka.common.serialization.StringSerializer
 import org.apache.zookeeper.server.{NIOServerCnxnFactory, ZooKeeperServer}
 
@@ -63,6 +64,7 @@ private[kafka010] class KafkaTestUtils extends Logging {
   private val brokerHost = "127.0.0.1"
   private var brokerPort = 0
   private var brokerConf: KafkaConfig = _
+  private var securityProtocol: SecurityProtocol = SecurityProtocol.PLAINTEXT
 
   // Kafka broker server
   private var server: KafkaServer = _
@@ -111,7 +113,7 @@ private[kafka010] class KafkaTestUtils extends Logging {
       brokerConf = new KafkaConfig(brokerConfiguration, doLog = false)
       server = new KafkaServer(brokerConf)
       server.startup()
-      brokerPort = server.boundPort(new ListenerName("PLAINTEXT"))
+      brokerPort = server.boundPort(ListenerName.forSecurityProtocol(securityProtocol))
       (server, brokerPort)
     }, new SparkConf(), "KafkaBroker")
 
