@@ -27,6 +27,7 @@ import scala.util.control.NonFatal
 import kafka.api._
 import kafka.common.{ErrorMapping, OffsetAndMetadata, OffsetMetadataAndError, TopicAndPartition}
 import kafka.consumer.{ConsumerConfig, SimpleConsumer}
+import org.apache.kafka.common.protocol.Errors
 
 import org.apache.spark.SparkException
 import org.apache.spark.annotation.DeveloperApi
@@ -131,13 +132,13 @@ class KafkaCluster(val kafkaParams: Map[String, String]) extends Serializable {
     val errs = new Err
     withBrokers(Random.shuffle(config.seedBrokers), errs) { consumer =>
       val resp: TopicMetadataResponse = consumer.send(req)
-      val respErrs = resp.topicsMetadata.filter(m => m.errorCode != ErrorMapping.NoError)
+      val respErrs = resp.topicsMetadata.filter(m => m.error.code() != ErrorMapping.NoError)
 
       if (respErrs.isEmpty) {
         return Right(resp.topicsMetadata.toSet)
       } else {
         respErrs.foreach { m =>
-          val cause = ErrorMapping.exceptionFor(m.errorCode)
+          val cause = ErrorMapping.exceptionFor(m.error.code())
           val msg = s"Error getting partition metadata for '${m.topic}'. Does the topic exist?"
           errs += new SparkException(msg, cause)
         }
@@ -199,7 +200,7 @@ class KafkaCluster(val kafkaParams: Map[String, String]) extends Serializable {
         val respMap = resp.partitionErrorAndOffsets
         partitionsToGetOffsets.foreach { tp: TopicAndPartition =>
           respMap.get(tp).foreach { por: PartitionOffsetsResponse =>
-            if (por.error == ErrorMapping.NoError) {
+            if (por.error.code() == ErrorMapping.NoError) {
               if (por.offsets.nonEmpty) {
                 result += tp -> por.offsets.map { off =>
                   LeaderOffset(consumer.host, consumer.port, off)
@@ -209,7 +210,7 @@ class KafkaCluster(val kafkaParams: Map[String, String]) extends Serializable {
                   s"Empty offsets for ${tp}, is ${before} before log beginning?")
               }
             } else {
-              errs += ErrorMapping.exceptionFor(por.error)
+              errs += ErrorMapping.exceptionFor(por.error.code())
             }
           }
         }
@@ -277,10 +278,10 @@ class KafkaCluster(val kafkaParams: Map[String, String]) extends Serializable {
       val needed = topicAndPartitions.diff(result.keySet)
       needed.foreach { tp: TopicAndPartition =>
         respMap.get(tp).foreach { ome: OffsetMetadataAndError =>
-          if (ome.error == ErrorMapping.NoError) {
+          if (ome.error.code() == ErrorMapping.NoError) {
             result += tp -> ome
           } else {
-            errs += ErrorMapping.exceptionFor(ome.error)
+            errs += ErrorMapping.exceptionFor(ome.error.code())
           }
         }
       }
@@ -338,11 +339,11 @@ class KafkaCluster(val kafkaParams: Map[String, String]) extends Serializable {
       val respMap = resp.commitStatus
       val needed = topicAndPartitions.diff(result.keySet)
       needed.foreach { tp: TopicAndPartition =>
-        respMap.get(tp).foreach { err: Short =>
-          if (err == ErrorMapping.NoError) {
-            result += tp -> err
+        respMap.get(tp).foreach { err: Errors =>
+          if (err.code() == ErrorMapping.NoError) {
+            result += tp -> err.code()
           } else {
-            errs += ErrorMapping.exceptionFor(err)
+            errs += ErrorMapping.exceptionFor(err.code())
           }
         }
       }
