@@ -32,9 +32,9 @@ import kafka.api.Request
 import kafka.producer.{KeyedMessage, Producer, ProducerConfig}
 import kafka.serializer.StringEncoder
 import kafka.server.{KafkaConfig, KafkaServer}
-import kafka.utils.{ZKStringSerializer, ZkUtils}
-import org.I0Itec.zkclient.ZkClient
+import kafka.utils.ZkUtils
 import org.apache.commons.lang3.RandomUtils
+import org.apache.kafka.common.security.JaasUtils
 import org.apache.zookeeper.server.{NIOServerCnxnFactory, ZooKeeperServer}
 
 import org.apache.spark.SparkConf
@@ -58,7 +58,7 @@ private[kafka] class KafkaTestUtils extends Logging {
 
   private var zookeeper: EmbeddedZookeeper = _
 
-  private var zkClient: ZkClient = _
+  private var zkUtils: ZkUtils = _
 
   // Kafka broker related configurations
   private val brokerHost = "localhost"
@@ -86,9 +86,9 @@ private[kafka] class KafkaTestUtils extends Logging {
     s"$brokerHost:$brokerPort"
   }
 
-  def zookeeperClient: ZkClient = {
+  def zookeeperUtils: ZkUtils = {
     assert(zkReady, "Zookeeper not setup yet or already torn down, cannot get zookeeper client")
-    Option(zkClient).getOrElse(
+    Option(zkUtils).getOrElse(
       throw new IllegalStateException("Zookeeper client is not yet initialized"))
   }
 
@@ -98,8 +98,8 @@ private[kafka] class KafkaTestUtils extends Logging {
     zookeeper = new EmbeddedZookeeper(s"$zkHost:$zkPort")
     // Get the actual zookeeper binding port
     zkPort = zookeeper.actualPort
-    zkClient = new ZkClient(s"$zkHost:$zkPort", zkSessionTimeout, zkConnectionTimeout,
-      ZKStringSerializer)
+    val zkClient = ZkUtils.createZkClient(s"$zkHost:$zkPort", zkSessionTimeout, zkConnectionTimeout)
+    zkUtils = ZkUtils(zkClient, JaasUtils.isZkSecurityEnabled())
     zkReady = true
   }
 
@@ -110,7 +110,7 @@ private[kafka] class KafkaTestUtils extends Logging {
     // Kafka broker startup
     Utils.startServiceOnPort(brokerPort, port => {
       brokerPort = port
-      brokerConf = new KafkaConfig(brokerConfiguration)
+      brokerConf = KafkaConfig.fromProps(brokerConfiguration)
       server = new KafkaServer(brokerConf)
       server.startup()
       (server, brokerPort)
@@ -153,9 +153,9 @@ private[kafka] class KafkaTestUtils extends Logging {
       }
     }
 
-    if (zkClient != null) {
-      zkClient.close()
-      zkClient = null
+    if (zkUtils != null) {
+      zkUtils.close()
+      zkUtils = null
     }
 
     if (zookeeper != null) {
@@ -166,7 +166,7 @@ private[kafka] class KafkaTestUtils extends Logging {
 
   /** Create a Kafka topic and wait until it is propagated to the whole cluster */
   def createTopic(topic: String, partitions: Int): Unit = {
-    AdminUtils.createTopic(zkClient, topic, partitions, 1)
+    AdminUtils.createTopic(zkUtils, topic, partitions, 1)
     // wait until metadata is propagated
     (0 until partitions).foreach { p => waitUntilMetadataIsPropagated(topic, p) }
   }
@@ -250,7 +250,7 @@ private[kafka] class KafkaTestUtils extends Logging {
       case Some(partitionState) =>
         val leaderAndInSyncReplicas = partitionState.leaderIsrAndControllerEpoch.leaderAndIsr
 
-        ZkUtils.getLeaderForPartition(zkClient, topic, partition).isDefined &&
+        zkUtils.getLeaderForPartition(topic, partition).isDefined &&
           Request.isValidBrokerId(leaderAndInSyncReplicas.leader) &&
           leaderAndInSyncReplicas.isr.size >= 1
 

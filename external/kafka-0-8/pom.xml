@@ -50,7 +50,7 @@
     <dependency>
       <groupId>org.apache.kafka</groupId>
       <artifactId>kafka_${scala.binary.version}</artifactId>
-      <version>0.8.2.1</version>
+      <version>${cdh.kafka.version}</version>
       <scope>${flume.deps.scope}</scope>
       <exclusions>
         <exclusion>
