@@ -33,8 +33,6 @@ import org.json4s.JsonAST._
 import org.json4s.jackson.JsonMethods
 import org.json4s.jackson.JsonMethods._
 import org.mockito.Mockito.when
-import org.openqa.selenium.WebDriver
-import org.openqa.selenium.htmlunit.HtmlUnitDriver
 import org.scalatest.{BeforeAndAfter, Matchers}
 import org.scalatest.concurrent.Eventually
 import org.scalatest.mock.MockitoSugar
@@ -298,7 +296,6 @@ class HistoryServerSuite extends SparkFunSuite with BeforeAndAfter with Matchers
 
   test("incomplete apps get refreshed") {
 
-    implicit val webDriver: WebDriver = new HtmlUnitDriver
     implicit val formats = org.json4s.DefaultFormats
 
     // this test dir is explictly deleted on successful runs; retained for diagnostics when
@@ -393,18 +390,6 @@ class HistoryServerSuite extends SparkFunSuite with BeforeAndAfter with Matchers
       provider.getAppUI(appId, None).get.ui
     }
 
-    // selenium isn't that useful on failures...add our own reporting
-    def getNumJobs(suffix: String): Int = {
-      val target = buildURL(appId, suffix)
-      val targetBody = HistoryServerSuite.getUrl(target)
-      try {
-        go to target.toExternalForm
-        findAll(cssSelector("tbody tr")).toIndexedSeq.size
-      } catch {
-        case ex: Exception =>
-          throw new Exception(s"Against $target\n$targetBody", ex)
-      }
-    }
     // use REST API to get #of jobs
     def getNumJobsRestful(): Int = {
       val json = HistoryServerSuite.getUrl(applications(appId, "/jobs"))
@@ -442,8 +427,6 @@ class HistoryServerSuite extends SparkFunSuite with BeforeAndAfter with Matchers
 
     activeJobs() should have size 0
     completedJobs() should have size 1
-    getNumJobs("") should be (1)
-    getNumJobs("/jobs") should be (1)
     getNumJobsRestful() should be (1)
     assert(metrics.lookupCount.getCount > 1, s"lookup count too low in $metrics")
 
@@ -459,10 +442,6 @@ class HistoryServerSuite extends SparkFunSuite with BeforeAndAfter with Matchers
     val stdTimeout = timeout(10 seconds)
     logDebug("waiting for UI to update")
     eventually(stdTimeout, stdInterval) {
-      assert(2 === getNumJobs(""),
-        s"jobs not updated, server=$server\n dir = ${listDir(logDirPath)}")
-      assert(2 === getNumJobs("/jobs"),
-        s"job count under /jobs not updated, server=$server\n dir = ${listDir(logDirPath)}")
       getNumJobsRestful() should be(2)
     }
 
@@ -471,7 +450,7 @@ class HistoryServerSuite extends SparkFunSuite with BeforeAndAfter with Matchers
     eventually(stdTimeout, stdInterval) {
       assert(4 === getNumJobsRestful(), s"two jobs back-to-back not updated, server=$server\n")
     }
-    val jobcount = getNumJobs("/jobs")
+    val jobcount = getNumJobsRestful()
     assert(!provider.getListing().head.completed)
 
     listApplications(false) should contain(appId)
@@ -491,7 +470,7 @@ class HistoryServerSuite extends SparkFunSuite with BeforeAndAfter with Matchers
     // app is no longer incomplete
     listApplications(false) should not contain(appId)
 
-    assert(jobcount === getNumJobs("/jobs"))
+    assert(jobcount === getNumJobsRestful())
 
     // no need to retain the test dir now the tests complete
     logDir.deleteOnExit();
