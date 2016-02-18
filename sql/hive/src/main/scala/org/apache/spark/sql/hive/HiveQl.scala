@@ -899,25 +899,21 @@ https://cwiki.apache.org/confluence/display/Hive/Enhanced+Aggregation%2C+Cube%2C
     case Token("TOK_TRUNCATETABLE",
           Token("TOK_TABLE_PARTITION", table) :: Nil) => NativePlaceholder
 
-    case Token("TOK_QUERY", queryArgs)
-        if Seq("TOK_FROM", "TOK_INSERT").contains(queryArgs.head.getText) =>
+    case Token("TOK_QUERY", queryArgs) =>
+      val fromClause = queryArgs.find(_.getText == "TOK_FROM").map { node =>
+        val Token(_, args) = node
+        args.head
+      }
 
-      val (fromClause: Option[ASTNode], insertClauses, cteRelations) =
-        queryArgs match {
-          case Token("TOK_FROM", args: Seq[ASTNode]) :: insertClauses =>
-            // check if has CTE
-            insertClauses.last match {
-              case Token("TOK_CTE", cteClauses) =>
-                val cteRelations = cteClauses.map(node => {
-                  val relation = nodeToRelation(node, context).asInstanceOf[Subquery]
-                  (relation.alias, relation)
-                }).toMap
-                (Some(args.head), insertClauses.init, Some(cteRelations))
+      val insertClauses = queryArgs.find(_.getText == "TOK_INSERT")
 
-              case _ => (Some(args.head), insertClauses, None)
-            }
-
-          case Token("TOK_INSERT", _) :: Nil => (None, queryArgs, None)
+      val cteRelations = queryArgs.find(_.getText == "TOK_CTE")
+        .map { node =>
+          val Token(_, cteClauses) = node
+          cteClauses.map { clause =>
+            val relation = nodeToRelation(clause, context).asInstanceOf[Subquery]
+            (relation.alias, relation)
+          }.toMap
         }
 
       // Return one query for each insert clause.
