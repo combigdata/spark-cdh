@@ -20,7 +20,7 @@ from __future__ import print_function
 import os
 import shutil
 import sys
-from threading import Lock
+from threading import Lock, RLock
 from tempfile import NamedTemporaryFile
 
 from pyspark import accumulators
