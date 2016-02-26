@@ -54,6 +54,13 @@ private[spark] abstract class YarnSchedulerBackend(
   // Flag to specify whether this schedulerBackend should be reset.
   private var shouldResetOnAmRegister = false
 
+  override def stop(): Unit = {
+    // SPARK-12009: To prevent Yarn allocator from requesting backup for the executors which
+    // was Stopped by SchedulerBackend.
+    requestTotalExecutors(0, 0, Map.empty)
+    super.stop()
+  }
+
   /**
    * Request executors from the ApplicationMaster by specifying the total number desired.
    * This includes executors already pending or running.
