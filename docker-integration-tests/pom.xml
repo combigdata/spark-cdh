@@ -168,4 +168,19 @@
     </dependency>
     <!-- End Jersey dependencies -->
   </dependencies>
+
+  <profiles>
+    <profile>
+      <id>disable-docker-tests</id>
+      <activation>
+        <property>
+          <name>cdh.build</name>
+        </property>
+      </activation>
+      <properties>
+        <skipTests>true</skipTests>
+      </properties>
+    </profile>
+  </profiles>
+
 </project>
