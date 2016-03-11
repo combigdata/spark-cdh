@@ -22,11 +22,11 @@ import java.util.Arrays
 
 import scala.collection.mutable.ArrayBuffer
 import scala.concurrent.duration._
+import scala.concurrent.Future
 import scala.language.implicitConversions
 import scala.language.postfixOps
-
-import org.mockito.Mockito.{mock, when}
 import org.mockito.{Matchers => mc}
+import org.mockito.Mockito.{mock, times, verify, when}
 import org.scalatest._
 import org.scalatest.concurrent.Eventually._
 import org.scalatest.concurrent.Timeouts._
@@ -36,6 +36,12 @@ import org.apache.spark.rpc.RpcEnv
 import org.apache.spark._
 import org.apache.spark.executor.DataReadMethod
 import org.apache.spark.memory.StaticMemoryManager
+
+import org.apache.spark.network.{BlockDataManager, BlockTransferService}
+import org.apache.spark.network.buffer.{ManagedBuffer, NioManagedBuffer}
+import org.apache.spark.network.netty.NettyBlockTransferService
+import org.apache.spark.network.shuffle.BlockFetchingListener
+import org.apache.spark.rpc.RpcEnv
 import org.apache.spark.scheduler.LiveListenerBus
 import org.apache.spark.serializer.{JavaSerializer, KryoSerializer}
 import org.apache.spark.shuffle.hash.HashShuffleManager
@@ -68,8 +74,11 @@ class BlockManagerSuite extends SparkFunSuite with Matchers with BeforeAndAfterE
   private def makeBlockManager(
       maxMem: Long,
       name: String = SparkContext.DRIVER_IDENTIFIER,
-      master: BlockManagerMaster = this.master): BlockManager = {
-    val transfer = new NettyBlockTransferService(conf, securityMgr, numCores = 1)
+      master: BlockManagerMaster = this.master,
+      transferService: Option[BlockTransferService] = Option.empty): BlockManager = {
+    val serializer = new KryoSerializer(conf)
+    val transfer = transferService
+      .getOrElse(new NettyBlockTransferService(conf, securityMgr, numCores = 1))
     val memManager = new StaticMemoryManager(conf, Long.MaxValue, maxMem, numCores = 1)
     val blockManager = new BlockManager(name, rpcEnv, master, serializer, conf,
       memManager, mapOutputTracker, shuffleManager, transfer, securityMgr, 0)
@@ -1318,5 +1327,77 @@ class BlockManagerSuite extends SparkFunSuite with Matchers with BeforeAndAfterE
     assert(result.size === 10000)
     assert(result.data === Right(bytes))
     assert(result.droppedBlocks === Nil)
+  }
+
+  test("SPARK-13328: refresh block locations (fetch should fail after hitting a threshold)") {
+    val mockBlockTransferService =
+      new MockBlockTransferService(conf.getInt("spark.block.failures.beforeLocationRefresh", 5))
+    store = makeBlockManager(8000, "executor1", transferService = Option(mockBlockTransferService))
+    store.putSingle("item", 999L, StorageLevel.MEMORY_ONLY, tellMaster = true)
+    intercept[BlockFetchException] {
+      store.getRemoteBytes("item")
+    }
+  }
+
+  test("SPARK-13328: refresh block locations (fetch should succeed after location refresh)") {
+    val maxFailuresBeforeLocationRefresh =
+      conf.getInt("spark.block.failures.beforeLocationRefresh", 5)
+    val mockBlockManagerMaster = mock(classOf[BlockManagerMaster])
+    val mockBlockTransferService =
+      new MockBlockTransferService(maxFailuresBeforeLocationRefresh)
+    // make sure we have more than maxFailuresBeforeLocationRefresh locations
+    // so that we have a chance to do location refresh
+    val blockManagerIds = (0 to maxFailuresBeforeLocationRefresh)
+      .map { i => BlockManagerId(s"id-$i", s"host-$i", i + 1) }
+    when(mockBlockManagerMaster.getLocations(mc.any[BlockId])).thenReturn(blockManagerIds)
+    store = makeBlockManager(8000, "executor1", mockBlockManagerMaster,
+      transferService = Option(mockBlockTransferService))
+    val block = store.getRemoteBytes("item")
+      .asInstanceOf[Option[ByteBuffer]]
+    assert(block.isDefined)
+    verify(mockBlockManagerMaster, times(2)).getLocations("item")
+  }
+
+  class MockBlockTransferService(val maxFailures: Int) extends BlockTransferService {
+    var numCalls = 0
+
+    override def init(blockDataManager: BlockDataManager): Unit = {}
+
+    override def fetchBlocks(
+        host: String,
+        port: Int,
+        execId: String,
+        blockIds: Array[String],
+        listener: BlockFetchingListener): Unit = {
+      listener.onBlockFetchSuccess("mockBlockId", new NioManagedBuffer(ByteBuffer.allocate(1)))
+    }
+
+    override def close(): Unit = {}
+
+    override def hostName: String = { "MockBlockTransferServiceHost" }
+
+    override def port: Int = { 63332 }
+
+    override def uploadBlock(
+        hostname: String,
+        port: Int, execId: String,
+        blockId: BlockId,
+        blockData: ManagedBuffer,
+        level: StorageLevel): Future[Unit] = {
+      import scala.concurrent.ExecutionContext.Implicits.global
+      Future {}
+    }
+
+    override def fetchBlockSync(
+        host: String,
+        port: Int,
+        execId: String,
+        blockId: String): ManagedBuffer = {
+      numCalls += 1
+      if (numCalls <= maxFailures) {
+        throw new RuntimeException("Failing block fetch in the mock block transfer service")
+      }
+      super.fetchBlockSync(host, port, execId, blockId)
+    }
   }
 }
