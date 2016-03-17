@@ -174,6 +174,14 @@ export MAVEN_OPTS="${MAVEN_OPTS:--Xmx2g -XX:MaxPermSize=512M -XX:ReservedCodeCac
 # See: http://mywiki.wooledge.org/BashFAQ/050
 BUILD_COMMAND=("$MVN" clean "$MVN_TARGET" -DskipTests $@)
 
+# We build spark artifacts in the local cauldron build in several passes. No-clean saves
+# time, since classes generated on the previous pass(es) are reused instead of compiling
+# them from scratch.
+if [ -n "${CAULDRON_NO_CLEAN}" ]; then
+  echo "CAULDRON_NO_CLEAN is set; will NOT perform mvn clean"
+  unset -v 'BUILD_COMMAND[1]'
+fi
+
 # Actually build the jar
 echo -e "\nBuilding with..."
 echo -e "\$ ${BUILD_COMMAND[@]}\n"
