@@ -1954,6 +1954,7 @@
                 launched by the tests have access to the correct test-time classpath.
               -->
               <SPARK_DIST_CLASSPATH>${test_classpath}</SPARK_DIST_CLASSPATH>
+              <SPARK_PREPEND_CLASSES>1</SPARK_PREPEND_CLASSES>
               <JAVA_HOME>${test.java.home}</JAVA_HOME>
             </environmentVariables>
             <systemProperties>
@@ -1991,6 +1992,7 @@
                 launched by the tests have access to the correct test-time classpath.
               -->
               <SPARK_DIST_CLASSPATH>${test_classpath}</SPARK_DIST_CLASSPATH>
+              <SPARK_PREPEND_CLASSES>1</SPARK_PREPEND_CLASSES>
               <JAVA_HOME>${test.java.home}</JAVA_HOME>
             </environmentVariables>
             <systemProperties>
