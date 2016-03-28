@@ -437,7 +437,7 @@ class SparkConf(loadDefaults: Boolean) extends Cloneable with Logging {
 
     // Warn against deprecated memory fractions (unless legacy memory management mode is enabled)
     val legacyMemoryManagementKey = "spark.memory.useLegacyMode"
-    val legacyMemoryManagement = getBoolean(legacyMemoryManagementKey, false)
+    val legacyMemoryManagement = getBoolean(legacyMemoryManagementKey, true)
     if (!legacyMemoryManagement) {
       val keyset = deprecatedMemoryKeys.toSet
       val detected = settings.keys().asScala.filter(keyset.contains)
