@@ -91,7 +91,7 @@ public class LauncherServerSuite extends BaseSuite {
       client = new TestClient(s);
       synchronized (waitLock) {
         client.send(new Hello(handle.getSecret(), "1.4.0"));
-        waitLock.wait(TimeUnit.SECONDS.toMillis(10));
+        waitLock.wait(TimeUnit.SECONDS.toMillis(30));
       }
 
       // Make sure the server matched the client to the handle.
@@ -99,18 +99,18 @@ public class LauncherServerSuite extends BaseSuite {
 
       synchronized (waitLock) {
         client.send(new SetAppId("app-id"));
-        waitLock.wait(TimeUnit.SECONDS.toMillis(10));
+        waitLock.wait(TimeUnit.SECONDS.toMillis(30));
       }
       assertEquals("app-id", handle.getAppId());
 
       synchronized (waitLock) {
         client.send(new SetState(SparkAppHandle.State.RUNNING));
-        waitLock.wait(TimeUnit.SECONDS.toMillis(10));
+        waitLock.wait(TimeUnit.SECONDS.toMillis(30));
       }
       assertEquals(SparkAppHandle.State.RUNNING, handle.getState());
 
       handle.stop();
-      Message stopMsg = client.inbound.poll(10, TimeUnit.SECONDS);
+      Message stopMsg = client.inbound.poll(30, TimeUnit.SECONDS);
       assertTrue(stopMsg instanceof Stop);
     } finally {
       kill(handle);
