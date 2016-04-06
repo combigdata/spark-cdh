@@ -23,8 +23,9 @@ import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat
 import org.apache.hadoop.hive.serde2.`lazy`.LazySimpleSerDe
 import org.apache.hadoop.mapred.TextInputFormat
+import org.apache.hadoop.util.VersionInfo
 
-import org.apache.spark.SparkFunSuite
+import org.apache.spark.{SparkConf, SparkFunSuite}
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql.AnalysisException
 import org.apache.spark.sql.catalyst.{FunctionIdentifier, TableIdentifier}
@@ -46,12 +47,34 @@ import org.apache.spark.util.{MutableURLClassLoader, Utils}
  */
 @ExtendedHiveTest
 class VersionsSuite extends SparkFunSuite with Logging {
-
+  private val sparkConf = new SparkConf()
   private val clientBuilder = new HiveClientBuilder
   import clientBuilder.buildClient
 
-  test("success sanity check") {
-    val badClient = buildClient(HiveUtils.hiveExecutionVersion, new Configuration())
+  // In order to speed up test execution during development or in Jenkins, you can specify the path
+  // of an existing Ivy cache:
+  private val ivyPath: Option[String] = {
+    sys.env.get("SPARK_VERSIONS_SUITE_IVY_PATH").orElse(
+      Some(new File(sys.props("java.io.tmpdir"), "hive-ivy-cache").getAbsolutePath))
+  }
+
+  private def buildConf() = {
+    lazy val warehousePath = Utils.createTempDir()
+    lazy val metastorePath = Utils.createTempDir()
+    metastorePath.delete()
+    Map(
+      "javax.jdo.option.ConnectionURL" -> s"jdbc:derby:;databaseName=$metastorePath;create=true",
+      "hive.metastore.warehouse.dir" -> warehousePath.toString)
+  }
+
+  ignore("success sanity check") {
+    val badClient = IsolatedClientLoader.forVersion(
+      hiveMetastoreVersion = HiveUtils.hiveExecutionVersion,
+      hadoopVersion = VersionInfo.getVersion,
+      sparkConf = sparkConf,
+      hadoopConf = new Configuration(),
+      config = buildConf(),
+      ivyPath = ivyPath).createClient()
     val db = new CatalogDatabase("default", "desc", "loc", Map())
     badClient.createDatabase(db, ignoreIfExists = true)
   }
@@ -59,7 +82,14 @@ class VersionsSuite extends SparkFunSuite with Logging {
   test("hadoop configuration preserved") {
     val hadoopConf = new Configuration()
     hadoopConf.set("test", "success")
-    val client = buildClient(HiveUtils.hiveExecutionVersion, hadoopConf)
+    val client = new IsolatedClientLoader(
+      version = IsolatedClientLoader.hiveVersion(HiveUtils.hiveExecutionVersion),
+      sparkConf = sparkConf,
+      hadoopConf = hadoopConf,
+      config = buildConf(),
+      isolationOn = false,
+      baseClassLoader = Utils.getContextOrSparkClassLoader
+    ).createClient()
     assert("success" === client.getConf("test", null))
   }
 
@@ -97,7 +127,15 @@ class VersionsSuite extends SparkFunSuite with Logging {
       System.gc() // Hack to avoid SEGV on some JVM versions.
       val hadoopConf = new Configuration()
       hadoopConf.set("test", "success")
-      client = buildClient(version, hadoopConf)
+      client =
+        new IsolatedClientLoader(
+          version = IsolatedClientLoader.hiveVersion(version),
+          sparkConf = sparkConf,
+          hadoopConf = hadoopConf,
+          config = buildConf(),
+          isolationOn = false,
+          baseClassLoader = Utils.getContextOrSparkClassLoader
+        ).createClient()
     }
 
     def table(database: String, tableName: String): CatalogTable = {
