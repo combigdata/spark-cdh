@@ -25,8 +25,9 @@ import org.apache.hadoop.hive.common.StatsSetupConst
 import org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat
 import org.apache.hadoop.hive.serde2.`lazy`.LazySimpleSerDe
 import org.apache.hadoop.mapred.TextInputFormat
+import org.apache.hadoop.util.VersionInfo
 
-import org.apache.spark.SparkFunSuite
+import org.apache.spark.{SparkConf, SparkFunSuite}
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql.{AnalysisException, Row}
 import org.apache.spark.sql.catalyst.{FunctionIdentifier, TableIdentifier}
@@ -49,7 +50,7 @@ import org.apache.spark.util.{MutableURLClassLoader, Utils}
  */
 @ExtendedHiveTest
 class VersionsSuite extends SparkFunSuite with Logging {
-
+  private val sparkConf = new SparkConf()
   private val clientBuilder = new HiveClientBuilder
   import clientBuilder.buildClient
 
@@ -73,16 +74,45 @@ class VersionsSuite extends SparkFunSuite with Logging {
     }
   }
 
-  test("success sanity check") {
-    val badClient = buildClient(HiveUtils.hiveExecutionVersion, new Configuration())
-    val db = new CatalogDatabase("default", "desc", new URI("loc"), Map())
+  // In order to speed up test execution during development or in Jenkins, you can specify the path
+  // of an existing Ivy cache:
+  private val ivyPath: Option[String] = {
+    sys.env.get("SPARK_VERSIONS_SUITE_IVY_PATH").orElse(
+      Some(new File(sys.props("java.io.tmpdir"), "hive-ivy-cache").getAbsolutePath))
+  }
+
+  private def buildConf() = {
+    lazy val warehousePath = Utils.createTempDir()
+    lazy val metastorePath = Utils.createTempDir()
+    metastorePath.delete()
+    Map(
+      "javax.jdo.option.ConnectionURL" -> s"jdbc:derby:;databaseName=$metastorePath;create=true",
+      "hive.metastore.warehouse.dir" -> warehousePath.toString)
+  }
+
+  ignore("success sanity check") {
+    val badClient = IsolatedClientLoader.forVersion(
+      hiveMetastoreVersion = HiveUtils.hiveExecutionVersion,
+      hadoopVersion = VersionInfo.getVersion,
+      sparkConf = sparkConf,
+      hadoopConf = new Configuration(),
+      config = buildConf(),
+      ivyPath = ivyPath).createClient()
+    val db = new CatalogDatabase("default", "desc", "loc", Map())
     badClient.createDatabase(db, ignoreIfExists = true)
   }
 
   test("hadoop configuration preserved") {
     val hadoopConf = new Configuration()
     hadoopConf.set("test", "success")
-    val client = buildClient(HiveUtils.hiveExecutionVersion, hadoopConf)
+    val client = new IsolatedClientLoader(
+      version = IsolatedClientLoader.hiveVersion(HiveUtils.hiveExecutionVersion),
+      sparkConf = sparkConf,
+      hadoopConf = hadoopConf,
+      config = buildConf(),
+      isolationOn = false,
+      baseClassLoader = Utils.getContextOrSparkClassLoader
+    ).createClient()
     assert("success" === client.getConf("test", null))
   }
 
@@ -125,11 +155,20 @@ class VersionsSuite extends SparkFunSuite with Logging {
       // Hive changed the default of datanucleus.schema.autoCreateAll from true to false and
       // hive.metastore.schema.verification from false to true since 2.0
       // For details, see the JIRA HIVE-6113 and HIVE-12463
-      if (version == "2.0" || version == "2.1") {
-        hadoopConf.set("datanucleus.schema.autoCreateAll", "true")
-        hadoopConf.set("hive.metastore.schema.verification", "false")
-      }
-      client = buildClient(version, hadoopConf, HiveUtils.hiveClientConfigurations(hadoopConf))
+      // if (version == "2.0" || version == "2.1") {
+      //   hadoopConf.set("datanucleus.schema.autoCreateAll", "true")
+      //   hadoopConf.set("hive.metastore.schema.verification", "false")
+      // }
+      // client = buildClient(version, hadoopConf, HiveUtils.hiveClientConfigurations(hadoopConf))
+      client =
+        new IsolatedClientLoader(
+          version = IsolatedClientLoader.hiveVersion(version),
+          sparkConf = sparkConf,
+          hadoopConf = hadoopConf,
+          config = buildConf(),
+          isolationOn = false,
+          baseClassLoader = Utils.getContextOrSparkClassLoader
+        ).createClient()
       if (versionSpark != null) versionSpark.reset()
       versionSpark = TestHiveVersion(client)
       assert(versionSpark.sharedState.externalCatalog.asInstanceOf[HiveExternalCatalog].client
