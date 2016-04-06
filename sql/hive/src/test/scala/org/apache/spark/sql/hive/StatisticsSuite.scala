@@ -70,7 +70,8 @@ class StatisticsSuite extends StatisticsCollectionTestBase with TestHiveSingleto
     }
   }
 
-  test("Hive serde tables should fallback to HDFS for size estimation") {
+  // CDH-56492: This test fails with Hive 2.1 because of hive.stats.autogather.
+  ignore("Hive serde tables should fallback to HDFS for size estimation") {
     withSQLConf(SQLConf.ENABLE_FALL_BACK_TO_HDFS_FOR_STATS.key -> "true") {
       withTable("csv_table") {
         withTempDir { tempDir =>

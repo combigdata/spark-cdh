@@ -28,7 +28,7 @@ import com.google.common.base.Objects
 import org.apache.avro.Schema
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.Path
-import org.apache.hadoop.hive.ql.exec.{UDF, Utilities}
+import org.apache.hadoop.hive.ql.exec.{SerializationUtilities, UDF}
 import org.apache.hadoop.hive.ql.plan.{FileSinkDesc, TableDesc}
 import org.apache.hadoop.hive.ql.udf.generic.GenericUDFMacro
 import org.apache.hadoop.hive.serde2.ColumnProjectionUtils
@@ -168,12 +168,21 @@ private[hive] object HiveShim {
     }
 
     def deserializePlan[UDFType](is: java.io.InputStream, clazz: Class[_]): UDFType = {
-      deserializeObjectByKryo(Utilities.runtimeSerializationKryo.get(), is, clazz)
-        .asInstanceOf[UDFType]
+      val kryo = SerializationUtilities.borrowKryo()
+      try {
+        deserializeObjectByKryo(kryo, is, clazz).asInstanceOf[UDFType]
+      } finally {
+        SerializationUtilities.releaseKryo(kryo)
+      }
     }
 
     def serializePlan(function: AnyRef, out: java.io.OutputStream): Unit = {
-      serializeObjectByKryo(Utilities.runtimeSerializationKryo.get(), function, out)
+      val kryo = SerializationUtilities.borrowKryo()
+      try {
+        serializeObjectByKryo(kryo, function, out)
+      } finally {
+        SerializationUtilities.releaseKryo(kryo)
+      }
     }
 
     def writeExternal(out: java.io.ObjectOutput) {

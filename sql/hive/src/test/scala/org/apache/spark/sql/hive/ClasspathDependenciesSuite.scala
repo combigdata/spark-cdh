@@ -57,7 +57,7 @@ class ClasspathDependenciesSuite extends SparkFunSuite {
     }
   }
 
-  test("shaded Protobuf") {
+  ignore("shaded Protobuf") {
     assertLoads("org.apache.hive.com.google.protobuf.ServiceException")
   }
 
@@ -81,7 +81,7 @@ class ClasspathDependenciesSuite extends SparkFunSuite {
   }
 
   test("parquet-hadoop-bundle") {
-    assertLoads("parquet.hadoop.ParquetOutputFormat")
-    assertLoads("parquet.hadoop.ParquetInputFormat")
+    assertLoads("org.apache.parquet.hadoop.ParquetOutputFormat")
+    assertLoads("org.apache.parquet.hadoop.ParquetInputFormat")
   }
 }

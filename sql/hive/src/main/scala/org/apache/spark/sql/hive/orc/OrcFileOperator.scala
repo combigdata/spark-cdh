@@ -81,6 +81,10 @@ private[hive] object OrcFileOperator extends Logging {
           } else {
             throw new SparkException(s"Could not read footer for file: $path", e)
           }
+        case _: IndexOutOfBoundsException =>
+          // CDH-56492: Hive 2.1's ORC code path seems to throw an IndexOutOfBoundsException when
+          // trying to open an empty file, so catch that here.
+          None
       }
       path -> reader
     }.collectFirst {

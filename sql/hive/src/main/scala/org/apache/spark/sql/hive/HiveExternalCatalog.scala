@@ -270,18 +270,18 @@ private[spark] class HiveExternalCatalog(conf: SparkConf, hadoopConf: Configurat
       // This workaround is not done for embedded metastores because (i) there's no Sentry in that
       // case, and (ii) HiveSparkSubmitSuite has a unit test that relies on the behavior without
       // the CDH change.
-      val tableLocation: Option[String] = if (tableDefinition.tableType == MANAGED) {
+      if (tableDefinition.tableType == MANAGED) {
         val metastoreURIs = client.getConf(HiveConf.ConfVars.METASTOREURIS.varname, "")
         if (metastoreURIs.nonEmpty) {
           val fs = FileSystem.get(hadoopConf)
           val metastoreTableLocation = fs.makeQualified(
             new Path(defaultTablePath(tableDefinition.identifier)))
           tableDefinition.storage.locationUri
-            .map { path => fs.makeQualified(new Path(path)).toString }
+            .map { path => fs.makeQualified(new Path(path)).toUri }
             .filter(_ != metastoreTableLocation)
         } else {
           tableDefinition.storage.locationUri
-            .orElse(Some(defaultTablePath(tableDefinition.identifier)))
+            .orElse(Some(CatalogUtils.stringToURI(defaultTablePath(tableDefinition.identifier))))
         }
       } else {
         tableDefinition.storage.locationUri

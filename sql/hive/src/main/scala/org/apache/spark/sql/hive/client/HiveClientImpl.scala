@@ -27,7 +27,7 @@ import scala.collection.mutable.ArrayBuffer
 
 import org.apache.hadoop.fs.Path
 import org.apache.hadoop.hive.common.StatsSetupConst
-import org.apache.hadoop.hive.conf.HiveConf
+import org.apache.hadoop.hive.conf.{HiveConf, HiveConfUtil}
 import org.apache.hadoop.hive.conf.HiveConf.ConfVars
 import org.apache.hadoop.hive.metastore.{TableType => HiveTableType}
 import org.apache.hadoop.hive.metastore.api.{Database => HiveDatabase, FieldSchema, Order}
@@ -50,6 +50,7 @@ import org.apache.spark.sql.catalyst.expressions.Expression
 import org.apache.spark.sql.catalyst.parser.{CatalystSqlParser, ParseException}
 import org.apache.spark.sql.execution.QueryExecutionException
 import org.apache.spark.sql.execution.command.DDLUtils
+import org.apache.spark.sql.hive.HiveExternalCatalog
 import org.apache.spark.sql.hive.HiveExternalCatalog.{DATASOURCE_SCHEMA, DATASOURCE_SCHEMA_NUMPARTS, DATASOURCE_SCHEMA_PART_PREFIX}
 import org.apache.spark.sql.hive.client.HiveClientImpl._
 import org.apache.spark.sql.types._
@@ -176,6 +177,13 @@ private[hive] class HiveClientImpl(
          """.stripMargin)
       hiveConf.set(k, v)
     }
+
+    // CDH-56492: When not using a HMS, enable auto-creation of data in Derby metastores.
+    if (HiveConfUtil.isEmbeddedMetaStore(hiveConf.getVar(ConfVars.METASTOREURIS))) {
+      hiveConf.setBoolVar(ConfVars.METASTORE_AUTO_CREATE_ALL, true)
+      hiveConf.setBoolVar(ConfVars.METASTORE_SCHEMA_VERIFICATION, false)
+    }
+
     val state = new SessionState(hiveConf)
     if (clientLoader.cachedHive != null) {
       Hive.set(clientLoader.cachedHive.asInstanceOf[Hive])
@@ -406,7 +414,10 @@ private[hive] class HiveClientImpl(
         unsupportedFeatures += "partitioned view"
       }
 
-      val properties = Option(h.getParameters).map(_.asScala.toMap).orNull
+      val properties = Option(h.getParameters).map(_.asScala.toMap).getOrElse(Map())
+
+      val provider = properties.get(HiveExternalCatalog.DATASOURCE_PROVIDER)
+        .orElse(Some(DDLUtils.HIVE_PROVIDER))
 
       // Hive-generated Statistics are also recorded in ignoredProperties
       val ignoredProperties = scala.collection.mutable.Map.empty[String, String]
@@ -437,6 +448,7 @@ private[hive] class HiveClientImpl(
             throw new AnalysisException("Hive index table is not supported.")
         },
         schema = schema,
+        provider = provider,
         partitionColumnNames = partCols.map(_.name),
         // If the table is written by Spark, we will put bucketing information in table properties,
         // and will always overwrite the bucket spec in hive metastore by the bucketing information
