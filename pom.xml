@@ -2689,6 +2689,18 @@
       </build>
     </profile>
 
+    <profile>
+      <!--
+           The CDH version of Snappy doesn't play nice on a mac.  We still want our real builds to use
+           the CDH version, but this way you can at least still run unit tests on your mac.
+           We should be sure to get rid of this if the CDH version gets upgraded.
+      -->
+      <id>mac</id>
+      <properties>
+        <snappy.version>1.0.5.4</snappy.version>
+      </properties>
+    </profile>
+
     <!--
      This is a profile to enable the use of the ASF snapshot and staging repositories
      during a build. It is useful when testing againt nightly or RC releases of dependencies.
