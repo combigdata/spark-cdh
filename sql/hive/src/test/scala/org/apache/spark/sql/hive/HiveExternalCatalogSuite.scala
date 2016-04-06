@@ -21,7 +21,8 @@ import org.apache.hadoop.conf.Configuration
 
 import org.apache.spark.SparkConf
 import org.apache.spark.sql.catalyst.catalog._
-import org.apache.spark.sql.hive.client.HiveClient
+import org.apache.spark.sql.hive.client.{HiveClient, IsolatedClientLoader}
+import org.apache.spark.util.Utils
 
 /**
  * Test suite for the [[HiveExternalCatalog]].
@@ -29,9 +30,16 @@ import org.apache.spark.sql.hive.client.HiveClient
 class HiveExternalCatalogSuite extends ExternalCatalogSuite {
 
   private val client: HiveClient = {
-    // We create a metastore at a temp location to avoid any potential
-    // conflict of having multiple connections to a single derby instance.
-    HiveUtils.newClientForExecution(new SparkConf, new Configuration)
+    val metaVersion = IsolatedClientLoader.hiveVersion(
+      HiveUtils.HIVE_METASTORE_VERSION.defaultValue.get)
+    new IsolatedClientLoader(
+      version = metaVersion,
+      sparkConf = new SparkConf(),
+      hadoopConf = new Configuration(),
+      config = HiveUtils.newTemporaryConfiguration(useInMemoryDerby = true),
+      isolationOn = false,
+      baseClassLoader = Utils.getContextOrSparkClassLoader
+    ).createClient()
   }
 
   protected override val utils: CatalogTestUtils = new CatalogTestUtils {
