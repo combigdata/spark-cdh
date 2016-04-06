@@ -2505,6 +2505,18 @@
       </properties>
     </profile>
 
+    <profile>
+      <!--
+           The CDH version of Snappy doesn't play nice on a mac.  We still want our real builds to use
+           the CDH version, but this way you can at least still run unit tests on your mac.
+           We should be sure to get rid of this if the CDH version gets upgraded.
+      -->
+      <id>mac</id>
+      <properties>
+        <snappy.version>1.0.5.4</snappy.version>
+      </properties>
+    </profile>
+
     <!--
       These empty profiles are available in some sub-modules. Declare them here so that
       maven does not complain when they're provided on the command line for a sub-module
