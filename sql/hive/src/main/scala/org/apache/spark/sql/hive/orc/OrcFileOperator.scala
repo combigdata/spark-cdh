@@ -64,10 +64,16 @@ private[hive] object OrcFileOperator extends Logging {
       hdfsPath.getFileSystem(conf)
     }
 
-    listOrcFiles(basePath, conf).iterator.map { path =>
-      path -> OrcFile.createReader(fs, path)
-    }.collectFirst {
-      case (path, reader) if isWithNonEmptySchema(path, reader) => reader
+    // CDH-56492: Hive 2.1's ORC code path seems to throw an IndexOutOfBoundsException when trying
+    // to open an empty file, so catch that here.
+    try {
+      listOrcFiles(basePath, conf).iterator.map { path =>
+        path -> OrcFile.createReader(fs, path)
+      }.collectFirst {
+        case (path, reader) if isWithNonEmptySchema(path, reader) => reader
+      }
+    } catch {
+      case _: IndexOutOfBoundsException => None
     }
   }
 

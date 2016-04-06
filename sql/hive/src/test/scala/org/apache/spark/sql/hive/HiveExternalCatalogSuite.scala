@@ -23,12 +23,28 @@ import org.apache.spark.SparkConf
 import org.apache.spark.sql.catalyst.TableIdentifier
 import org.apache.spark.sql.catalyst.catalog._
 import org.apache.spark.sql.execution.command.DDLUtils
+import org.apache.spark.sql.hive.client.{HiveClient, IsolatedClientLoader}
 import org.apache.spark.sql.types.StructType
+import org.apache.spark.util.Utils
+
 
 /**
  * Test suite for the [[HiveExternalCatalog]].
  */
 class HiveExternalCatalogSuite extends ExternalCatalogSuite {
+
+  private val client: HiveClient = {
+    val metaVersion = IsolatedClientLoader.hiveVersion(
+      HiveUtils.HIVE_METASTORE_VERSION.defaultValue.get)
+    new IsolatedClientLoader(
+      version = metaVersion,
+      sparkConf = new SparkConf(),
+      hadoopConf = new Configuration(),
+      config = HiveUtils.newTemporaryConfiguration(useInMemoryDerby = true),
+      isolationOn = false,
+      baseClassLoader = Utils.getContextOrSparkClassLoader
+    ).createClient()
+  }
 
   private val externalCatalog: HiveExternalCatalog = {
     val catalog = new HiveExternalCatalog(new SparkConf, new Configuration)

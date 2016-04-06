@@ -25,7 +25,8 @@ import scala.collection.mutable.ArrayBuffer
 
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.Path
-import org.apache.hadoop.hive.conf.HiveConf
+import org.apache.hadoop.hive.conf.{HiveConf, HiveConfUtil}
+import org.apache.hadoop.hive.conf.HiveConf.ConfVars
 import org.apache.hadoop.hive.metastore.{TableType => HiveTableType}
 import org.apache.hadoop.hive.metastore.api.{Database => HiveDatabase, FieldSchema}
 import org.apache.hadoop.hive.metastore.api.{SerDeInfo, StorageDescriptor}
@@ -47,6 +48,7 @@ import org.apache.spark.sql.catalyst.expressions.Expression
 import org.apache.spark.sql.catalyst.parser.{CatalystSqlParser, ParseException}
 import org.apache.spark.sql.execution.QueryExecutionException
 import org.apache.spark.sql.execution.command.DDLUtils
+import org.apache.spark.sql.hive.HiveExternalCatalog
 import org.apache.spark.sql.hive.client.HiveClientImpl._
 import org.apache.spark.sql.types._
 import org.apache.spark.util.{CircularBuffer, Utils}
@@ -184,6 +186,13 @@ private[hive] class HiveClientImpl(
           }
           hiveConf.set(k, v)
         }
+
+        // CDH-56492: When not using a HMS, enable auto-creation of data in Derby metastores.
+        if (HiveConfUtil.isEmbeddedMetaStore(hiveConf.getVar(ConfVars.METASTOREURIS))) {
+          hiveConf.setVar(ConfVars.METASTORE_AUTO_CREATE_ALL, "true")
+          hiveConf.setVar(ConfVars.METASTORE_SCHEMA_VERIFICATION, "false")
+        }
+
         val state = new SessionState(hiveConf)
         if (clientLoader.cachedHive != null) {
           Hive.set(clientLoader.cachedHive.asInstanceOf[Hive])
@@ -395,7 +404,10 @@ private[hive] class HiveClientImpl(
         unsupportedFeatures += "partitioned view"
       }
 
-      val properties = Option(h.getParameters).map(_.asScala.toMap).orNull
+      val properties = Option(h.getParameters).map(_.asScala.toMap).getOrElse(Map())
+
+      val provider = properties.get(HiveExternalCatalog.DATASOURCE_PROVIDER)
+        .orElse(Some(DDLUtils.HIVE_PROVIDER))
 
       CatalogTable(
         identifier = TableIdentifier(h.getTableName, Option(h.getDbName)),
@@ -407,6 +419,7 @@ private[hive] class HiveClientImpl(
             throw new AnalysisException("Hive index table is not supported.")
         },
         schema = schema,
+        provider = provider,
         partitionColumnNames = partCols.map(_.name),
         // We can not populate bucketing information for Hive tables as Spark SQL has a different
         // implementation of hash function from Hive.

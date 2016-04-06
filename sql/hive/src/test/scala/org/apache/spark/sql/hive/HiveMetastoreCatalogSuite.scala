@@ -99,6 +99,8 @@ class DataSourceWithHiveMetastoreCatalogSuite
             .write
             .mode(SaveMode.Overwrite)
             .format(provider)
+            // Disable compression because of CDH-25336.
+            .option("compression", "uncompressed")
             .saveAsTable("t")
         }
 
@@ -115,7 +117,8 @@ class DataSourceWithHiveMetastoreCatalogSuite
         assert(columns.map(_.dataType) === Seq(DecimalType(10, 3), StringType))
 
         checkAnswer(table("t"), testDF)
-        assert(sparkSession.metadataHive.runSqlHive("SELECT * FROM t") === Seq("1.1\t1", "2.1\t2"))
+        assert(sparkSession.metadataHive.runSqlHive("SELECT * FROM t") ===
+          Seq("1.100\t1", "2.100\t2"))
       }
     }
 
@@ -130,6 +133,8 @@ class DataSourceWithHiveMetastoreCatalogSuite
               .mode(SaveMode.Overwrite)
               .format(provider)
               .option("path", path.toString)
+              // Disable compression because of CDH-25336.
+              .option("compression", "uncompressed")
               .saveAsTable("t")
           }
 
@@ -148,7 +153,7 @@ class DataSourceWithHiveMetastoreCatalogSuite
 
           checkAnswer(table("t"), testDF)
           assert(sparkSession.metadataHive.runSqlHive("SELECT * FROM t") ===
-            Seq("1.1\t1", "2.1\t2"))
+            Seq("1.100\t1", "2.100\t2"))
         }
       }
     }
@@ -156,9 +161,10 @@ class DataSourceWithHiveMetastoreCatalogSuite
     test(s"Persist non-partitioned $provider relation into metastore as managed table using CTAS") {
       withTempPath { dir =>
         withTable("t") {
+          // Disable compression because of CDH-25336.
           sql(
             s"""CREATE TABLE t USING $provider
-               |OPTIONS (path '${dir.toURI}')
+               |OPTIONS (path '${dir.toURI}', compression 'uncompressed')
                |AS SELECT 1 AS d1, "val_1" AS d2
              """.stripMargin)
 

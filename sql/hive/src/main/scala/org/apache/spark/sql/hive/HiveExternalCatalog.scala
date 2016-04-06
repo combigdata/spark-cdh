@@ -248,18 +248,18 @@ private[spark] class HiveExternalCatalog(conf: SparkConf, hadoopConf: Configurat
       // This workaround is not done for embedded metastores because (i) there's no Sentry in that
       // case, and (ii) HiveSparkSubmitSuite has a unit test that relies on the behavior without
       // the CDH change.
-      val tableLocation: Option[String] = if (tableDefinition.tableType == MANAGED) {
+      if (tableDefinition.tableType == MANAGED) {
         val metastoreURIs = client.getConf(HiveConf.ConfVars.METASTOREURIS.varname, "")
         if (metastoreURIs.nonEmpty) {
           val fs = FileSystem.get(hadoopConf)
           val metastoreTableLocation = fs.makeQualified(
             new Path(defaultTablePath(tableDefinition.identifier)))
           tableDefinition.storage.locationUri
-            .map { path => fs.makeQualified(new Path(path)).toString }
+            .map { path => fs.makeQualified(new Path(path)).toUri }
             .filter(_ != metastoreTableLocation)
         } else {
           tableDefinition.storage.locationUri
-            .orElse(Some(defaultTablePath(tableDefinition.identifier)))
+            .orElse(Some(CatalogUtils.stringToURI(defaultTablePath(tableDefinition.identifier))))
         }
       } else {
         tableDefinition.storage.locationUri
@@ -661,15 +661,24 @@ private[spark] class HiveExternalCatalog(conf: SparkConf, hadoopConf: Configurat
     // Add table metadata such as table schema, partition columns, etc. to table properties.
     val updatedTable = withNewSchema.copy(
       properties = withNewSchema.properties ++ tableMetaToTableProps(withNewSchema))
+
+    // If it's a data source table, make sure the original schema is left unchanged; the
+    // actual schema is recorded as a table property.
+    val tableToStore = if (DDLUtils.isDatasourceTable(updatedTable)) {
+      updatedTable.copy(schema = rawTable.schema)
+    } else {
+      updatedTable
+    }
+
     try {
-      client.alterTable(updatedTable)
+      client.alterTable(tableToStore)
     } catch {
       case NonFatal(e) =>
         val warningMessage =
           s"Could not alter schema of table  ${rawTable.identifier.quotedString} in a Hive " +
             "compatible way. Updating Hive metastore in Spark SQL specific format."
         logWarning(warningMessage, e)
-        client.alterTable(updatedTable.copy(schema = updatedTable.partitionSchema))
+        client.alterTable(tableToStore.copy(schema = tableToStore.partitionSchema))
     }
   }
 

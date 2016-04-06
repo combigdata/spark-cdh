@@ -159,14 +159,14 @@
     <fasterxml.jackson.version>2.6.5</fasterxml.jackson.version>
     <snappy.version>${cdh.hadoop-snappy.version}</snappy.version>
     <netlib.java.version>1.1.2</netlib.java.version>
-    <calcite.version>1.2.0-incubating</calcite.version>
+    <calcite.version>1.10.0</calcite.version>
     <commons-codec.version>1.10</commons-codec.version>
     <commons-io.version>2.4</commons-io.version>
     <!-- org.apache.commons/commons-lang/-->
     <commons-lang2.version>2.6</commons-lang2.version>
     <!-- org.apache.commons/commons-lang3/-->
     <commons-lang3.version>3.5</commons-lang3.version>
-    <datanucleus-core.version>3.2.10</datanucleus-core.version>
+    <datanucleus-core.version>4.1.6</datanucleus-core.version>
     <janino.version>3.0.0</janino.version>
     <jersey.version>2.22.2</jersey.version>
     <joda.version>${cdh.joda-time.version}</joda.version>
@@ -1409,10 +1409,12 @@
             <artifactId>avro-mapred</artifactId>
           </exclusion>
           <!--  this is needed and must be explicitly included later-->
+          <!--
           <exclusion>
             <groupId>org.apache.calcite</groupId>
             <artifactId>calcite-core</artifactId>
           </exclusion>
+          -->
           <exclusion>
             <groupId>org.apache.curator</groupId>
             <artifactId>apache-curator</artifactId>
@@ -1822,6 +1824,7 @@
           </exclusion>
         </exclusions>
       </dependency>
+      <!--
       <dependency>
         <groupId>org.apache.calcite</groupId>
         <artifactId>calcite-avatica</artifactId>
@@ -1841,6 +1844,7 @@
           </exclusion>
         </exclusions>
       </dependency>
+      -->
       <dependency>
         <groupId>org.codehaus.janino</groupId>
         <artifactId>janino</artifactId>

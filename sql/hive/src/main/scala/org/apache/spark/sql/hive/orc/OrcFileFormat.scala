@@ -22,16 +22,20 @@ import java.util.Properties
 
 import scala.collection.JavaConverters._
 
+import org.apache.commons.codec.binary.Base64
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.{FileStatus, Path}
 import org.apache.hadoop.hive.conf.HiveConf.ConfVars
 import org.apache.hadoop.hive.ql.io.orc._
+import org.apache.hadoop.hive.ql.io.sarg.SearchArgument
 import org.apache.hadoop.hive.serde2.objectinspector.{SettableStructObjectInspector, StructObjectInspector}
 import org.apache.hadoop.hive.serde2.typeinfo.{StructTypeInfo, TypeInfoUtils}
 import org.apache.hadoop.io.{NullWritable, Writable}
 import org.apache.hadoop.mapred.{JobConf, OutputFormat => MapRedOutputFormat, RecordWriter, Reporter}
 import org.apache.hadoop.mapreduce._
 import org.apache.hadoop.mapreduce.lib.input.{FileInputFormat, FileSplit}
+import org.apache.hive.com.esotericsoftware.kryo.Kryo
+import org.apache.hive.com.esotericsoftware.kryo.io.Output
 
 import org.apache.spark.TaskContext
 import org.apache.spark.sql.{Row, SparkSession}
@@ -109,6 +113,15 @@ class OrcFileFormat extends FileFormat with DataSourceRegister with Serializable
     true
   }
 
+  // CDH-56492: Adapted from Hive 1.2's SearchArgumentImpl.toKryo().
+  private def toKryo(sarg: SearchArgument): String = {
+    val kryo = new Kryo()
+    val out = new Output(4 * 1024, 10 * 1024 * 1024)
+    kryo.writeObject(out, sarg)
+    out.close()
+    Base64.encodeBase64String(out.toBytes())
+  }
+
   override def buildReader(
       sparkSession: SparkSession,
       dataSchema: StructType,
@@ -120,7 +133,7 @@ class OrcFileFormat extends FileFormat with DataSourceRegister with Serializable
     if (sparkSession.sessionState.conf.orcFilterPushDown) {
       // Sets pushed predicates
       OrcFilters.createFilter(requiredSchema, filters.toArray).foreach { f =>
-        hadoopConf.set(OrcRelation.SARG_PUSHDOWN, f.toKryo)
+        hadoopConf.set(OrcRelation.SARG_PUSHDOWN, toKryo(f))
         hadoopConf.setBoolean(ConfVars.HIVEOPTINDEXFILTER.varname, true)
       }
     }

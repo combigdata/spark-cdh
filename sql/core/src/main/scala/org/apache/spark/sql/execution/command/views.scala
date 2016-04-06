@@ -300,7 +300,11 @@ case class AlterViewAsCommand(
       properties = newProperties,
       viewText = Some(originalText))
 
-    session.sessionState.catalog.alterTable(updatedViewMeta)
+    // CDH-56492: In Hive 2.1, ALTER VIEW is failing if the schema of the view changes, since
+    // METASTORE_DISALLOW_INCOMPATIBLE_COL_TYPE_CHANGES is enabled by default and Hive seems to
+    // also apply it to views. So drop the view, then create it again with the new data.
+    session.sessionState.catalog.dropTable(viewMeta.identifier, true, false)
+    session.sessionState.catalog.createTable(updatedViewMeta, false)
   }
 }
 

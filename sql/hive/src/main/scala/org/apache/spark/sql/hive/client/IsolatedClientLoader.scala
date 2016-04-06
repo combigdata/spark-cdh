@@ -183,6 +183,10 @@ private[hive] class IsolatedClientLoader(
     (name.startsWith("com.google") && !name.startsWith("com.google.cloud")) ||
     name.startsWith("java.lang.") ||
     name.startsWith("java.net") ||
+    // CDH-56492: BeanUtils seems to get confused if these classes are loaded by the client's class
+    // loader.
+    name.startsWith("org.apache.commons.beanutils.") ||
+    name.startsWith("org.apache.commons.configuration2.") ||
     sharedPrefixes.exists(name.startsWith)
   }
 

@@ -17,8 +17,10 @@
 
 package org.apache.spark.sql.hive.orc
 
-import org.apache.hadoop.hive.ql.io.sarg.{SearchArgument, SearchArgumentFactory}
+import org.apache.hadoop.hive.common.`type`.HiveDecimal
+import org.apache.hadoop.hive.ql.io.sarg.{PredicateLeaf, SearchArgument, SearchArgumentFactory}
 import org.apache.hadoop.hive.ql.io.sarg.SearchArgument.Builder
+import org.apache.hadoop.hive.serde2.io.HiveDecimalWritable
 
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql.sources._
@@ -79,13 +81,22 @@ private[orc] object OrcFilters extends Logging {
       builder: Builder): Option[Builder] = {
     def newBuilder = SearchArgumentFactory.newBuilder()
 
-    def isSearchableType(dataType: DataType): Boolean = dataType match {
-      // Only the values in the Spark types below can be recognized by
-      // the `SearchArgumentImpl.BuilderImpl.boxLiteral()` method.
-      case ByteType | ShortType | FloatType | DoubleType => true
-      case IntegerType | LongType | StringType | BooleanType => true
-      case TimestampType | _: DecimalType => true
-      case _ => false
+    def predicateLeafType(dataType: DataType): Option[PredicateLeaf.Type] = dataType match {
+      case ByteType | ShortType | IntegerType | LongType => Some(PredicateLeaf.Type.LONG)
+      case FloatType | DoubleType => Some(PredicateLeaf.Type.FLOAT)
+      case StringType => Some(PredicateLeaf.Type.STRING)
+      case TimestampType => Some(PredicateLeaf.Type.TIMESTAMP)
+      case _: DecimalType => Some(PredicateLeaf.Type.DECIMAL)
+      case BooleanType => Some(PredicateLeaf.Type.BOOLEAN)
+      case _ => None
+    }
+
+    def coerce(value: Any, ltype: PredicateLeaf.Type): Any = ltype match {
+      case PredicateLeaf.Type.LONG => value.asInstanceOf[Number].longValue()
+      case PredicateLeaf.Type.FLOAT => value.asInstanceOf[Number].doubleValue()
+      case PredicateLeaf.Type.DECIMAL =>
+        new HiveDecimalWritable(HiveDecimal.create(value.asInstanceOf[java.math.BigDecimal]))
+      case _ => value
     }
 
     expression match {
@@ -122,32 +133,51 @@ private[orc] object OrcFilters extends Logging {
       // call is mandatory.  ORC `SearchArgument` builder requires that all leaf predicates must be
       // wrapped by a "parent" predicate (`And`, `Or`, or `Not`).
 
-      case EqualTo(attribute, value) if isSearchableType(dataTypeMap(attribute)) =>
-        Some(builder.startAnd().equals(attribute, value).end())
+      case EqualTo(attribute, value) =>
+        predicateLeafType(dataTypeMap(attribute)).map { ltype =>
+          builder.startAnd().equals(attribute, ltype, coerce(value, ltype)).end()
+        }
 
-      case EqualNullSafe(attribute, value) if isSearchableType(dataTypeMap(attribute)) =>
-        Some(builder.startAnd().nullSafeEquals(attribute, value).end())
+      case EqualNullSafe(attribute, value) =>
+        predicateLeafType(dataTypeMap(attribute)).map { ltype =>
+          builder.startAnd().nullSafeEquals(attribute, ltype, coerce(value, ltype)).end()
+        }
 
-      case LessThan(attribute, value) if isSearchableType(dataTypeMap(attribute)) =>
-        Some(builder.startAnd().lessThan(attribute, value).end())
+      case LessThan(attribute, value) =>
+        predicateLeafType(dataTypeMap(attribute)).map { ltype =>
+          builder.startAnd().lessThan(attribute, ltype, coerce(value, ltype)).end()
+        }
 
-      case LessThanOrEqual(attribute, value) if isSearchableType(dataTypeMap(attribute)) =>
-        Some(builder.startAnd().lessThanEquals(attribute, value).end())
+      case LessThanOrEqual(attribute, value) =>
+        predicateLeafType(dataTypeMap(attribute)).map { ltype =>
+          builder.startAnd().lessThanEquals(attribute, ltype, coerce(value, ltype)).end()
+        }
 
-      case GreaterThan(attribute, value) if isSearchableType(dataTypeMap(attribute)) =>
-        Some(builder.startNot().lessThanEquals(attribute, value).end())
+      case GreaterThan(attribute, value) =>
+        predicateLeafType(dataTypeMap(attribute)).map { ltype =>
+          builder.startNot().lessThanEquals(attribute, ltype, coerce(value, ltype)).end()
+        }
 
-      case GreaterThanOrEqual(attribute, value) if isSearchableType(dataTypeMap(attribute)) =>
-        Some(builder.startNot().lessThan(attribute, value).end())
+      case GreaterThanOrEqual(attribute, value) =>
+        predicateLeafType(dataTypeMap(attribute)).map { ltype =>
+          builder.startNot().lessThan(attribute, ltype, coerce(value, ltype)).end()
+        }
 
-      case IsNull(attribute) if isSearchableType(dataTypeMap(attribute)) =>
-        Some(builder.startAnd().isNull(attribute).end())
+      case IsNull(attribute) =>
+        predicateLeafType(dataTypeMap(attribute)).map { ltype =>
+          builder.startAnd().isNull(attribute, ltype).end()
+        }
 
-      case IsNotNull(attribute) if isSearchableType(dataTypeMap(attribute)) =>
-        Some(builder.startNot().isNull(attribute).end())
+      case IsNotNull(attribute) =>
+        predicateLeafType(dataTypeMap(attribute)).map { ltype =>
+          builder.startNot().isNull(attribute, ltype).end()
+        }
 
-      case In(attribute, values) if isSearchableType(dataTypeMap(attribute)) =>
-        Some(builder.startAnd().in(attribute, values.map(_.asInstanceOf[AnyRef]): _*).end())
+      case In(attribute, values) =>
+        predicateLeafType(dataTypeMap(attribute)).map { ltype =>
+          val coerced = values.map { v => coerce(v, ltype).asInstanceOf[AnyRef] }
+          builder.startAnd().in(attribute, ltype, coerced: _*).end()
+        }
 
       case _ => None
     }

@@ -91,6 +91,15 @@ case class InsertIntoHiveTable(
     "hive_" + format.format(new Date) + "_" + Math.abs(rand.nextLong)
   }
 
+  // CDH-56492: FileUtils.isSubDir() was removed in Hive 2.1.
+  private def isSubDir(child: Path, parent: Path, fs: FileSystem): Boolean = {
+    val parentUri = fs.makeQualified(parent).toUri()
+    val childUri = fs.makeQualified(child).toUri()
+
+    parentUri.getScheme() == childUri.getScheme() &&
+      childUri.getPath().startsWith(parentUri.getPath().stripSuffix("/") + "/")
+  }
+
   private def getStagingDir(
       inputPath: Path,
       hadoopConf: Configuration,
@@ -108,7 +117,7 @@ case class InsertIntoHiveTable(
     // SPARK-20594: This is a walk-around fix to resolve a Hive bug. Hive requires that the
     // staging directory needs to avoid being deleted when users set hive.exec.stagingdir
     // under the table directory.
-    if (FileUtils.isSubDir(new Path(stagingPathName), inputPath, fs) &&
+    if (isSubDir(new Path(stagingPathName), inputPath, fs) &&
       !stagingPathName.stripPrefix(inputPathName).stripPrefix(File.separator).startsWith(".")) {
       logDebug(s"The staging dir '$stagingPathName' should be a child directory starts " +
         "with '.' to avoid being deleted if we set hive.exec.stagingdir under the table " +
