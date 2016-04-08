@@ -39,4 +39,5 @@ MVN_REPO_LOCAL=${WORKSPACE:-$HOME}/.m2/repository
 export MAVEN_OPTS="-XX:PermSize=1024m -XX:MaxPermSize=1024m -XX:ReservedCodeCacheSize=512m"
 
 # Build is done by the packaging job before this gets called anyways, so we simply run tests
+export APACHE_MIRROR=http://mirror.infra.cloudera.com/apache
 ./build/mvn --force -B -Dcdh.build=true -P-hive -pl \!docker-integration-tests test -fae -Dmaven.repo.local="$MVN_REPO_LOCAL"
