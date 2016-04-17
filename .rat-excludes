@@ -85,3 +85,6 @@ org.apache.spark.sql.sources.DataSourceRegister
 org.apache.spark.scheduler.SparkHistoryListenerFactory
 .*parquet
 spark-deps-.*
+.*csv
+.*tsv
+org.apache.spark.scheduler.ExternalClusterManager
