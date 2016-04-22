@@ -214,7 +214,7 @@ class ConnectionManagerSuite extends SparkFunSuite {
       manager.sendMessageReliably(managerServer.id, bufferMessage)
     }).foreach(f => {
       try {
-        val g = Await.result(f, 1 second)
+        val g = Await.result(f, 10 second)
       } catch {
         case e: Exception => {
           assert(false)
