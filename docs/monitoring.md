@@ -161,21 +161,10 @@ The history server can be configured as follows:
       Specifies whether acls should be checked to authorize users viewing the applications.
       If enabled, access control checks are made regardless of what the individual application had 
       set for <code>spark.ui.acls.enable</code> when the application was run. The application owner
-      will always have authorization to view their own application and any users specified via 
-      <code>spark.ui.view.acls</code> when the application was run will also have authorization
-      to view that application. 
-      If disabled, no access control checks are made. 
-    </td>
-  </tr>
-  <tr>
-    <td>spark.history.ui.admin.acls</td>
-    <td>empty</td>
-    <td>
-      Comma separated list of users/administrators that have view access to all the Spark applications in
-      history server. By default only the users permitted to view the application at run-time could
-      access the related application history, with this, configured users/administrators could also
-      have the permission to access it.
-      Putting a "*" in the list means any user can have the privilege of admin.
+      will always have authorization to view their own application and any users specified via
+      <code>spark.ui.view.acls</code> and groups specified via <code>spark.ui.view.acls.groups<code>
+      when the application was run will also have authorization to view that application.
+      If disabled, no access control checks are made.
     </td>
   </tr>
   <tr>
