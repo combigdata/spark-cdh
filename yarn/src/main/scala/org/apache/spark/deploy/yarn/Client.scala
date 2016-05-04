@@ -418,11 +418,10 @@ private[spark] class Client(
       distribute(f, targetDir = targetDir)
     }
 
-    // Distribute an archive with Hadoop and Spark configuration for the AM.
+    // Distribute an archive with Hadoop and Spark configuration.
     val (_, confLocalizedPath) = distribute(createConfArchive().toURI().getPath(),
       resType = LocalResourceType.ARCHIVE,
-      destName = Some(LOCALIZED_CONF_DIR),
-      appMasterOnly = true)
+      destName = Some(LOCALIZED_CONF_DIR))
     require(confLocalizedPath != null)
 
     localResources
@@ -533,7 +532,7 @@ private[spark] class Client(
     logInfo("Setting up the launch environment for our AM container")
     val env = new HashMap[String, String]()
     val extraCp = sparkConf.getOption("spark.driver.extraClassPath")
-    populateClasspath(args, yarnConf, sparkConf, env, true, extraCp)
+    populateClasspath(args, yarnConf, sparkConf, env, extraCp)
     env("SPARK_YARN_MODE") = "true"
     env("SPARK_YARN_STAGING_DIR") = stagingDir
     env("SPARK_USER") = UserGroupInformation.getCurrentUser().getShortUserName()
@@ -1140,18 +1139,14 @@ object Client extends Logging {
       conf: Configuration,
       sparkConf: SparkConf,
       env: HashMap[String, String],
-      isAM: Boolean,
       extraClassPath: Option[String] = None): Unit = {
     extraClassPath.foreach { cp =>
       addClasspathEntry(getClusterPath(sparkConf, cp), env)
     }
     addClasspathEntry(YarnSparkHadoopUtil.expandEnvironment(Environment.PWD), env)
-
-    if (isAM) {
-      addClasspathEntry(
-        YarnSparkHadoopUtil.expandEnvironment(Environment.PWD) + Path.SEPARATOR +
-          LOCALIZED_CONF_DIR, env)
-    }
+    addClasspathEntry(
+      YarnSparkHadoopUtil.expandEnvironment(Environment.PWD) + Path.SEPARATOR +
+        LOCALIZED_CONF_DIR, env)
 
     if (sparkConf.getBoolean("spark.yarn.user.classpath.first", false)) {
       val userClassPath =
