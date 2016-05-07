@@ -26,11 +26,12 @@ import org.mockito.Mockito.{mock, when}
 import org.scalatest.{BeforeAndAfter, Matchers}
 import org.scalatest.concurrent.Eventually._
 
-import org.apache.spark.network.netty.NettyBlockTransferService
-import org.apache.spark.rpc.RpcEnv
 import org.apache.spark._
+import org.apache.spark.broadcast.BroadcastManager
 import org.apache.spark.memory.StaticMemoryManager
 import org.apache.spark.network.BlockTransferService
+import org.apache.spark.network.netty.NettyBlockTransferService
+import org.apache.spark.rpc.RpcEnv
 import org.apache.spark.scheduler.LiveListenerBus
 import org.apache.spark.serializer.KryoSerializer
 import org.apache.spark.shuffle.hash.HashShuffleManager
@@ -43,7 +44,8 @@ class BlockManagerReplicationSuite extends SparkFunSuite with Matchers with Befo
   private var rpcEnv: RpcEnv = null
   private var master: BlockManagerMaster = null
   private val securityMgr = new SecurityManager(conf)
-  private val mapOutputTracker = new MapOutputTrackerMaster(conf)
+  private val bcastManager = new BroadcastManager(true, conf, securityMgr)
+  private val mapOutputTracker = new MapOutputTrackerMaster(conf, bcastManager, true)
   private val shuffleManager = new HashShuffleManager(conf)
 
   // List of block manager created during an unit test, so that all of the them can be stopped

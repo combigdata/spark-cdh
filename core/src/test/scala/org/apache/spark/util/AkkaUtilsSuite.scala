@@ -24,6 +24,7 @@ import java.util.concurrent.TimeoutException
 import akka.actor.ActorNotFound
 
 import org.apache.spark._
+import org.apache.spark.broadcast.BroadcastManager
 import org.apache.spark.rpc.RpcEnv
 import org.apache.spark.scheduler.MapStatus
 import org.apache.spark.storage.{BlockManagerId, ShuffleBlockId}
@@ -47,7 +48,7 @@ class AkkaUtilsSuite extends SparkFunSuite with LocalSparkContext with ResetSyst
     System.setProperty("spark.hostPort", rpcEnv.address.hostPort)
     assert(securityManager.isAuthenticationEnabled() === true)
 
-    val masterTracker = new MapOutputTrackerMaster(conf)
+    val masterTracker = newTrackerMaster(conf)
     masterTracker.trackerEndpoint = rpcEnv.setupEndpoint(MapOutputTracker.ENDPOINT_NAME,
       new MapOutputTrackerMasterEndpoint(rpcEnv, masterTracker, conf))
 
@@ -82,7 +83,7 @@ class AkkaUtilsSuite extends SparkFunSuite with LocalSparkContext with ResetSyst
 
     assert(securityManager.isAuthenticationEnabled() === false)
 
-    val masterTracker = new MapOutputTrackerMaster(conf)
+    val masterTracker = newTrackerMaster(conf)
     masterTracker.trackerEndpoint = rpcEnv.setupEndpoint(MapOutputTracker.ENDPOINT_NAME,
       new MapOutputTrackerMasterEndpoint(rpcEnv, masterTracker, conf))
 
@@ -129,7 +130,7 @@ class AkkaUtilsSuite extends SparkFunSuite with LocalSparkContext with ResetSyst
 
     assert(securityManager.isAuthenticationEnabled() === true)
 
-    val masterTracker = new MapOutputTrackerMaster(conf)
+    val masterTracker = newTrackerMaster(conf)
     masterTracker.trackerEndpoint = rpcEnv.setupEndpoint(MapOutputTracker.ENDPOINT_NAME,
       new MapOutputTrackerMasterEndpoint(rpcEnv, masterTracker, conf))
 
@@ -178,7 +179,7 @@ class AkkaUtilsSuite extends SparkFunSuite with LocalSparkContext with ResetSyst
 
     assert(securityManager.isAuthenticationEnabled() === true)
 
-    val masterTracker = new MapOutputTrackerMaster(conf)
+    val masterTracker = newTrackerMaster(conf)
     masterTracker.trackerEndpoint = rpcEnv.setupEndpoint(MapOutputTracker.ENDPOINT_NAME,
       new MapOutputTrackerMasterEndpoint(rpcEnv, masterTracker, conf))
 
@@ -211,7 +212,7 @@ class AkkaUtilsSuite extends SparkFunSuite with LocalSparkContext with ResetSyst
 
     assert(securityManager.isAuthenticationEnabled() === false)
 
-    val masterTracker = new MapOutputTrackerMaster(conf)
+    val masterTracker = newTrackerMaster(conf)
     masterTracker.trackerEndpoint = rpcEnv.setupEndpoint(MapOutputTracker.ENDPOINT_NAME,
       new MapOutputTrackerMasterEndpoint(rpcEnv, masterTracker, conf))
 
@@ -256,7 +257,7 @@ class AkkaUtilsSuite extends SparkFunSuite with LocalSparkContext with ResetSyst
 
     assert(securityManager.isAuthenticationEnabled() === true)
 
-    val masterTracker = new MapOutputTrackerMaster(conf)
+    val masterTracker = newTrackerMaster(conf)
     masterTracker.trackerEndpoint = rpcEnv.setupEndpoint(MapOutputTracker.ENDPOINT_NAME,
       new MapOutputTrackerMasterEndpoint(rpcEnv, masterTracker, conf))
 
@@ -303,7 +304,7 @@ class AkkaUtilsSuite extends SparkFunSuite with LocalSparkContext with ResetSyst
 
     assert(securityManager.isAuthenticationEnabled() === true)
 
-    val masterTracker = new MapOutputTrackerMaster(conf)
+    val masterTracker = newTrackerMaster(conf)
     masterTracker.trackerEndpoint = rpcEnv.setupEndpoint(MapOutputTracker.ENDPOINT_NAME,
       new MapOutputTrackerMasterEndpoint(rpcEnv, masterTracker, conf))
 
@@ -335,7 +336,7 @@ class AkkaUtilsSuite extends SparkFunSuite with LocalSparkContext with ResetSyst
 
     assert(securityManager.isAuthenticationEnabled() === false)
 
-    val masterTracker = new MapOutputTrackerMaster(conf)
+    val masterTracker = newTrackerMaster(conf)
     masterTracker.trackerEndpoint = rpcEnv.setupEndpoint(MapOutputTracker.ENDPOINT_NAME,
       new MapOutputTrackerMasterEndpoint(rpcEnv, masterTracker, conf))
 
@@ -355,6 +356,11 @@ class AkkaUtilsSuite extends SparkFunSuite with LocalSparkContext with ResetSyst
 
     rpcEnv.shutdown()
     slaveRpcEnv.shutdown()
+  }
+
+  private def newTrackerMaster(conf: SparkConf): MapOutputTrackerMaster = {
+    val broadcastManager = new BroadcastManager(true, conf, new SecurityManager(conf))
+    new MapOutputTrackerMaster(conf, broadcastManager, true)
   }
 
 }
