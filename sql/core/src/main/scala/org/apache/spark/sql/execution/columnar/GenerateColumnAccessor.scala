@@ -20,7 +20,7 @@ package org.apache.spark.sql.execution.columnar
 import org.apache.spark.Logging
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.expressions._
-import org.apache.spark.sql.catalyst.expressions.codegen.{UnsafeRowWriter, CodeFormatter, CodeGenerator}
+import org.apache.spark.sql.catalyst.expressions.codegen.{CodeAndComment, CodeFormatter, CodeGenerator, UnsafeRowWriter}
 import org.apache.spark.sql.types._
 
 /**
@@ -114,7 +114,7 @@ object GenerateColumnAccessor extends CodeGenerator[Seq[DataType], ColumnarItera
       (createCode, extract + patch)
     }.unzip
 
-    val code = s"""
+    val codeBody = s"""
       import java.nio.ByteBuffer;
       import java.nio.ByteOrder;
       import scala.collection.Iterator;
@@ -188,6 +188,7 @@ object GenerateColumnAccessor extends CodeGenerator[Seq[DataType], ColumnarItera
         }
       }"""
 
+    val code = new CodeAndComment(codeBody, ctx.getPlaceHolderToComments())
     logDebug(s"Generated ColumnarIterator: ${CodeFormatter.format(code)}")
 
     compile(code).generate(ctx.references.toArray).asInstanceOf[ColumnarIterator]
