@@ -202,6 +202,34 @@
           </execution>
         </executions>
       </plugin>
+      <!-- CDH-40455 publish pyspark and py4j zip files for Oozie -->
+      <plugin>
+        <groupId>org.codehaus.mojo</groupId>
+        <artifactId>build-helper-maven-plugin</artifactId>
+        <executions>
+          <execution>
+            <id>add-jar</id>
+            <phase>package</phase>
+            <goals>
+              <goal>attach-artifact</goal>
+            </goals>
+            <configuration>
+              <artifacts>
+                <artifact>
+                  <file>${basedir}/../python/lib/pyspark.zip</file>
+                  <type>zip</type>
+                  <classifier>pyspark</classifier>
+                </artifact>
+                <artifact>
+                  <file>${basedir}/../python/lib/py4j-0.9-src.zip</file>
+                  <type>zip</type>
+                  <classifier>py4j</classifier>
+                </artifact>
+              </artifacts>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
     </plugins>
   </build>
 
