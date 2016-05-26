@@ -68,7 +68,7 @@ class DirectTaskResult[T](var valueBytes: ByteBuffer, var accumUpdates: Map[Long
 
     val numUpdates = in.readInt
     if (numUpdates == 0) {
-      accumUpdates = null
+      accumUpdates = Seq()
     } else {
       val _accumUpdates = mutable.Map[Long, Any]()
       for (i <- 0 until numUpdates) {
