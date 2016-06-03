@@ -883,7 +883,6 @@ private[spark] class Client(
       CryptoConf.initSparkShuffleCredentials(sparkConf, credentials)
     }
     setupSecurityToken(amContainer)
-    UserGroupInformation.getCurrentUser().addCredentials(credentials)
 
     amContainer
   }
@@ -911,7 +910,8 @@ private[spark] class Client(
       sparkConf.set("spark.yarn.keytab", keytabFileName)
       sparkConf.set("spark.yarn.principal", principal)
     }
-    credentials = UserGroupInformation.getCurrentUser.getCredentials
+    // Defensive copy of the credentials
+    credentials = new Credentials(UserGroupInformation.getCurrentUser.getCredentials)
   }
 
   /**
