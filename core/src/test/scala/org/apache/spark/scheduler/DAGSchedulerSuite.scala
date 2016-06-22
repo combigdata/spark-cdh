@@ -202,7 +202,11 @@ class DAGSchedulerSuite
     cancelledStages.clear()
     cacheLocations.clear()
     results.clear()
-    mapOutputTracker = new MapOutputTrackerMaster(conf)
+    mapOutputTracker = new MapOutputTrackerMaster(conf) {
+      override def sendTracker(message: Any): Unit = {
+        // no-op, just so we can stop this to avoid leaking threads
+      }
+    }
     scheduler = new DAGScheduler(
         sc,
         taskScheduler,
@@ -213,8 +217,14 @@ class DAGSchedulerSuite
     dagEventProcessLoopTester = new DAGSchedulerEventProcessLoopTester(scheduler)
   }
 
-  after {
-    scheduler.stop()
+  override def afterEach(): Unit = {
+    try {
+      scheduler.stop()
+      dagEventProcessLoopTester.stop()
+      mapOutputTracker.stop()
+    } finally {
+      super.afterEach()
+    }
   }
 
   override def afterAll() {
