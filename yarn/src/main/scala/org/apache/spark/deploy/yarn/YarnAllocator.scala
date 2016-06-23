@@ -314,7 +314,7 @@ private[yarn] class YarnAllocator(
       if (unlocalized > 0) {
           logInfo(s"Submitted $unlocalized unlocalized container requests.")
       }
-    } else if (missing < 0) {
+    } else if (numPendingAllocate > 0 && missing < 0) {
       val numToCancel = math.min(numPendingAllocate, -missing)
       logInfo(s"Canceling requests for $numToCancel executor containers")
 
