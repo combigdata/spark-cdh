@@ -18,6 +18,9 @@
 package org.apache.spark.sql.hive
 
 import java.util
+import java.util.Properties
+
+import scala.collection.JavaConverters._
 
 import org.apache.hadoop.fs.{Path, PathFilter}
 import org.apache.hadoop.hive.conf.HiveConf
@@ -228,10 +231,21 @@ class HadoopTableReader(
       // Fill all partition keys to the given MutableRow object
       fillPartitionKeys(partValues, mutableRow)
 
+      val tableProperties = relation.tableDesc.getProperties
+
       createHadoopRdd(tableDesc, inputPathStr, ifc).mapPartitions { iter =>
         val hconf = broadcastedHiveConf.value.value
         val deserializer = localDeserializer.newInstance()
-        deserializer.initialize(hconf, partProps)
+        // SPARK-13709: For SerDes like AvroSerDe, some essential information (e.g. Avro schema
+        // information) may be defined in table properties. Here we should merge table properties
+        // and partition properties before initializing the deserializer. Note that partition
+        // properties take a higher priority here. For example, a partition may have a different
+        // SerDe as the one defined in table properties.
+        val props = new Properties(tableProperties)
+        partProps.asScala.foreach {
+          case (key, value) => props.setProperty(key, value)
+        }
+        deserializer.initialize(hconf, props)
         // get the table deserializer
         val tableSerDe = tableDesc.getDeserializerClass.newInstance()
         tableSerDe.initialize(hconf, tableDesc.getProperties)
