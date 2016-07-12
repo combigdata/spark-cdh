@@ -19,6 +19,7 @@ package org.apache.spark.deploy.yarn
 
 import java.io.File
 import java.net.URL
+import java.nio.charset.StandardCharsets
 import java.util.{HashMap => JHashMap, Properties}
 
 import scala.collection.mutable
@@ -32,6 +33,7 @@ import org.scalatest.Matchers
 import org.scalatest.concurrent.Eventually._
 
 import org.apache.spark._
+import org.apache.spark.deploy.SparkHadoopUtil
 import org.apache.spark.launcher._
 import org.apache.spark.scheduler.{SparkListener, SparkListenerApplicationStart,
   SparkListenerExecutorAdded}
@@ -82,6 +84,10 @@ class YarnClusterSuite extends BaseYarnClusterSuite {
 
   test("run Spark in yarn-cluster mode") {
     testBasicYarnApp(false)
+  }
+
+  test("run Spark in yarn-cluster mode with using SparkHadoopUtil.conf") {
+    testYarnAppUseSparkHadoopUtilConf()
   }
 
   test("run Spark in yarn-cluster mode unsuccessfully") {
@@ -141,6 +147,15 @@ class YarnClusterSuite extends BaseYarnClusterSuite {
     val result = File.createTempFile("result", null, tempDir)
     val finalState = runSpark(clientMode, mainClassName(YarnClusterDriver.getClass),
       appArgs = Seq(result.getAbsolutePath()))
+    checkResult(finalState, result)
+  }
+
+  private def testYarnAppUseSparkHadoopUtilConf(): Unit = {
+    val result = File.createTempFile("result", null, tempDir)
+    val finalState = runSpark(false,
+      mainClassName(YarnClusterDriverUseSparkHadoopUtilConf.getClass),
+      appArgs = Seq("key=value", result.getAbsolutePath()),
+      extraConf = Map("spark.hadoop.key" -> "value"))
     checkResult(finalState, result)
   }
 
@@ -212,6 +227,37 @@ private[spark] class SaveExecutorInfo extends SparkListener {
 
   override def onApplicationStart(appStart: SparkListenerApplicationStart): Unit = {
     driverLogs = appStart.driverLogs
+  }
+}
+
+private object YarnClusterDriverUseSparkHadoopUtilConf extends Logging with Matchers {
+  def main(args: Array[String]): Unit = {
+    if (args.length != 2) {
+      // scalastyle:off println
+      System.err.println(
+        s"""
+        |Invalid command line: ${args.mkString(" ")}
+        |
+        |Usage: YarnClusterDriverUseSparkHadoopUtilConf [hadoopConfKey=value] [result file]
+        """.stripMargin)
+      // scalastyle:on println
+      System.exit(1)
+    }
+
+    val sc = new SparkContext(new SparkConf()
+      .set("spark.extraListeners", classOf[SaveExecutorInfo].getName)
+      .setAppName("yarn test using SparkHadoopUtil's conf"))
+
+    val kv = args(0).split("=")
+    val status = new File(args(1))
+    var result = "failure"
+    try {
+      SparkHadoopUtil.get.conf.get(kv(0)) should be (kv(1))
+      result = "success"
+    } finally {
+      Files.write(result, status, StandardCharsets.UTF_8)
+      sc.stop()
+    }
   }
 }
 
