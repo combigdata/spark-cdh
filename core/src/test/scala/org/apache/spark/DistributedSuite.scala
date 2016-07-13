@@ -21,6 +21,7 @@ import org.scalatest.concurrent.Timeouts._
 import org.scalatest.Matchers
 import org.scalatest.time.{Millis, Span}
 
+import org.apache.spark.scheduler.BlacklistConfs.BLACKLIST_ENABLED
 import org.apache.spark.storage.{RDDBlockId, StorageLevel}
 
 class NotSerializableClass
@@ -104,8 +105,9 @@ class DistributedSuite extends SparkFunSuite with Matchers with LocalSparkContex
   }
 
   test("repeatedly failing task") {
-    sc = new SparkContext(clusterUrl, "test")
-    val accum = sc.accumulator(0)
+    val conf = new SparkConf().setAppName("test").setMaster(clusterUrl)
+      .set(BLACKLIST_ENABLED, "false")
+    sc = new SparkContext(conf)
     val thrown = intercept[SparkException] {
       // scalastyle:off println
       sc.parallelize(1 to 10, 10).foreach(x => println(x / 0))
@@ -120,7 +122,9 @@ class DistributedSuite extends SparkFunSuite with Matchers with LocalSparkContex
     // than hanging due to retrying the failed task infinitely many times (eventually the
     // standalone scheduler will remove the application, causing the job to hang waiting to
     // reconnect to the master).
-    sc = new SparkContext(clusterUrl, "test")
+    val conf = new SparkConf().setAppName("test").setMaster(clusterUrl)
+      .set(BLACKLIST_ENABLED, "false")
+    sc = new SparkContext(conf)
     failAfter(Span(100000, Millis)) {
       val thrown = intercept[SparkException] {
         // One of the tasks always fails.
@@ -265,7 +269,9 @@ class DistributedSuite extends SparkFunSuite with Matchers with LocalSparkContex
   test("recover from repeated node failures during shuffle-reduce") {
     import DistributedSuite.{markNodeIfIdentity, failOnMarkedIdentity}
     DistributedSuite.amMaster = true
-    sc = new SparkContext(clusterUrl, "test")
+    val conf = new SparkConf().setAppName("test").setMaster(clusterUrl)
+      .set("spark.scheduler.blacklist.enabled", "false")
+    sc = new SparkContext(conf)
     for (i <- 1 to 3) {
       val data = sc.parallelize(Seq(true, true), 2)
       assert(data.count === 2)

@@ -22,10 +22,8 @@ import java.nio.ByteBuffer
 import java.util.Arrays
 import java.util.concurrent.ConcurrentLinkedQueue
 
-import scala.collection.mutable.ArrayBuffer
-import scala.collection.mutable.HashMap
-import scala.collection.mutable.HashSet
-import scala.math.{min, max}
+import scala.collection.mutable.{ArrayBuffer, HashMap, HashSet}
+import scala.math.{max, min}
 import scala.util.control.NonFatal
 
 import org.apache.spark._
@@ -50,22 +48,30 @@ import org.apache.spark.util.{Clock, SystemClock, Utils}
  *                        task set will be aborted
  */
 private[spark] class TaskSetManager(
-    sched: TaskSchedulerImpl,
+    val sched: TaskSchedulerImpl,
+    val blacklistTracker: Option[BlacklistTracker],
     val taskSet: TaskSet,
     val maxTaskFailures: Int,
-    clock: Clock = new SystemClock())
+    val clock: Clock)
   extends Schedulable with Logging {
 
-  val conf = sched.sc.conf
+  def this(
+      sched: TaskSchedulerImpl,
+      taskSet: TaskSet,
+      maxTaskFailures: Int,
+      clock: Clock = new SystemClock()) {
+    this(sched, None, taskSet, maxTaskFailures, clock)
+  }
 
-  /*
-   * Sometimes if an executor is dead or in an otherwise invalid state, the driver
-   * does not realize right away leading to repeated task failures. If enabled,
-   * this temporarily prevents a task from re-launching on an executor where
-   * it just failed.
-   */
-  private val EXECUTOR_TASK_BLACKLIST_TIMEOUT =
-    conf.getLong("spark.scheduler.executorTaskBlacklistTime", 0L)
+  private val conf = sched.sc.conf
+  private val MAX_TASK_ATTEMPTS_PER_EXECUTOR =
+    conf.getInt(BlacklistConfs.MAX_TASK_ATTEMPTS_PER_EXECUTOR, 1)
+  private val MAX_TASK_ATTEMPTS_PER_NODE =
+    conf.getInt(BlacklistConfs.MAX_TASK_ATTEMPTS_PER_NODE, 2)
+  private val MAX_FAILURES_PER_EXEC_STAGE =
+    conf.getInt(BlacklistConfs.MAX_FAILURES_PER_EXEC_STAGE, 2)
+  private val MAX_FAILED_EXEC_PER_NODE_STAGE =
+    conf.getInt(BlacklistConfs.MAX_FAILED_EXEC_PER_NODE_STAGE, 2)
 
   // Quantile of tasks at which to start speculation
   val SPECULATION_QUANTILE = conf.getDouble("spark.speculation.quantile", 0.75)
@@ -83,8 +89,16 @@ private[spark] class TaskSetManager(
   val copiesRunning = new Array[Int](numTasks)
   val successful = new Array[Boolean](numTasks)
   private val numFailures = new Array[Int](numTasks)
-  // key is taskId (aka TaskInfo.index), value is a Map of executor id to when it failed
-  private val failedExecutors = new HashMap[Int, HashMap[String, Long]]()
+  val execToFailures: HashMap[String, ExecutorFailuresInTaskSet] = new HashMap()
+  /**
+   * Map from node to all executors on it with failures.  Needed because we want to know about
+   * executors on a node even after they have died.
+   */
+  private val nodeToExecsWithFailures: HashMap[String, HashSet[String]] = new HashMap()
+  private val nodeToBlacklistedTasks: HashMap[String, HashSet[Int]] = new HashMap()
+  private val blacklistedExecs: HashSet[String] = new HashSet()
+  private val blacklistedNodes: HashSet[String] = new HashSet()
+
 
   val taskAttempts = Array.fill[List[TaskInfo]](numTasks)(Nil)
   var tasksSuccessful = 0
@@ -247,12 +261,15 @@ private[spark] class TaskSetManager(
    * This method also cleans up any tasks in the list that have already
    * been launched, since we want that to happen lazily.
    */
-  private def dequeueTaskFromList(execId: String, list: ArrayBuffer[Int]): Option[Int] = {
+  private def dequeueTaskFromList(
+      execId: String,
+      host: String,
+      list: ArrayBuffer[Int]): Option[Int] = {
     var indexOffset = list.size
     while (indexOffset > 0) {
       indexOffset -= 1
       val index = list(indexOffset)
-      if (!executorIsBlacklisted(execId, index)) {
+      if (!isTaskBlacklistedOnExecOrNode(index, execId, host)) {
         // This should almost always be list.trimEnd(1) to remove tail
         list.remove(indexOffset)
         if (copiesRunning(index) == 0 && !successful(index)) {
@@ -268,19 +285,13 @@ private[spark] class TaskSetManager(
     taskAttempts(taskIndex).exists(_.host == host)
   }
 
-  /**
-   * Is this re-execution of a failed task on an executor it already failed in before
-   * EXECUTOR_TASK_BLACKLIST_TIMEOUT has elapsed ?
-   */
-  private[scheduler] def executorIsBlacklisted(execId: String, taskId: Int): Boolean = {
-    if (failedExecutors.contains(taskId)) {
-      val failed = failedExecutors.get(taskId).get
-
-      return failed.contains(execId) &&
-        clock.getTimeMillis() - failed.get(execId).get < EXECUTOR_TASK_BLACKLIST_TIMEOUT
+  private def isTaskBlacklistedOnExecOrNode(index: Int, execId: String, host: String): Boolean = {
+    if (blacklistTracker.isDefined) {
+      isNodeBlacklistedForTask(host, index) ||
+        isExecutorBlacklistedForTask(execId, index)
+    } else {
+      false
     }
-
-    false
   }
 
   /**
@@ -294,8 +305,10 @@ private[spark] class TaskSetManager(
   {
     speculatableTasks.retain(index => !successful(index)) // Remove finished tasks from set
 
-    def canRunOnHost(index: Int): Boolean =
-      !hasAttemptOnHost(index, host) && !executorIsBlacklisted(execId, index)
+    def canRunOnHost(index: Int): Boolean = {
+      !hasAttemptOnHost(index, host) &&
+        !isTaskBlacklistedOnExecOrNode(index, execId, host)
+    }
 
     if (!speculatableTasks.isEmpty) {
       // Check for process-local tasks; note that tasks can be process-local
@@ -368,19 +381,19 @@ private[spark] class TaskSetManager(
   private def dequeueTask(execId: String, host: String, maxLocality: TaskLocality.Value)
     : Option[(Int, TaskLocality.Value, Boolean)] =
   {
-    for (index <- dequeueTaskFromList(execId, getPendingTasksForExecutor(execId))) {
+    for (index <- dequeueTaskFromList(execId, host, getPendingTasksForExecutor(execId))) {
       return Some((index, TaskLocality.PROCESS_LOCAL, false))
     }
 
     if (TaskLocality.isAllowed(maxLocality, TaskLocality.NODE_LOCAL)) {
-      for (index <- dequeueTaskFromList(execId, getPendingTasksForHost(host))) {
+      for (index <- dequeueTaskFromList(execId, host, getPendingTasksForHost(host))) {
         return Some((index, TaskLocality.NODE_LOCAL, false))
       }
     }
 
     if (TaskLocality.isAllowed(maxLocality, TaskLocality.NO_PREF)) {
       // Look for noPref tasks after NODE_LOCAL for minimize cross-rack traffic
-      for (index <- dequeueTaskFromList(execId, pendingTasksWithNoPrefs)) {
+      for (index <- dequeueTaskFromList(execId, host, pendingTasksWithNoPrefs)) {
         return Some((index, TaskLocality.PROCESS_LOCAL, false))
       }
     }
@@ -388,14 +401,14 @@ private[spark] class TaskSetManager(
     if (TaskLocality.isAllowed(maxLocality, TaskLocality.RACK_LOCAL)) {
       for {
         rack <- sched.getRackForHost(host)
-        index <- dequeueTaskFromList(execId, getPendingTasksForRack(rack))
+        index <- dequeueTaskFromList(execId, host, getPendingTasksForRack(rack))
       } {
         return Some((index, TaskLocality.RACK_LOCAL, false))
       }
     }
 
     if (TaskLocality.isAllowed(maxLocality, TaskLocality.ANY)) {
-      for (index <- dequeueTaskFromList(execId, allPendingTasks)) {
+      for (index <- dequeueTaskFromList(execId, host, allPendingTasks)) {
         return Some((index, TaskLocality.ANY, false))
       }
     }
@@ -423,7 +436,11 @@ private[spark] class TaskSetManager(
       maxLocality: TaskLocality.TaskLocality)
     : Option[TaskDescription] =
   {
-    if (!isZombie) {
+    val offerBlacklisted = blacklistTracker.map { _ =>
+      isNodeBlacklistedForTaskSet(host) ||
+        isExecutorBlacklistedForTaskSet(execId)
+    }.getOrElse(false)
+    if (!isZombie && !offerBlacklisted) {
       val curTime = clock.getTimeMillis()
 
       var allowedLocality = maxLocality
@@ -480,8 +497,8 @@ private[spark] class TaskSetManager(
           // a good proxy to task serialization time.
           // val timeTaken = clock.getTime() - startTime
           val taskName = s"task ${info.id} in stage ${taskSet.id}"
-          logInfo(s"Starting $taskName (TID $taskId, $host, partition ${task.partitionId}," +
-            s"$taskLocality, ${serializedTask.limit} bytes)")
+          logInfo(s"Starting $taskName (TID $taskId, $host, executor ${info.executorId}, " +
+            s"partition ${task.partitionId},$taskLocality, ${serializedTask.limit} bytes)")
 
           sched.dagScheduler.taskStarted(task, info)
           return Some(new TaskDescription(taskId = taskId, attemptNumber = attemptNum, execId,
@@ -496,6 +513,10 @@ private[spark] class TaskSetManager(
   private def maybeFinishTaskSet() {
     if (isZombie && runningTasks == 0) {
       sched.taskSetFinished(this)
+      if (tasksSuccessful == numTasks) {
+        blacklistTracker.foreach(_.updateBlacklistForSuccessfulTaskSet(taskSet.stageId,
+          taskSet.stageAttemptId, execToFailures))
+      }
     }
   }
 
@@ -595,34 +616,59 @@ private[spark] class TaskSetManager(
    * failures (this is because the method picks on unscheduled task, and then iterates through each
    * executor until it finds one that the task hasn't failed on already).
    */
-  private[scheduler] def abortIfCompletelyBlacklisted(executors: Iterable[String]): Unit = {
+  private[scheduler] def abortIfCompletelyBlacklisted(
+      executorsByHost: HashMap[String, HashSet[String]]): Unit = {
+    blacklistTracker.foreach { blacklist =>
+      // because this is called in a loop, with multiple resource offers and locality levels,
+      // we could end up aborting this taskset multiple times without the !isZombie check
+      if (!isZombie) {
+        // take any task that needs to be scheduled, and see if we can find some executor it *could*
+        // run on
+        val pendingTask: Option[Int] = {
+          // usually this will just take the last pending task, but because of the lazy removal
+          // from each list, we may need to go deeper in the list.  We poll from the end because
+          // failed tasks are put back at the end of allPendingTasks, so we're more likely to find
+          // an unschedulable task this way.
+          val indexOffset = allPendingTasks.lastIndexWhere { indexInTaskSet =>
+            copiesRunning(indexInTaskSet) == 0 && !successful(indexInTaskSet)
+          }
+          if (indexOffset == -1) {
+            None
+          } else {
+            Some(allPendingTasks(indexOffset))
+          }
+        }
 
-    val pendingTask: Option[Int] = {
-      // usually this will just take the last pending task, but because of the lazy removal
-      // from each list, we may need to go deeper in the list.  We poll from the end because
-      // failed tasks are put back at the end of allPendingTasks, so we're more likely to find
-      // an unschedulable task this way.
-      val indexOffset = allPendingTasks.lastIndexWhere { indexInTaskSet =>
-        copiesRunning(indexInTaskSet) == 0 && !successful(indexInTaskSet)
-      }
-      if (indexOffset == -1) {
-        None
-      } else {
-        Some(allPendingTasks(indexOffset))
-      }
-    }
-
-    // If no executors have registered yet, don't abort the stage, just wait.  We probably
-    // got here because a task set was added before the executors registered.
-    if (executors.nonEmpty) {
-      // take any task that needs to be scheduled, and see if we can find some executor it *could*
-      // run on
-      pendingTask.foreach { taskId =>
-        if (executors.forall(executorIsBlacklisted(_, taskId))) {
-          val execs = executors.toIndexedSeq.sorted.mkString("(", ",", ")")
-          val partition = tasks(taskId).partitionId
-          abort(s"Aborting ${taskSet} because task $taskId (partition $partition)" +
-            s" has already failed on executors $execs, and no other executors are available.")
+        // If no executors have registered yet, don't abort the stage, just wait.  We probably
+        // got here because a task set was added before the executors registered.
+        if (executorsByHost.nonEmpty) {
+          pendingTask.foreach { indexInTaskSet =>
+            // try to find some executor this task can run on.  Its possible that some *other*
+            // task isn't schedulable anywhere, but we will discover that in some later call,
+            // when that unschedulable task is the last task remaining.
+            val blacklistedEverywhere = executorsByHost.forall { case (host, execs) =>
+              // Check if the task can run on the node
+              val nodeBlacklisted = blacklist.isNodeBlacklisted(host) ||
+                isNodeBlacklistedForTaskSet(host) ||
+                isNodeBlacklistedForTask(host, indexInTaskSet)
+              if (nodeBlacklisted) {
+                true
+              } else {
+                // Check if the task can run on any of the executors
+                execs.forall { exec =>
+                  blacklist.isExecutorBlacklisted(exec) ||
+                    isExecutorBlacklistedForTaskSet(exec) ||
+                    isExecutorBlacklistedForTask(exec, indexInTaskSet)
+                }
+              }
+            }
+            if (blacklistedEverywhere) {
+              val partition = tasks(indexInTaskSet).partitionId
+              abort(s"Aborting ${taskSet} because task $indexInTaskSet (partition $partition) " +
+                s"cannot run anywhere due to node and executor blacklist.  Blacklisting behavior " +
+                s"can be configured via spark.blacklist.*.")
+            }
+          }
         }
       }
     }
@@ -673,8 +719,9 @@ private[spark] class TaskSetManager(
       tasks(index), Success, result.value(), result.accumUpdates, info, result.metrics)
     if (!successful(index)) {
       tasksSuccessful += 1
-      logInfo("Finished task %s in stage %s (TID %d) in %d ms on %s (%d/%d)".format(
-        info.id, taskSet.id, info.taskId, info.duration, info.host, tasksSuccessful, numTasks))
+      logInfo("Finished task %s in stage %s (TID %d) in %d ms on %s (executor %s) (%d/%d)".format(
+        info.id, taskSet.id, info.taskId, info.duration, info.host, info.executorId,
+        tasksSuccessful, numTasks))
       // Mark successful and stop if all the tasks have succeeded.
       successful(index) = true
       if (tasksSuccessful == numTasks) {
@@ -684,7 +731,6 @@ private[spark] class TaskSetManager(
       logInfo("Ignoring task-finished event for " + info.id + " in stage " + taskSet.id +
         " because task " + index + " has already completed successfully")
     }
-    failedExecutors.remove(index)
     maybeFinishTaskSet()
   }
 
@@ -692,7 +738,7 @@ private[spark] class TaskSetManager(
    * Marks the task as failed, re-adds it to the list of pending tasks, and notifies the
    * DAG Scheduler.
    */
-  def handleFailedTask(tid: Long, state: TaskState, reason: TaskEndReason) {
+  def handleFailedTask(tid: Long, state: TaskState, reason: TaskFailedReason) {
     val info = taskInfos(tid)
     if (info.failed) {
       return
@@ -703,8 +749,8 @@ private[spark] class TaskSetManager(
     copiesRunning(index) -= 1
     var taskMetrics : TaskMetrics = null
 
-    val failureReason = s"Lost task ${info.id} in stage ${taskSet.id} (TID $tid, ${info.host}): " +
-      reason.asInstanceOf[TaskFailedReason].toErrorString
+    val failureReason = s"Lost task ${info.id} in stage ${taskSet.id} (TID $tid, ${info.host}," +
+      s" executor ${info.executorId}): ${reason.toErrorString}"
     val failureException: Option[Throwable] = reason match {
       case fetchFailed: FetchFailed =>
         logWarning(failureReason)
@@ -712,7 +758,6 @@ private[spark] class TaskSetManager(
           successful(index) = true
           tasksSuccessful += 1
         }
-        // Not adding to failed executors for FetchFailed.
         isZombie = true
         None
 
@@ -747,8 +792,8 @@ private[spark] class TaskSetManager(
           logWarning(failureReason)
         } else {
           logInfo(
-            s"Lost task ${info.id} in stage ${taskSet.id} (TID $tid) on executor ${info.host}: " +
-            s"${ef.className} (${ef.description}) [duplicate $dupCount]")
+            s"Lost task ${info.id} in stage ${taskSet.id} (TID $tid) on ${info.host}, executor" +
+              s" ${info.executorId}: ${ef.className} (${ef.description}) [duplicate $dupCount]")
         }
         ef.exception
 
@@ -761,19 +806,28 @@ private[spark] class TaskSetManager(
       case e: TaskFailedReason =>  // TaskResultLost, TaskKilled, and others
         logWarning(failureReason)
         None
-
-      case e: TaskEndReason =>
-        logError("Unknown TaskEndReason: " + e)
-        None
     }
-    // always add to failed executors
-    failedExecutors.getOrElseUpdate(index, new HashMap[String, Long]()).
-      put(info.executorId, clock.getTimeMillis())
+
+    // we might rack up a bunch of fetch-failures in rapid succession, due to a bad node.  But
+    // that bad node will get handled separately by spark's stage-failure handling mechanism.  It
+    // shouldn't penalize *this* executor at all, so don't count it as a task-failure as far as
+    // the blacklist is concerned.
+    if (reason.countTowardsTaskFailures && blacklistTracker.isDefined) {
+      updateBlacklistForFailedTask(info.host, info.executorId, index)
+    }
+
     sched.dagScheduler.taskEnded(tasks(index), reason, null, null, info, taskMetrics)
-    addPendingTask(index)
-    if (!isZombie && state != TaskState.KILLED
-        && reason.isInstanceOf[TaskFailedReason]
-        && reason.asInstanceOf[TaskFailedReason].countTowardsTaskFailures) {
+
+    if (successful(index)) {
+      logInfo(
+        s"Task ${info.id} in stage ${taskSet.id} (TID $tid) failed, " +
+        "but another instance of the task has already succeeded, " +
+        "so not re-queuing the task to be re-executed.")
+    } else {
+      addPendingTask(index)
+    }
+
+    if (!isZombie && reason.countTowardsTaskFailures) {
       assert (null != failureReason)
       numFailures(index) += 1
       if (numFailures(index) >= maxTaskFailures) {
@@ -785,6 +839,86 @@ private[spark] class TaskSetManager(
       }
     }
     maybeFinishTaskSet()
+  }
+
+  private[scheduler] def updateBlacklistForFailedTask(
+      host: String,
+      exec: String,
+      index: Int): Unit = {
+    val execFailures = execToFailures.getOrElseUpdate(exec, new ExecutorFailuresInTaskSet(host))
+    execFailures.updateWithFailure(index, clock.getTimeMillis() +
+      blacklistTracker.get.BLACKLIST_TIMEOUT_MILLIS)
+
+    // check if this task has also failed on other executors on the same host -- if its gone
+    // over the limit, blacklist it from the entire host
+    val execsWithFailuresOnNode = nodeToExecsWithFailures.getOrElseUpdate(host, new HashSet())
+    execsWithFailuresOnNode += exec
+    val failuresOnHost = execsWithFailuresOnNode.toIterator.map { exec =>
+      execToFailures.get(exec).map { failures =>
+        // We count task attempts here, not the number of unique executors with failures.  This is
+        // because jobs are aborted based on the number task attempts; if we counted unique
+        // executors, it would be hard to config to ensure that you try another
+        // node before hitting the max number of task failures.
+        failures.taskToFailureCountAndExpiryTime.getOrElse(index, (0, 0))._1
+      }.getOrElse(0)
+    }.sum
+    if (failuresOnHost >= MAX_TASK_ATTEMPTS_PER_NODE) {
+      nodeToBlacklistedTasks.getOrElseUpdate(host, new HashSet()) += index
+    }
+
+    if (execFailures.numUniqueTasksWithFailures >= MAX_FAILURES_PER_EXEC_STAGE) {
+      if (blacklistedExecs.add(exec)) {
+        logInfo(s"Blacklisting executor ${exec} for stage $stageId")
+        // This executor has been pushed into the blacklist for this stage.  Let's check if it
+        // pushes the whole node into the blacklist.
+        val blacklistedExecutorsOnNode =
+          execsWithFailuresOnNode.filter(blacklistedExecs.contains(_))
+        if (blacklistedExecutorsOnNode.size >= MAX_FAILED_EXEC_PER_NODE_STAGE) {
+          if (blacklistedNodes.add(host)) {
+            logInfo(s"Blacklisting ${host} for stage $stageId")
+          }
+        }
+      }
+    }
+  }
+
+  /**
+   * Return true if this executor is blacklisted for the given task.  This does *not*
+   * need to return true if the executor is blacklisted for the entire stage, or blacklisted
+   * altogether.  That is to keep this method as fast as possible in the inner-loop of the
+   * scheduler, where those filters will have already been applied.
+   */
+  def isExecutorBlacklistedForTask(
+      executorId: String,
+      index: Int): Boolean = {
+    execToFailures.get(executorId)
+      .map { execFailures =>
+        val count = execFailures.taskToFailureCountAndExpiryTime.getOrElse(index, (0, 0))._1
+        count >= MAX_TASK_ATTEMPTS_PER_EXECUTOR
+      }
+      .getOrElse(false)
+  }
+
+  def isNodeBlacklistedForTask(
+      node: String,
+      index: Int): Boolean = {
+    nodeToBlacklistedTasks.get(node)
+      .map(_.contains(index))
+      .getOrElse(false)
+  }
+
+  /**
+   * Return true if this executor is blacklisted for the given stage.  Completely ignores whether
+   * the executor is blacklisted overall (or anything to do with the node the executor is on).  That
+   * is to keep this method as fast as possible in the inner-loop of the scheduler, where those
+   * filters will already have been applied.
+   */
+  def isExecutorBlacklistedForTaskSet(executorId: String): Boolean = {
+    blacklistedExecs.contains(executorId)
+  }
+
+  def isNodeBlacklistedForTaskSet(node: String): Boolean = {
+    blacklistedNodes.contains(node)
   }
 
   def abort(message: String, exception: Option[Throwable] = None): Unit = sched.synchronized {
