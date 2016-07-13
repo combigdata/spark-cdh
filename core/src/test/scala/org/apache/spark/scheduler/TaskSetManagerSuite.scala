@@ -23,6 +23,8 @@ import scala.collection.Map
 import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
 
+import org.mockito.Mockito.{mock, verify}
+
 import org.apache.spark._
 import org.apache.spark.executor.TaskMetrics
 import org.apache.spark.util.ManualClock
@@ -103,7 +105,7 @@ class FakeTaskScheduler(sc: SparkContext, liveExecutors: (String, String)* /* ex
     val host = executorIdToHost.get(execId)
     assert(host != None)
     val hostId = host.get
-    val executorsOnHost = executorsByHost(hostId)
+    val executorsOnHost = hostToExecutors(hostId)
     executorsOnHost -= execId
     for (rack <- getRackForHost(hostId); hosts <- hostsByRack.get(rack)) {
       hosts -= hostId
@@ -113,7 +115,9 @@ class FakeTaskScheduler(sc: SparkContext, liveExecutors: (String, String)* /* ex
     }
   }
 
-  override def taskSetFinished(manager: TaskSetManager): Unit = finishedManagers += manager
+  override def taskSetFinished(manager: TaskSetManager): Unit = {
+    finishedManagers += manager
+  }
 
   override def isExecutorAlive(execId: String): Boolean = executors.contains(execId)
 
@@ -125,7 +129,7 @@ class FakeTaskScheduler(sc: SparkContext, liveExecutors: (String, String)* /* ex
 
   def addExecutor(execId: String, host: String) {
     executors.put(execId, host)
-    val executorsOnHost = executorsByHost.getOrElseUpdate(host, new mutable.HashSet[String])
+    val executorsOnHost = hostToExecutors.getOrElseUpdate(host, new mutable.HashSet[String])
     executorsOnHost += execId
     executorIdToHost += execId -> host
     for (rack <- getRackForHost(host)) {
@@ -156,9 +160,21 @@ class TaskSetManagerSuite extends SparkFunSuite with LocalSparkContext with Logg
   val LOCALITY_WAIT_MS = conf.getTimeAsMs("spark.locality.wait", "3s")
   val MAX_TASK_FAILURES = 4
 
-  override def beforeEach() {
+  var sched: FakeTaskScheduler = null
+
+  override def beforeEach(): Unit = {
     super.beforeEach()
     FakeRackUtil.cleanUp()
+    sched = null
+  }
+
+  override def afterEach(): Unit = {
+    super.afterEach()
+    if (sched != null) {
+      sched.dagScheduler.stop()
+      sched.stop()
+      sched = null
+    }
   }
 
   test("TaskSet with no preferences") {
@@ -393,8 +409,9 @@ class TaskSetManagerSuite extends SparkFunSuite with LocalSparkContext with Logg
   test("executors should be blacklisted after task failure, in spite of locality preferences") {
     val rescheduleDelay = 300L
     val conf = new SparkConf().
-      set("spark.scheduler.executorTaskBlacklistTime", rescheduleDelay.toString).
-      // dont wait to jump locality levels in this test
+      set(BlacklistConfs.BLACKLIST_ENABLED, "true").
+      set(BlacklistConfs.BLACKLIST_TIMEOUT_CONF, rescheduleDelay.toString).
+      // don't wait to jump locality levels in this test
       set("spark.locality.wait", "0")
 
     sc = new SparkContext("local", "test", conf)
@@ -404,7 +421,9 @@ class TaskSetManagerSuite extends SparkFunSuite with LocalSparkContext with Logg
     // affinity to exec1 on host1 - which we will fail.
     val taskSet = FakeTask.createTaskSet(1, Seq(TaskLocation("host1", "exec1")))
     val clock = new ManualClock
-    val manager = new TaskSetManager(sched, taskSet, 4, clock)
+
+    val blacklist = new BlacklistTracker(conf, clock)
+    val manager = new TaskSetManager(sched, Some(blacklist), taskSet, 4, clock)
 
     {
       val offerResult = manager.resourceOffer("exec1", "host1", PROCESS_LOCAL)
@@ -457,19 +476,25 @@ class TaskSetManagerSuite extends SparkFunSuite with LocalSparkContext with Logg
       assert(manager.resourceOffer("exec2", "host2", ANY).isEmpty)
     }
 
-    // After reschedule delay, scheduling on exec1 should be possible.
+    // Despite advancing beyond the time for expiring executors from within the blacklist,
+    // we *never* expire from *within* the stage blacklist
     clock.advance(rescheduleDelay)
+    blacklist.applyBlacklistTimeout()
 
     {
       val offerResult = manager.resourceOffer("exec1", "host1", PROCESS_LOCAL)
-      assert(offerResult.isDefined, "Expect resource offer to return a task")
+      assert(offerResult.isEmpty)
+    }
 
+    {
+      val offerResult = manager.resourceOffer("exec3", "host3", ANY)
+      assert(offerResult.isDefined)
       assert(offerResult.get.index === 0)
-      assert(offerResult.get.executorId === "exec1")
+      assert(offerResult.get.executorId === "exec3")
 
-      assert(manager.resourceOffer("exec1", "host1", PROCESS_LOCAL).isEmpty)
+      assert(manager.resourceOffer("exec3", "host3", ANY).isEmpty)
 
-      // Cause exec1 to fail : failure 4
+      // Cause exec3 to fail : failure 4
       manager.handleFailedTask(offerResult.get.taskId, TaskState.FINISHED, TaskResultLost)
     }
 
@@ -786,7 +811,7 @@ class TaskSetManagerSuite extends SparkFunSuite with LocalSparkContext with Logg
     assert(TaskLocation("executor_host1_3") === ExecutorCacheTaskLocation("host1", "3"))
   }
 
-  def createTaskResult(id: Int): DirectTaskResult[Int] = {
+  private def createTaskResult(id: Int): DirectTaskResult[Int] = {
     val valueSer = SparkEnv.get.serializer.newInstance()
     new DirectTaskResult[Int](valueSer.serialize(id), mutable.Map.empty, new TaskMetrics)
   }
