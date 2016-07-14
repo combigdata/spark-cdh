@@ -72,7 +72,7 @@ public class YarnShuffleService extends AuxiliaryService {
   @VisibleForTesting
   static final String STOP_ON_FAILURE_KEY = "spark.yarn.shuffle.stopOnFailure";
   private static final boolean DEFAULT_STOP_ON_FAILURE = true;
-  private static final String RECOVERY_FILE_NAME = "registeredExecutor.ldb";
+  private static final String RECOVERY_FILE_NAME = "registeredExecutors.ldb";
 
   // An entity that manages the shuffle secret per application
   // This is used only if authentication is enabled
