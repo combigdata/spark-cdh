@@ -414,3 +414,34 @@ If you need a reference to the proper location to put log files in the YARN so t
 - In `cluster` mode, the local directories used by the Spark executors and the Spark driver will be the local directories configured for YARN (Hadoop YARN config `yarn.nodemanager.local-dirs`). If the user specifies `spark.local.dir`, it will be ignored. In `client` mode, the Spark executors will use the local directories configured for YARN while the Spark driver will use those defined in `spark.local.dir`. This is because the Spark driver does not run on the YARN cluster in `client` mode, only the Spark executors do.
 - The `--files` and `--archives` options support specifying file names with the # similar to Hadoop. For example you can specify: `--files localtest.txt#appSees.txt` and this will upload the file you have locally named `localtest.txt` into HDFS but this will be linked to by the name `appSees.txt`, and your application should use the name as `appSees.txt` to reference it when running on YARN.
 - The `--jars` option allows the `SparkContext.addJar` function to work if you are using it with local files and running in `cluster` mode. It does not need to be used if you are using it with HDFS, HTTP, HTTPS, or FTP files.
+
+## Configuring the External Shuffle Service
+
+To start the Spark Shuffle Service on each `NodeManager` in your YARN cluster, follow these
+instructions:
+
+1. Build Spark with the [YARN profile](building-spark.html). Skip this step if you are using a
+pre-packaged distribution.
+1. Locate the `spark-<version>-yarn-shuffle.jar`. This should be under
+`$SPARK_HOME/common/network-yarn/target/scala-<version>` if you are building Spark yourself, and under
+`lib` if you are using a distribution.
+1. Add this jar to the classpath of all `NodeManager`s in your cluster.
+1. In the `yarn-site.xml` on each node, add `spark_shuffle` to `yarn.nodemanager.aux-services`,
+then set `yarn.nodemanager.aux-services.spark_shuffle.class` to
+`org.apache.spark.network.yarn.YarnShuffleService`.
+1. Restart all `NodeManager`s in your cluster.
+
+The following extra configuration options are available when the shuffle service is running on YARN:
+
+<table class="table">
+<tr><th>Property Name</th><th>Default</th><th>Meaning</th></tr>
+<tr>
+  <td><code>spark.yarn.shuffle.stopOnFailure</code></td>
+  <td><code>false</code></td>
+  <td>
+    Whether to stop the NodeManager when there's a failure in the Spark Shuffle Service's
+    initialization. This prevents application failures caused by running containers on
+    NodeManagers where the Spark Shuffle Service is not running.
+  </td>
+</tr>
+</table>
