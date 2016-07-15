@@ -23,11 +23,13 @@ import java.util.concurrent.atomic.AtomicBoolean
 
 import scala.collection.mutable
 import scala.util.{Failure, Success}
-import org.apache.spark.rpc._
+import scala.util.control.NonFatal
+
 import org.apache.spark._
 import org.apache.spark.TaskState.TaskState
 import org.apache.spark.deploy.SparkHadoopUtil
 import org.apache.spark.deploy.worker.WorkerWatcher
+import org.apache.spark.rpc._
 import org.apache.spark.scheduler.TaskDescription
 import org.apache.spark.scheduler.cluster.CoarseGrainedClusterMessages._
 import org.apache.spark.serializer.SerializerInstance
@@ -61,10 +63,8 @@ private[spark] class CoarseGrainedExecutorBackend(
       // This is a very fast action so we can use "ThreadUtils.sameThread"
       case Success(msg) =>
         // Always receive `true`. Just ignore it
-      case Failure(e) => {
-        logError(s"Cannot register with driver: $driverUrl", e)
-        System.exit(1)
-      }
+      case Failure(e) =>
+        exitExecutor(1, s"Cannot register with driver: $driverUrl", e)
     }(ThreadUtils.sameThread)
   }
 
@@ -77,16 +77,19 @@ private[spark] class CoarseGrainedExecutorBackend(
   override def receive: PartialFunction[Any, Unit] = {
     case RegisteredExecutor(hostname) =>
       logInfo("Successfully registered with driver")
-      executor = new Executor(executorId, hostname, env, userClassPath, isLocal = false)
+      try {
+        executor = new Executor(executorId, hostname, env, userClassPath, isLocal = false)
+      } catch {
+        case NonFatal(e) =>
+          exitExecutor(1, "Unable to create executor due to " + e.getMessage, e)
+      }
 
     case RegisterExecutorFailed(message) =>
-      logError("Slave registration failed: " + message)
-      System.exit(1)
+      exitExecutor(1, "Slave registration failed: " + message)
 
     case LaunchTask(data) =>
       if (executor == null) {
-        logError("Received LaunchTask command but executor was null")
-        System.exit(1)
+        exitExecutor(1, "Received LaunchTask command but executor was null")
       } else {
         val taskDesc = ser.deserialize[TaskDescription](data.value)
         logInfo("Got assigned task " + taskDesc.taskId)
@@ -96,8 +99,7 @@ private[spark] class CoarseGrainedExecutorBackend(
 
     case KillTask(taskId, _, interruptThread) =>
       if (executor == null) {
-        logError("Received KillTask command but executor was null")
-        System.exit(1)
+        exitExecutor(1, "Received KillTask command but executor was null")
       } else {
         executor.killTask(taskId, interruptThread)
       }
@@ -120,8 +122,7 @@ private[spark] class CoarseGrainedExecutorBackend(
     if (stopping.get()) {
       logInfo(s"Driver from $remoteAddress disconnected during shutdown")
     } else if (driver.exists(_.address == remoteAddress)) {
-      logError(s"Driver $remoteAddress disassociated! Shutting down.")
-      System.exit(1)
+      exitExecutor(1, s"Driver $remoteAddress disassociated! Shutting down.")
     } else {
       logWarning(s"An unknown ($remoteAddress) driver disconnected.")
     }
@@ -133,6 +134,19 @@ private[spark] class CoarseGrainedExecutorBackend(
       case Some(driverRef) => driverRef.send(msg)
       case None => logWarning(s"Drop $msg because has not yet connected to driver")
     }
+  }
+  /**
+   * This function can be overloaded by other child classes to handle
+   * executor exits differently. For e.g. when an executor goes down,
+   * back-end may not want to take the parent process down.
+   */
+  protected def exitExecutor(code: Int, reason: String, throwable: Throwable = null) = {
+    if (throwable != null) {
+      logError(reason, throwable)
+    } else {
+      logError(reason)
+    }
+    System.exit(code)
   }
 }
 
