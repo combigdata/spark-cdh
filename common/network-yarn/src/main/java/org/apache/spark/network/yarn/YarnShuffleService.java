@@ -73,7 +73,7 @@ public class YarnShuffleService extends AuxiliaryService {
   // Whether failure during service initialization should stop the NM.
   @VisibleForTesting
   static final String STOP_ON_FAILURE_KEY = "spark.yarn.shuffle.stopOnFailure";
-  private static final boolean DEFAULT_STOP_ON_FAILURE = false;
+  private static final boolean DEFAULT_STOP_ON_FAILURE = true;
 
   // An entity that manages the shuffle secret per application
   // This is used only if authentication is enabled
