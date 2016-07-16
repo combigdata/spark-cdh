@@ -88,7 +88,7 @@ public class YarnShuffleService extends AuxiliaryService {
   // Whether failure during service initialization should stop the NM.
   @VisibleForTesting
   static final String STOP_ON_FAILURE_KEY = "spark.yarn.shuffle.stopOnFailure";
-  private static final boolean DEFAULT_STOP_ON_FAILURE = false;
+  private static final boolean DEFAULT_STOP_ON_FAILURE = true;
 
   // just for testing when you want to find an open port
   @VisibleForTesting
