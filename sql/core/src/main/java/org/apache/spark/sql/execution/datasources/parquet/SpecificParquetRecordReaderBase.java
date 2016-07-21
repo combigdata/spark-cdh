@@ -60,6 +60,7 @@ import parquet.hadoop.util.ConfigurationUtil;
 import parquet.schema.MessageType;
 import parquet.schema.Types;
 import org.apache.spark.sql.types.StructType;
+import org.apache.spark.sql.types.StructType$;
 
 /**
  * Base class for custom RecordReaders for Parquet that directly materialize to `T`.
@@ -136,7 +137,9 @@ public abstract class SpecificParquetRecordReaderBase<T> extends RecordReader<Vo
     ReadSupport.ReadContext readContext = readSupport.init(new InitContext(
         taskAttemptContext.getConfiguration(), toSetMultiMap(fileMetadata), fileSchema));
     this.requestedSchema = readContext.getRequestedSchema();
-    this.sparkSchema = new ParquetSchemaConverter(configuration).convert(requestedSchema);
+    String sparkRequestedSchemaString =
+        configuration.get(ParquetReadSupport$.MODULE$.SPARK_ROW_REQUESTED_SCHEMA());
+    this.sparkSchema = StructType$.MODULE$.fromString(sparkRequestedSchemaString);
     this.reader = new ParquetFileReader(configuration, file, blocks, requestedSchema.getColumns());
     for (BlockMetaData block : blocks) {
       this.totalRowCount += block.getRowCount();
