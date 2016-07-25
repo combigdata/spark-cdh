@@ -224,6 +224,10 @@ function deploy_client_config {
   # enable the use of the Hive metastore.
   local catalog_impl='in-memory'
   if [ -d "$HIVE_CONF_DIR" ]; then
+    local hive_metastore_jars="\${env:HADOOP_COMMON_HOME}/../hive/lib/*"
+    hive_metastore_jars="$hive_metastore_jars:\${env:HADOOP_COMMON_HOME}/client/*"
+    set_config 'spark.sql.hive.metastore.jars' "$hive_metastore_jars" "$SPARK_DEFAULTS"
+    set_config 'spark.sql.hive.metastore.version' '1.1.0' "$SPARK_DEFAULTS"
     copy_client_config "$HIVE_CONF_DIR" "$HADOOP_CLIENT_CONF_DIR" "$TARGET_HADOOP_CONF_DIR"
     catalog_impl='hive'
   fi
