@@ -85,8 +85,8 @@ function replace {
   perl -pi -e "s#${1}#${2}#g" $3
 }
 
-# Read a configuration value from a Spark config file.
-function read_spark_conf {
+# Read a value from a properties file.
+function read_property {
   local key="$1"
   local file="$2"
   echo $(grep "^$key=" "$file" | tail -n 1 | sed "s/^$key=\(.*\)/\\1/")
@@ -239,7 +239,7 @@ function deploy_client_config {
   # to fix the configuration file to add the protocol. But if the user has specified a path
   # with a protocol, don't overwrite it.
   key="spark.eventLog.dir"
-  value=$(read_spark_conf "$key" "$SPARK_DEFAULTS")
+  value=$(read_property "$key" "$SPARK_DEFAULTS")
   if [ -n "$value" ]; then
     value=$(prepend_protocol "$value" "$DEFAULT_FS")
     replace_spark_conf "$key" "$value" "$SPARK_DEFAULTS"
@@ -270,7 +270,7 @@ function deploy_client_config {
   # If no Spark jars are defined, look for the location of jars on the local filesystem,
   # which we assume will be the same across the cluster.
   key="spark.yarn.jars"
-  value=$(read_spark_conf "$key" "$SPARK_DEFAULTS")
+  value=$(read_property "$key" "$SPARK_DEFAULTS")
   if [ -n "$value" ]; then
     local prefixed_values=
     # the value is a comma separated list of files (which can be globs)
@@ -294,7 +294,7 @@ function deploy_client_config {
   fi
   for i in driver executor yarn.am; do
     key="spark.${i}.extraLibraryPath"
-    value=$(read_spark_conf "$key" "$SPARK_DEFAULTS")
+    value=$(read_property "$key" "$SPARK_DEFAULTS")
     if [ -n "$value" ]; then
       value="$value:$EXTRA_LIB_PATH"
     else

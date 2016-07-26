@@ -1,4 +1,4 @@
-<!-- Copyright (c) 2013 Cloudera, Inc. All rights reserved. -->
+<!-- Copyright (c) 2013-2016 Cloudera, Inc. All rights reserved. -->
 <assembly>
     <id>assemble</id>
     <formats>
@@ -8,6 +8,10 @@
     <fileSets>
       <fileSet>
         <directory>${project.basedir}/src</directory>
+        <outputDirectory>/</outputDirectory>
+      </fileSet>
+      <fileSet>
+        <directory>${project.build.directory}/generated-resources</directory>
         <outputDirectory>/</outputDirectory>
       </fileSet>
     </fileSets>

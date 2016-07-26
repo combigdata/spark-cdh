@@ -19,6 +19,23 @@
 
 . $(cd $(dirname $0) && pwd)/common.sh
 
+CSD_VERSION=$(cat "$CONF_DIR/meta/version")
+
+# Drop the "-SNAPSHOT" from the name since we don't put that in the parcel / package version.
+CSD_VERSION=${CSD_VERSION/-SNAPSHOT/}
+
+SPARK_VERSION_FILE="$SPARK_HOME/cloudera/cdh_version.properties"
+SPARK_VERSION=$(read_property "cloudera.pkg.version" "$SPARK_VERSION_FILE")
+if [ "$CSD_VERSION" != "$SPARK_VERSION" ]; then
+  echo "**********"
+  echo "* The CSD version ($CSD_VERSION) is not compatible with the current"
+  echo "* Spark 2 version ($SPARK_VERSION). Either update your CSD or      "
+  echo "* make sure you have the correct Spark version installed and       "
+  echo "* activated.                                                       "
+  echo "**********"
+  exit 1
+fi
+
 case $1 in
   (start_history_server)
     start_history_server
