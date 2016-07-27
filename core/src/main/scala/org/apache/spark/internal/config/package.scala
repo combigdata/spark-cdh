@@ -103,4 +103,9 @@ package object config {
     .stringConf
     .checkValues(Set("hive", "in-memory"))
     .createWithDefault("in-memory")
+
+  // This property sets the root namespace for metrics reporting
+  private[spark] val METRICS_NAMESPACE = ConfigBuilder("spark.metrics.namespace")
+    .stringConf
+    .createOptional
 }
