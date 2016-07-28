@@ -93,7 +93,7 @@
       "label" : "Spark History Location (HDFS)",
       "description" : "The location of Spark application history logs in HDFS. Changing this value will not move existing logs to the new location.",
       "configName" : "spark.eventLog.dir",
-      "default" : "/user/spark2/applicationHistory",
+      "default" : "/user/spark/spark2ApplicationHistory",
       "type" : "path",
       "pathType" : "serviceSpecific",
       "required" : "true"
@@ -224,7 +224,7 @@
       "configWriter" : {
         "generators" : [
           {
-            "filename" : "spark-history-server.conf",
+            "filename" : "spark2-conf/spark-history-server.conf",
             "configFormat" : "properties",
             "includedParams" : [
               "history_server_web_port",

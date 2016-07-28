@@ -180,7 +180,7 @@ function run_spark_class {
 
 function start_history_server {
   log "Starting Spark History Server"
-  local CONF_FILE="$CONF_DIR/spark-history-server.conf"
+  local CONF_FILE="$SPARK_CONF_DIR/spark-history-server.conf"
   local DEFAULT_FS=$(get_default_fs $HADOOP_CONF_DIR)
   local LOG_DIR=$(prepend_protocol "$HISTORY_LOG_DIR" "$DEFAULT_FS")
 
