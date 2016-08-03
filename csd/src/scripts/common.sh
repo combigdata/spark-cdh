@@ -329,4 +329,17 @@ function deploy_client_config {
     sed "s,$OLD_TOPOLOGY_SCRIPT,$NEW_TOPOLOGY_SCRIPT," "$CORE_SITE" > "$CORE_SITE.tmp"
     mv "$CORE_SITE.tmp" "$CORE_SITE"
   fi
+
+  # These values cannot be declared in the descriptor, since the CSD framework will
+  # treat them as config references and fail. So add them here unless they've already
+  # been set by the user in the safety valve.
+  LOG_CONFIG="$SPARK_CONF_DIR/log4j.properties"
+  SHELL_CLASSES=("org.apache.spark.repl.Main"
+    "org.apache.spark.api.python.PythonGatewayServer")
+  for class in "${SHELL_CLASSES[@]}"; do
+    key="log4j.logger.$class"
+    if ! has_config "$key" "$LOG_CONFIG"; then
+      echo "$key=\${shell.log.level}" >> "$LOG_CONFIG"
+    fi
+  done
 }

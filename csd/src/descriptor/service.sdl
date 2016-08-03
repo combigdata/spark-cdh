@@ -405,8 +405,7 @@
       "configFilename" : "spark2-conf/log4j.properties",
       "loggingType" : "log4j",
       "additionalConfigs" : [
-        { "key" : "log4j.logger.org.apache.spark.repl.Main", "value" : "${spark_gateway_shell_logging_threshold}" },
-
+        { "key" : "shell.log.level", "value" : "${spark_gateway_shell_logging_threshold}" },
         { "key" : "log4j.logger.org.eclipse.jetty", "value" : "WARN" },
         { "key" : "log4j.logger.org.spark-project.jetty", "value" : "WARN" },
         { "key" : "log4j.logger.org.spark-project.jetty.util.component.AbstractLifeCycle", "value" : "ERROR" },
