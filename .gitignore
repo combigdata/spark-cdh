@@ -77,6 +77,11 @@ spark-warehouse/
 # For R session data
 .RData
 .RHistory
+.Rhistory
+*.Rproj
+*.Rproj.*
+
+.Rproj.user
 
 # Cloudera specific
 cloudera/util.py
