@@ -143,7 +143,15 @@ class YarnClusterSuite extends BaseYarnClusterSuite {
     }
   }
 
-  private def testBasicYarnApp(clientMode: Boolean): Unit = {
+  test("timeout to get SparkContext in cluster mode triggers failure") {
+    val timeout = 2000
+    val finalState = runSpark(false, mainClassName(SparkContextTimeoutApp.getClass),
+      appArgs = Seq((timeout * 4).toString),
+      extraConf = Map("spark.yarn.am.waitTime" -> timeout.toString))
+    finalState should be (SparkAppHandle.State.FAILED)
+  }
+
+  private def testBasicYarnApp(clientMode: Boolean, conf: Map[String, String] = Map()): Unit = {
     val result = File.createTempFile("result", null, tempDir)
     val finalState = runSpark(clientMode, mainClassName(YarnClusterDriver.getClass),
       appArgs = Seq(result.getAbsolutePath()))
@@ -388,6 +396,19 @@ private object YarnLauncherTestApp {
         wait()
       }
     }
+  }
+
+}
+
+/**
+ * Used to test code in the AM that detects the SparkContext instance. Expects a single argument
+ * with the duration to sleep for, in ms.
+ */
+private object SparkContextTimeoutApp {
+
+  def main(args: Array[String]): Unit = {
+    val Array(sleepTime) = args
+    Thread.sleep(java.lang.Long.parseLong(sleepTime))
   }
 
 }
