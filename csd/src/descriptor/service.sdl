@@ -146,6 +146,7 @@
       },
       "topology" : { "minInstances" : 1, "maxInstances" : 1 },
       "logging" : {
+        "configFilename" : "spark2-conf/log4j.properties",
         "dir" : "/var/log/spark2",
         "filename" : "spark2-history-server-${host}.log",
         "modifiable" : true,
