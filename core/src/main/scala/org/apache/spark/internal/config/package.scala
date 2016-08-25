@@ -128,4 +128,10 @@ package object config {
       .internal()
       .stringConf
       .createWithDefaultString("AES/CTR/NoPadding")
+
+  // To limit memory usage, we only track information for a fixed number of tasks
+  private[spark] val UI_RETAINED_TASKS = ConfigBuilder("spark.ui.retainedTasks")
+    .intConf
+    .createWithDefault(100000)
+
 }
