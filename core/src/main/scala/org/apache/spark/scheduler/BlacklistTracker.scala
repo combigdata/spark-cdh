@@ -247,6 +247,65 @@ private[scheduler] object BlacklistTracker extends Logging {
         conf.getOption(BlacklistConfs.BLACKLIST_LEGACY_TIMEOUT_CONF).getOrElse(DEFAULT_TIMEOUT)
     })
   }
+
+  /**
+   * Verify that blacklist configurations are consistent; if not, throw an exception.  Should only
+   * be called if blacklisting is enabled.
+   *
+   * The configuration for the blacklist is expected to adhere to a few invariants.  Default
+   * values follow these rules of course, but users may unwittingly change one configuration
+   * without making the corresponding adjustment elsewhere.  This ensures we fail-fast when
+   * there are such misconfigurations.
+   */
+  def validateBlacklistConfs(conf: SparkConf): Unit = {
+
+    def mustBePos(k: String, v: String): Unit = {
+      throw new IllegalArgumentException(s"$k was $v, but must be > 0.")
+    }
+
+    // undocumented escape hatch for validation -- just for tests that want to run in an "unsafe"
+    // configuration.
+    if (!conf.get("spark.blacklist.testing.skipValidation", "false").toBoolean) {
+
+      Seq(
+        BlacklistConfs.MAX_TASK_ATTEMPTS_PER_EXECUTOR -> 1,
+        BlacklistConfs.MAX_TASK_ATTEMPTS_PER_NODE -> 2,
+        BlacklistConfs.MAX_FAILURES_PER_EXEC_STAGE -> 2,
+        BlacklistConfs.MAX_FAILED_EXEC_PER_NODE_STAGE -> 2,
+        BlacklistConfs.MAX_FAILURES_PER_EXEC -> 2,
+        BlacklistConfs.MAX_FAILED_EXEC_PER_NODE -> 2
+      ).foreach { case (config, default) =>
+        val v = conf.getInt(config, default)
+        if (v <= 0) {
+          mustBePos(config, v.toString)
+        }
+      }
+
+      val timeout = getBlacklistTimeout(conf)
+      if (timeout <= 0) {
+        // first, figure out where the timeout came from, to include the right conf in the message.
+        conf.getOption(BlacklistConfs.BLACKLIST_TIMEOUT_CONF) match {
+          case Some(t) =>
+            mustBePos(BlacklistConfs.BLACKLIST_TIMEOUT_CONF, timeout.toString)
+          case None =>
+            mustBePos(BlacklistConfs.BLACKLIST_LEGACY_TIMEOUT_CONF, timeout.toString)
+        }
+      }
+
+      val maxTaskFailures = conf.getInt("spark.task.maxFailures", 4)
+      val maxNodeAttempts = conf.getInt(BlacklistConfs.MAX_TASK_ATTEMPTS_PER_NODE, 2)
+
+      if (maxNodeAttempts >= maxTaskFailures) {
+        throw new IllegalArgumentException(s"${BlacklistConfs.MAX_TASK_ATTEMPTS_PER_NODE} " +
+          s"( = ${maxNodeAttempts}) was >= spark.task.maxFailures " +
+          s"( = ${maxTaskFailures} ).  Though blacklisting is enabled, with this configuration, " +
+          s"Spark will not be robust to one bad node.  Increase " +
+          s"${BlacklistConfs.MAX_TASK_ATTEMPTS_PER_NODE} or spark.task.maxFailures, or disable " +
+          s"blacklisting with ${BlacklistConfs.BLACKLIST_ENABLED}")
+      }
+    }
+
+  }
 }
 
 /** Failures for one executor, within one taskset */
@@ -263,7 +322,6 @@ private[scheduler] final class ExecutorFailuresInTaskSet(val node: String) {
     taskToFailureCountAndExpiryTime(taskIndex) = (prevFailureCount + 1, failureExpiryTime)
   }
   def numUniqueTasksWithFailures: Int = taskToFailureCountAndExpiryTime.size
-
 
   override def toString(): String = {
     s"numUniqueTasksWithFailures= $numUniqueTasksWithFailures; " +
@@ -317,6 +375,10 @@ private[scheduler] final class ExecutorFailureList extends Logging {
         failures = failures.drop(minIndexToKeep)
       }
     }
+  }
+
+  override def toString(): String = {
+    s"failures = $failures"
   }
 }
 
