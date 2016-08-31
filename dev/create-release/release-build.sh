@@ -102,7 +102,7 @@ echo "Checked out Spark git hash $git_hash"
 if [ -z "$SPARK_VERSION" ]; then
   # Run $MVN in a separate command so that 'set -e' does the right thing.
   TMP=$(mktemp)
-  $MVN help:evaluate -Dexpression=project.version > $TMP
+  $MVN help:evaluate -Dexpression=project.version -T 1 > $TMP
   SPARK_VERSION=$(cat $TMP | grep -v INFO | grep -v WARNING | grep -v Download)
   rm $TMP
 fi
