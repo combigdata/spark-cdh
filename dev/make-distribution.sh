@@ -117,14 +117,29 @@ if [ ! "$(command -v "$MVN")" ] ; then
     exit -1;
 fi
 
-VERSION=$("$MVN" help:evaluate -Dexpression=project.version $@ 2>/dev/null | grep -v "INFO" | tail -n 1)
-SCALA_VERSION=$("$MVN" help:evaluate -Dexpression=scala.binary.version $@ 2>/dev/null\
+# help:evaluate is not safe to multi-threaded builds, so if there is a "-T *" in the args, remove it
+ORIGINAL_ARGS=("$@")
+TRIMMED_ARGS=()
+i=0
+while [ $i -lt ${#ORIGINAL_ARGS[@]} ]; do
+  arg="${ORIGINAL_ARGS[$i]}"
+  if [ "-T" == $arg ]; then
+    # skip this arg and the next one
+    i=$((i + 1))
+  else
+    TRIMMED_ARGS+=($arg)
+  fi
+  i=$((i + 1))
+done
+
+VERSION=$("$MVN" help:evaluate -Dexpression=project.version $TRIMMED_ARGS 2>/dev/null | grep -v "INFO" | tail -n 1)
+SCALA_VERSION=$("$MVN" help:evaluate -Dexpression=scala.binary.version $TRIMMED_ARGS 2>/dev/null\
     | grep -v "INFO"\
     | tail -n 1)
-SPARK_HADOOP_VERSION=$("$MVN" help:evaluate -Dexpression=hadoop.version $@ 2>/dev/null\
+SPARK_HADOOP_VERSION=$("$MVN" help:evaluate -Dexpression=hadoop.version $TRIMMED_ARGS 2>/dev/null\
     | grep -v "INFO"\
     | tail -n 1)
-SPARK_HIVE=$("$MVN" help:evaluate -Dexpression=project.activeProfiles -pl sql/hive $@ 2>/dev/null\
+SPARK_HIVE=$("$MVN" help:evaluate -Dexpression=project.activeProfiles -pl sql/hive $TRIMMED_ARGS 2>/dev/null\
     | grep -v "INFO"\
     | fgrep --count "<id>hive</id>";\
     # Reset exit status to 0, otherwise the script stops here if the last grep finds nothing\
@@ -152,6 +167,14 @@ export MAVEN_OPTS="${MAVEN_OPTS:--Xmx2g -XX:ReservedCodeCacheSize=512m}"
 # Normal quoting tricks don't work.
 # See: http://mywiki.wooledge.org/BashFAQ/050
 BUILD_COMMAND=("$MVN" -T 1C clean package -DskipTests $@)
+
+# We build spark artifacts in the local cauldron build in several passes. No-clean saves
+# time, since classes generated on the previous pass(es) are reused instead of compiling
+# them from scratch.
+if [ -n "${CAULDRON_NO_CLEAN}" ]; then
+  echo "CAULDRON_NO_CLEAN is set; will NOT perform mvn clean"
+  unset -v 'BUILD_COMMAND[1]'
+fi
 
 # Actually build the jar
 echo -e "\nBuilding with..."
