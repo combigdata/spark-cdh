@@ -372,7 +372,7 @@ class StandaloneDynamicAllocationSuite
     assert(apps.head.getExecutorLimit === 1)
   }
 
-  test("the pending replacement executors should not be lost (SPARK-10515)") {
+  ignore("the pending replacement executors should not be lost (SPARK-10515)") {
     sc = new SparkContext(appConf)
     val appId = sc.applicationId
     eventually(timeout(10.seconds), interval(10.millis)) {
@@ -430,7 +430,7 @@ class StandaloneDynamicAllocationSuite
     val executorIdToTaskCount = taskScheduler invokePrivate getMap()
     executorIdToTaskCount(executors.head) = 1
     // kill the busy executor without force; this should fail
-    assert(killExecutor(sc, executors.head, force = false))
+    assert(!killExecutor(sc, executors.head, force = false))
     apps = getApplications()
     assert(apps.head.executors.size === 2)
 

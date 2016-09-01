@@ -23,6 +23,7 @@ import java.util.{Collections, List => JList}
 
 import scala.collection.JavaConverters._
 import scala.collection.mutable.{HashMap, HashSet}
+import scala.concurrent.Future
 
 import com.google.common.collect.HashBiMap
 import org.apache.mesos.Protos.{TaskInfo => MesosTaskInfo, _}
@@ -415,7 +416,7 @@ private[spark] class CoarseMesosSchedulerBackend(
       super.applicationId
     }
 
-  override def doRequestTotalExecutors(requestedTotal: Int): Boolean = {
+  override def doRequestTotalExecutors(requestedTotal: Int): Future[Boolean] = Future.successful {
     // We don't truly know if we can fulfill the full amount of executors
     // since at coarse grain it depends on the amount of slaves available.
     logInfo("Capping the total amount of executors to " + requestedTotal)
@@ -423,26 +424,26 @@ private[spark] class CoarseMesosSchedulerBackend(
     true
   }
 
-  override def doKillExecutors(executorIds: Seq[String]): Boolean = {
+  override def doKillExecutors(executorIds: Seq[String]): Future[Boolean] = Future.successful {
     if (mesosDriver == null) {
       logWarning("Asked to kill executors before the Mesos driver was started.")
-      return false
-    }
-
-    val slaveIdToTaskId = taskIdToSlaveId.inverse()
-    for (executorId <- executorIds) {
-      val slaveId = executorId.split("/")(0)
-      if (slaveIdToTaskId.containsKey(slaveId)) {
-        mesosDriver.killTask(
-          TaskID.newBuilder().setValue(slaveIdToTaskId.get(slaveId).toString).build())
-        pendingRemovedSlaveIds += slaveId
-      } else {
-        logWarning("Unable to find executor Id '" + executorId + "' in Mesos scheduler")
+      false
+    } else {
+      val slaveIdToTaskId = taskIdToSlaveId.inverse()
+      for (executorId <- executorIds) {
+        val slaveId = executorId.split("/")(0)
+        if (slaveIdToTaskId.containsKey(slaveId)) {
+          mesosDriver.killTask(
+            TaskID.newBuilder().setValue(slaveIdToTaskId.get(slaveId).toString).build())
+          pendingRemovedSlaveIds += slaveId
+        } else {
+          logWarning("Unable to find executor Id '" + executorId + "' in Mesos scheduler")
+        }
       }
+      // no need to adjust `executorLimitOption` since the AllocationManager already communicated
+      // the desired limit through a call to `doRequestTotalExecutors`.
+      // See [[o.a.s.scheduler.cluster.CoarseGrainedSchedulerBackend.killExecutors]]
+      true
     }
-    // no need to adjust `executorLimitOption` since the AllocationManager already communicated
-    // the desired limit through a call to `doRequestTotalExecutors`.
-    // See [[o.a.s.scheduler.cluster.CoarseGrainedSchedulerBackend.killExecutors]]
-    true
   }
 }
