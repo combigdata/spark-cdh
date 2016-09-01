@@ -21,7 +21,7 @@ import scala.collection.mutable.{ArrayBuffer, SynchronizedBuffer}
 import scala.concurrent.duration._
 
 import org.scalatest.BeforeAndAfterAll
-import org.scalatest.concurrent.Eventually._
+import org.scalatest.concurrent.{Eventually, ScalaFutures}
 
 import org.apache.spark._
 import org.apache.spark.deploy.{ApplicationDescription, Command}
@@ -34,7 +34,12 @@ import org.apache.spark.util.Utils
 /**
  * End-to-end tests for application client in standalone mode.
  */
-class AppClientSuite extends SparkFunSuite with LocalSparkContext with BeforeAndAfterAll {
+class AppClientSuite
+    extends SparkFunSuite
+    with LocalSparkContext
+    with BeforeAndAfterAll
+    with Eventually
+    with ScalaFutures {
   private val numWorkers = 2
   private val conf = new SparkConf()
   private val securityManager = new SecurityManager(conf)
@@ -88,7 +93,12 @@ class AppClientSuite extends SparkFunSuite with LocalSparkContext with BeforeAnd
 
     // Send message to Master to request Executors, verify request by change in executor limit
     val numExecutorsRequested = 1
-    assert(ci.client.requestTotalExecutors(numExecutorsRequested))
+    whenReady(
+        ci.client.requestTotalExecutors(numExecutorsRequested),
+        timeout(10.seconds),
+        interval(10.millis)) { acknowledged =>
+      assert(acknowledged)
+    }
 
     eventually(timeout(10.seconds), interval(10.millis)) {
       val apps = getApplications()
@@ -96,10 +106,12 @@ class AppClientSuite extends SparkFunSuite with LocalSparkContext with BeforeAnd
     }
 
     // Send request to kill executor, verify request was made
-    assert {
-      val apps = getApplications()
-      val executorId: String = apps.head.executors.head._2.fullId
-      ci.client.killExecutors(Seq(executorId))
+    val executorId: String = getApplications().head.executors.head._2.fullId
+    whenReady(
+        ci.client.killExecutors(Seq(executorId)),
+        timeout(10.seconds),
+        interval(10.millis)) { acknowledged =>
+      assert(acknowledged)
     }
 
     // Issue stop command for Client to disconnect from Master
@@ -117,7 +129,9 @@ class AppClientSuite extends SparkFunSuite with LocalSparkContext with BeforeAnd
     val ci = new AppClientInst(masterRpcEnv.address.toSparkURL)
 
     // requests to master should fail immediately
-    assert(ci.client.requestTotalExecutors(3) === false)
+    whenReady(ci.client.requestTotalExecutors(3), timeout(1.seconds)) { success =>
+      assert(success === false)
+    }
   }
 
   // ===============================

@@ -19,6 +19,9 @@ package org.apache.spark.scheduler.cluster.mesos
 
 import java.util
 import java.util.Collections
+import java.util.concurrent.TimeUnit
+
+import scala.concurrent.duration._
 
 import org.apache.mesos.Protos.Value.Scalar
 import org.apache.mesos.Protos._
@@ -26,6 +29,7 @@ import org.apache.mesos.{Protos, Scheduler, SchedulerDriver}
 import org.mockito.Matchers._
 import org.mockito.Mockito._
 import org.mockito.Matchers
+import org.scalatest.concurrent.ScalaFutures
 import org.scalatest.mock.MockitoSugar
 import org.scalatest.BeforeAndAfter
 
@@ -35,7 +39,12 @@ import org.apache.spark.{LocalSparkContext, SparkConf, SparkContext, SecurityMan
 class CoarseMesosSchedulerBackendSuite extends SparkFunSuite
     with LocalSparkContext
     with MockitoSugar
-    with BeforeAndAfter {
+    with BeforeAndAfter
+    with ScalaFutures {
+
+  // All 'requests' to the scheduler run immediately on the same thread, so
+  // demand that all futures have their value available immediately.
+  implicit override val patienceConfig = PatienceConfig(timeout = Duration(0, TimeUnit.SECONDS))
 
   private def createOffer(offerId: String, slaveId: String, mem: Int, cpu: Int): Offer = {
     val builder = Offer.newBuilder()
@@ -113,8 +122,8 @@ class CoarseMesosSchedulerBackendSuite extends SparkFunSuite
       any[Filters])
 
     // simulate the allocation manager down-scaling executors
-    backend.doRequestTotalExecutors(0)
-    assert(backend.doKillExecutors(Seq("s1/0")))
+    assert(backend.doRequestTotalExecutors(0).futureValue)
+    assert(backend.doKillExecutors(Seq("s1/0")).futureValue)
     verify(driver, times(1)).killTask(taskID0)
 
     val mesosOffers2 = new java.util.ArrayList[Offer]
