@@ -19,16 +19,14 @@ package org.apache.spark.deploy.yarn
 
 import java.util.{Arrays, List => JList}
 
-import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic
 import org.apache.hadoop.net.DNSToSwitchMapping
 import org.apache.hadoop.yarn.api.records._
 import org.apache.hadoop.yarn.client.api.AMRMClient
 import org.apache.hadoop.yarn.client.api.AMRMClient.ContainerRequest
-import org.scalatest.{BeforeAndAfterEach, Matchers}
-
-import org.scalatest.{BeforeAndAfterEach, Matchers}
+import org.apache.hadoop.yarn.conf.YarnConfiguration
 import org.mockito.Mockito._
+import org.scalatest.{BeforeAndAfterEach, Matchers}
 
 import org.apache.spark.{SecurityManager, SparkFunSuite}
 import org.apache.spark.SparkConf
@@ -50,7 +48,7 @@ class MockResolver extends DNSToSwitchMapping {
 }
 
 class YarnAllocatorSuite extends SparkFunSuite with Matchers with BeforeAndAfterEach {
-  val conf = new Configuration()
+  val conf = new YarnConfiguration()
   conf.setClass(
     CommonConfigurationKeysPublic.NET_TOPOLOGY_NODE_SWITCH_MAPPING_IMPL_KEY,
     classOf[MockResolver], classOf[DNSToSwitchMapping])

@@ -26,10 +26,10 @@ import scala.collection.mutable.{ArrayBuffer, HashMap, HashSet}
 import scala.collection.JavaConverters._
 import scala.util.control.NonFatal
 
-import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.yarn.api.records._
 import org.apache.hadoop.yarn.client.api.AMRMClient
 import org.apache.hadoop.yarn.client.api.AMRMClient.ContainerRequest
+import org.apache.hadoop.yarn.conf.YarnConfiguration
 import org.apache.hadoop.yarn.util.RackResolver
 
 import org.apache.log4j.{Level, Logger}
@@ -57,7 +57,7 @@ import org.apache.spark.util.ThreadUtils
 private[yarn] class YarnAllocator(
     driverUrl: String,
     driverRef: RpcEndpointRef,
-    conf: Configuration,
+    conf: YarnConfiguration,
     sparkConf: SparkConf,
     amClient: AMRMClient[ContainerRequest],
     appAttemptId: ApplicationAttemptId,
@@ -277,8 +277,9 @@ private[yarn] class YarnAllocator(
     val missing = targetNumExecutors - numPendingAllocate - numExecutorsRunning
 
     if (missing > 0) {
-      logInfo(s"Will request $missing executor containers, each with ${resource.getVirtualCores} " +
-        s"cores and ${resource.getMemory} MB memory including $memoryOverhead MB overhead")
+      logInfo(s"Will request $missing executor container(s), each with " +
+        s"${resource.getVirtualCores} core(s) and " +
+        s"${resource.getMemory} MB memory (including $memoryOverhead MB of overhead)")
 
       // Split the pending container request into three groups: locality matched list, locality
       // unmatched list and non-locality list. Take the locality matched container request into
@@ -298,12 +299,19 @@ private[yarn] class YarnAllocator(
         updatedNumContainer, numLocalityAwareTasks, hostToLocalTaskCounts,
           allocatedHostToContainersMap, localityMatched)
 
+      var unlocalized = 0
       for (locality <- containerLocalityPreferences) {
         val request = createContainerRequest(resource, locality.nodes, locality.racks)
         amClient.addContainerRequest(request)
         val nodes = request.getNodes
-        val hostStr = if (nodes == null || nodes.isEmpty) "Any" else nodes.asScala.last
-        logInfo(s"Container request (host: $hostStr, capability: $resource)")
+        if (nodes != null && !nodes.isEmpty) {
+          logInfo(s"Container request (host: $nodes.asScala.last, capability: $resource)")
+        } else {
+          unlocalized += 1
+        }
+      }
+      if (unlocalized > 0) {
+          logInfo(s"Submitted $unlocalized unlocalized container requests.")
       }
     } else if (missing < 0) {
       val numToCancel = math.min(numPendingAllocate, -missing)
@@ -424,7 +432,7 @@ private[yarn] class YarnAllocator(
       val containerId = container.getId
       val executorId = executorIdCounter.toString
       assert(container.getResource.getMemory >= resource.getMemory)
-      logInfo("Launching container %s for on host %s".format(containerId, executorHostname))
+      logInfo(s"Launching container $containerId on host $executorHostname")
 
       def updateInternalState(): Unit = synchronized {
         numExecutorsRunning += 1
@@ -439,14 +447,11 @@ private[yarn] class YarnAllocator(
       }
 
       if (launchContainers) {
-        logInfo("Launching ExecutorRunnable. driverUrl: %s,  executorHostname: %s".format(
-          driverUrl, executorHostname))
-
         launcherPool.execute(new Runnable {
           override def run(): Unit = {
             try {
               new ExecutorRunnable(
-                container,
+                Some(container),
                 conf,
                 sparkConf,
                 driverUrl,

@@ -43,11 +43,11 @@ import org.apache.spark.network.util.JavaUtils
 import org.apache.spark.util.Utils
 
 class ExecutorRunnable(
-    container: Container,
-    conf: Configuration,
+    container: Option[Container],
+    conf: YarnConfiguration,
     sparkConf: SparkConf,
     masterAddress: String,
-    slaveId: String,
+    executorId: String,
     hostname: String,
     executorMemory: Int,
     executorCores: Int,
@@ -56,46 +56,48 @@ class ExecutorRunnable(
 
   var rpc: YarnRPC = YarnRPC.create(conf)
   var nmClient: NMClient = _
-  val yarnConf: YarnConfiguration = new YarnConfiguration(conf)
-  lazy val env = prepareEnvironment(container)
 
   def run(): Unit = {
-    logInfo("Starting Executor Container")
+    logDebug("Starting Executor Container")
     nmClient = NMClient.createNMClient()
-    nmClient.init(yarnConf)
+    nmClient.init(conf)
     nmClient.start()
     startContainer()
   }
 
-  def startContainer(): java.util.Map[String, ByteBuffer] = {
-    logInfo("Setting up ContainerLaunchContext")
+  def launchContextDebugInfo(): String = {
+    val commands = prepareCommand()
+    val env = prepareEnvironment()
+    val localResources = prepareLocalResources
 
+    s"""
+    |===============================================================================
+    |YARN executor launch context:
+    |  env:
+    |${env.map { case (k, v) => s"    $k -> $v\n" }.mkString}
+    |  command:
+    |    ${commands.mkString(" \\ \n      ")}
+    |
+    |  resources:
+    |${localResources.map { case (k, v) => s"    $k -> $v\n" }.mkString}
+    |===============================================================================""".stripMargin
+  }
+
+  def startContainer(): java.util.Map[String, ByteBuffer] = {
     val ctx = Records.newRecord(classOf[ContainerLaunchContext])
       .asInstanceOf[ContainerLaunchContext]
+    val env = prepareEnvironment().asJava
 
     val localResources = prepareLocalResources
     ctx.setLocalResources(localResources.asJava)
-
-    ctx.setEnvironment(env.asJava)
+    ctx.setEnvironment(env)
 
     val credentials = UserGroupInformation.getCurrentUser().getCredentials()
     val dob = new DataOutputBuffer()
     credentials.writeTokenStorageToStream(dob)
     ctx.setTokens(ByteBuffer.wrap(dob.getData()))
 
-    val commands = prepareCommand(masterAddress, slaveId, hostname, executorMemory, executorCores,
-      appId, localResources)
-
-    logInfo(s"""
-      |===============================================================================
-      |YARN executor launch context:
-      |  env:
-      |${env.map { case (k, v) => s"    $k -> $v\n" }.mkString}
-      |  command:
-      |    ${commands.mkString(" ")}
-      |===============================================================================
-      """.stripMargin)
-
+    val commands = prepareCommand()
     ctx.setCommands(commands.asJava)
     ctx.setApplicationACLs(
       YarnSparkHadoopUtil.getApplicationAclsForYarn(securityMgr).asJava)
@@ -118,22 +120,15 @@ class ExecutorRunnable(
 
     // Send the start request to the ContainerManager
     try {
-      nmClient.startContainer(container, ctx)
+      nmClient.startContainer(container.get, ctx)
     } catch {
       case ex: Exception =>
-        throw new SparkException(s"Exception while starting container ${container.getId}" +
+        throw new SparkException(s"Exception while starting container ${container.get.getId}" +
           s" on host $hostname", ex)
     }
   }
 
-  private def prepareCommand(
-      masterAddress: String,
-      slaveId: String,
-      hostname: String,
-      executorMemory: Int,
-      executorCores: Int,
-      appId: String,
-      localResources: HashMap[String, LocalResource]): List[String] = {
+  private def prepareCommand(): List[String] = {
     // Extra options for the JVM
     val javaOpts = ListBuffer[String]()
 
@@ -222,15 +217,15 @@ class ExecutorRunnable(
       YarnSparkHadoopUtil.getOutOfMemoryErrorArgument) ++
       javaOpts ++
       Seq("org.apache.spark.executor.CoarseGrainedExecutorBackend",
-        "--driver-url", masterAddress.toString,
-        "--executor-id", slaveId.toString,
-        "--hostname", hostname.toString,
+        "--driver-url", masterAddress,
+        "--executor-id", executorId,
+        "--hostname", hostname,
         "--cores", executorCores.toString,
         "--app-id", appId) ++
       userClassPath ++
       Seq(
-        "1>", ApplicationConstants.LOG_DIR_EXPANSION_VAR + "/stdout",
-        "2>", ApplicationConstants.LOG_DIR_EXPANSION_VAR + "/stderr")
+        s"1>${ApplicationConstants.LOG_DIR_EXPANSION_VAR}/stdout",
+        s"2>${ApplicationConstants.LOG_DIR_EXPANSION_VAR}/stderr")
 
     // TODO: it would be nicer to just make sure there are no null commands here
     commands.map(s => if (s == null) "null" else s).toList
@@ -283,10 +278,10 @@ class ExecutorRunnable(
     localResources
   }
 
-  private def prepareEnvironment(container: Container): HashMap[String, String] = {
+  private def prepareEnvironment(): HashMap[String, String] = {
     val env = new HashMap[String, String]()
     val extraCp = sparkConf.getOption("spark.executor.extraClassPath")
-    Client.populateClasspath(null, yarnConf, sparkConf, env, extraCp)
+    Client.populateClasspath(null, conf, sparkConf, env, extraCp)
 
     sparkConf.getExecutorEnv.foreach { case (key, value) =>
       // This assumes each executor environment variable set here is a path
@@ -300,20 +295,22 @@ class ExecutorRunnable(
     }
 
     // lookup appropriate http scheme for container log urls
-    val yarnHttpPolicy = yarnConf.get(
+    val yarnHttpPolicy = conf.get(
       YarnConfiguration.YARN_HTTP_POLICY_KEY,
       YarnConfiguration.YARN_HTTP_POLICY_DEFAULT
     )
     val httpScheme = if (yarnHttpPolicy == "HTTPS_ONLY") "https://" else "http://"
 
     // Add log urls
-    sys.env.get("SPARK_USER").foreach { user =>
-      val containerId = ConverterUtils.toString(container.getId)
-      val address = container.getNodeHttpAddress
-      val baseUrl = s"$httpScheme$address/node/containerlogs/$containerId/$user"
+    container.foreach { c =>
+      sys.env.get("SPARK_USER").foreach { user =>
+        val containerId = ConverterUtils.toString(c.getId)
+        val address = c.getNodeHttpAddress
+        val baseUrl = s"$httpScheme$address/node/containerlogs/$containerId/$user"
 
-      env("SPARK_LOG_URL_STDERR") = s"$baseUrl/stderr?start=-4096"
-      env("SPARK_LOG_URL_STDOUT") = s"$baseUrl/stdout?start=-4096"
+        env("SPARK_LOG_URL_STDERR") = s"$baseUrl/stderr?start=-4096"
+        env("SPARK_LOG_URL_STDOUT") = s"$baseUrl/stdout?start=-4096"
+      }
     }
 
     System.getenv().asScala.filterKeys(_.startsWith("SPARK"))

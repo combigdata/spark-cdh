@@ -260,19 +260,31 @@ private[spark] class ApplicationMaster(
       securityMgr: SecurityManager) = {
     val sc = sparkContextRef.get()
 
+    val _sparkConf = if (sc != null) sc.getConf else sparkConf
     val appId = client.getAttemptId().getApplicationId().toString()
     val attemptId = client.getAttemptId().getAttemptId().toString()
     val historyAddress =
-      sparkConf.getOption("spark.yarn.historyServer.address")
+      _sparkConf.getOption("spark.yarn.historyServer.address")
         .map { text => SparkHadoopUtil.get.substituteHadoopVariables(text, yarnConf) }
         .map { address => s"${address}${HistoryServer.UI_PATH_PREFIX}/${appId}/${attemptId}" }
         .getOrElse("")
 
-    val _sparkConf = if (sc != null) sc.getConf else sparkConf
     val driverUrl = _rpcEnv.uriOf(
         SparkEnv.driverActorSystemName,
         RpcAddress(_sparkConf.get("spark.driver.host"), _sparkConf.get("spark.driver.port").toInt),
         CoarseGrainedSchedulerBackend.ENDPOINT_NAME)
+
+    // Before we initialize the allocator, let's log the information about how executors will
+    // be run up front, to avoid printing this out for every single executor being launched.
+    // Use placeholders for information that changes such as executor IDs.
+    logInfo {
+      val executorMemory = sparkConf.getInt("spark.executor.memory", 1024)
+      val executorCores = sparkConf.getInt("spark.executor.cores", 1)
+      val dummyRunner = new ExecutorRunnable(None, yarnConf, sparkConf, driverUrl, "<executorId>",
+        "<hostname>", executorMemory, executorCores, appId, securityMgr)
+      dummyRunner.launchContextDebugInfo()
+    }
+
     allocator = client.register(driverUrl,
       driverRef,
       yarnConf,
