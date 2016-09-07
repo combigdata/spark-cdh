@@ -112,9 +112,9 @@
     <module>external/kafka-0-8</module>
     <!-- Disabled in CDH
     <module>external/kafka-0-8-assembly</module>
-    -->
     <module>external/kafka-0-10</module>
     <module>external/kafka-0-10-assembly</module>
+    -->
     <module>csd</module>
   </modules>
 
@@ -673,7 +673,7 @@
       <dependency>
         <groupId>org.glassfish.jersey.core</groupId>
         <artifactId>jersey-client</artifactId>
-        <version>${jersey.version}</version>		
+        <version>${jersey.version}</version>
       </dependency>
       <dependency>
         <groupId>org.glassfish.jersey.containers</groupId>
