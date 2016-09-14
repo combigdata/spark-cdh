@@ -100,7 +100,7 @@ sparkR.stop <- function() {
 #' @param sparkEnvir Named list of environment variables to set on worker nodes
 #' @param sparkExecutorEnv Named list of environment variables to be used when launching executors
 #' @param sparkJars Character vector of jar files to pass to the worker nodes
-#' @param sparkPackages Character vector of packages from spark-packages.org
+#' @param sparkPackages Character vector of package coordinates
 #' @seealso \link{sparkR.session}
 #' @rdname sparkR.init-deprecated
 #' @export
