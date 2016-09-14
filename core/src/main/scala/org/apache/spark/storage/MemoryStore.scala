@@ -510,10 +510,10 @@ private[spark] class MemoryStore(blockManager: BlockManager, memoryManager: Memo
         val memoryToRelease = math.min(memory, unrollMemoryMap(taskAttemptId))
         if (memoryToRelease > 0) {
           unrollMemoryMap(taskAttemptId) -= memoryToRelease
-          if (unrollMemoryMap(taskAttemptId) == 0) {
-            unrollMemoryMap.remove(taskAttemptId)
-          }
           memoryManager.releaseUnrollMemory(memoryToRelease)
+        }
+        if (unrollMemoryMap(taskAttemptId) == 0) {
+          unrollMemoryMap.remove(taskAttemptId)
         }
       }
     }
@@ -529,10 +529,10 @@ private[spark] class MemoryStore(blockManager: BlockManager, memoryManager: Memo
         val memoryToRelease = math.min(memory, pendingUnrollMemoryMap(taskAttemptId))
         if (memoryToRelease > 0) {
           pendingUnrollMemoryMap(taskAttemptId) -= memoryToRelease
-          if (pendingUnrollMemoryMap(taskAttemptId) == 0) {
-            pendingUnrollMemoryMap.remove(taskAttemptId)
-          }
           memoryManager.releaseUnrollMemory(memoryToRelease)
+        }
+        if (pendingUnrollMemoryMap(taskAttemptId) == 0) {
+          pendingUnrollMemoryMap.remove(taskAttemptId)
         }
       }
     }
