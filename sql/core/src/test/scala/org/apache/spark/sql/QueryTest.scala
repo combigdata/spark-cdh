@@ -265,8 +265,7 @@ abstract class QueryTest extends PlanTest {
           origin.child,
           l.tableName)(
           origin.cachedColumnBuffers,
-          l._statistics,
-          origin._batchStats)
+          origin.batchStats)
     }
 
     assert(logicalRDDs.isEmpty)

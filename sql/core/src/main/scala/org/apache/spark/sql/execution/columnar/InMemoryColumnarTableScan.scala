@@ -61,54 +61,25 @@ private[sql] case class InMemoryRelation(
     @transient child: SparkPlan,
     tableName: Option[String])(
     @transient private[sql] var _cachedColumnBuffers: RDD[CachedBatch] = null,
-    @transient private[sql] var _statistics: Statistics = null,
-    private[sql] var _batchStats: Accumulable[ArrayBuffer[InternalRow], InternalRow] = null)
+    _batchStats: Accumulator[Long] = null)
   extends LogicalPlan with MultiInstanceRelation {
 
-  private val batchStats: Accumulable[ArrayBuffer[InternalRow], InternalRow] =
+  private[sql] val batchStats: Accumulator[Long] =
     if (_batchStats == null) {
-      child.sqlContext.sparkContext.accumulableCollection(ArrayBuffer.empty[InternalRow])
+      child.sqlContext.sparkContext.accumulator(0L)
     } else {
       _batchStats
     }
 
   @transient val partitionStatistics = new PartitionStatistics(output)
 
-  private def computeSizeInBytes = {
-    val sizeOfRow: Expression =
-      BindReferences.bindReference(
-        output.map(a => partitionStatistics.forAttribute(a).sizeInBytes).reduce(Add),
-        partitionStatistics.schema)
-
-    batchStats.value.map(row => sizeOfRow.eval(row).asInstanceOf[Long]).sum
-  }
-
-  // Statistics propagation contracts:
-  // 1. Non-null `_statistics` must reflect the actual statistics of the underlying data
-  // 2. Only propagate statistics when `_statistics` is non-null
-  private def statisticsToBePropagated = if (_statistics == null) {
-    val updatedStats = statistics
-    if (_statistics == null) null else updatedStats
-  } else {
-    _statistics
-  }
-
   override def statistics: Statistics = {
-    if (_statistics == null) {
-      if (batchStats.value.isEmpty) {
-        // Underlying columnar RDD hasn't been materialized, no useful statistics information
-        // available, return the default statistics.
-        Statistics(sizeInBytes = child.sqlContext.conf.defaultSizeInBytes)
-      } else {
-        // Underlying columnar RDD has been materialized, required information has also been
-        // collected via the `batchStats` accumulator, compute the final statistics,
-        // and update `_statistics`.
-        _statistics = Statistics(sizeInBytes = computeSizeInBytes)
-        _statistics
-      }
+    if (batchStats.value == 0L) {
+      // Underlying columnar RDD hasn't been materialized, no useful statistics information
+      // available, return the default statistics.
+      Statistics(sizeInBytes = child.sqlContext.conf.defaultSizeInBytes)
     } else {
-      // Pre-computed statistics
-      _statistics
+      Statistics(sizeInBytes = batchStats.value.longValue)
     }
   }
 
@@ -159,10 +130,10 @@ private[sql] case class InMemoryRelation(
             rowCount += 1
           }
 
+          batchStats += totalSize
+
           val stats = InternalRow.fromSeq(columnBuilders.map(_.columnStats.collectedStatistics)
                         .flatMap(_.values))
-
-          batchStats += stats
           CachedBatch(rowCount, columnBuilders.map(_.build().array()), stats)
         }
 
@@ -177,7 +148,7 @@ private[sql] case class InMemoryRelation(
   def withOutput(newOutput: Seq[Attribute]): InMemoryRelation = {
     InMemoryRelation(
       newOutput, useCompression, batchSize, storageLevel, child, tableName)(
-      _cachedColumnBuffers, statisticsToBePropagated, batchStats)
+      _cachedColumnBuffers, batchStats)
   }
 
   override def children: Seq[LogicalPlan] = Seq.empty
@@ -191,14 +162,13 @@ private[sql] case class InMemoryRelation(
       child,
       tableName)(
       _cachedColumnBuffers,
-      statisticsToBePropagated,
       batchStats).asInstanceOf[this.type]
   }
 
   def cachedColumnBuffers: RDD[CachedBatch] = _cachedColumnBuffers
 
   override protected def otherCopyArgs: Seq[AnyRef] =
-    Seq(_cachedColumnBuffers, statisticsToBePropagated, batchStats)
+    Seq(_cachedColumnBuffers, batchStats)
 
   private[sql] def uncache(blocking: Boolean): Unit = {
     Accumulators.remove(batchStats.id)

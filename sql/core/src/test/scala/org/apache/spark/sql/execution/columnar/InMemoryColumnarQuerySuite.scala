@@ -219,4 +219,18 @@ class InMemoryColumnarQuerySuite extends QueryTest with SharedSQLContext {
     assert(data.count() === 10)
     assert(data.filter($"s" === "3").count() === 1)
   }
+
+  test("SPARK-17549: cached table size should be correctly calculated") {
+    val data = sparkContext.parallelize(1 to 10, 5).toDF()
+    val plan = sqlContext.executePlan(data.logicalPlan).sparkPlan
+    val cached = InMemoryRelation(true, 5, MEMORY_ONLY, plan, None)
+
+    // Materialize the data.
+    val expectedAnswer = data.collect()
+    checkAnswer(cached, expectedAnswer)
+
+    // Check that the right size was calculated.
+    assert(cached.batchStats.value === expectedAnswer.size * INT.defaultSize)
+  }
+
 }
