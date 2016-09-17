@@ -1,0 +1,9 @@
+el5 RedHat5
+el6 RedHat6
+el7 RedHat7
+trusty Ubuntu1404
+precise Ubuntu1204
+jessie Debian8
+wheezy Debian7
+sles11 SLES11
+sles12 SLES12

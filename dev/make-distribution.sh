@@ -226,6 +226,7 @@ rm "$DISTDIR/bin/beeline"
 rm "$DISTDIR/bin/sparkR"
 rm "$DISTDIR/sbin/start-thriftserver.sh"
 rm "$DISTDIR/sbin/stop-thriftserver.sh"
+rm $DISTDIR/bin/*.cmd
 
 if [ "$MAKE_TGZ" == "true" ]; then
   TARDIR_NAME=spark-$VERSION-bin-$NAME
