@@ -17,6 +17,7 @@
 package org.apache.spark.network.yarn
 
 import java.io.{DataOutputStream, File, FileOutputStream, IOException}
+import java.nio.ByteBuffer
 import java.nio.file.Files
 import java.nio.file.attribute.PosixFilePermission._
 import java.util.EnumSet
@@ -41,14 +42,17 @@ import org.apache.spark.network.shuffle.protocol.ExecutorShuffleInfo
 import org.apache.spark.util.Utils
 
 class YarnShuffleServiceSuite extends SparkFunSuite with Matchers with BeforeAndAfterEach {
-  private[yarn] var yarnConfig: YarnConfiguration = new YarnConfiguration
+  private[yarn] var yarnConfig: YarnConfiguration = null
   private[yarn] val SORT_MANAGER = "org.apache.spark.shuffle.sort.SortShuffleManager"
 
   override def beforeEach(): Unit = {
+    super.beforeEach()
+    yarnConfig = new YarnConfiguration()
     yarnConfig.set(YarnConfiguration.NM_AUX_SERVICES, "spark_shuffle")
     yarnConfig.set(YarnConfiguration.NM_AUX_SERVICE_FMT.format("spark_shuffle"),
       classOf[YarnShuffleService].getCanonicalName)
     yarnConfig.setInt("spark.shuffle.service.port", 0)
+    yarnConfig.setBoolean(YarnShuffleService.STOP_ON_FAILURE_KEY, true)
     val localDir = Utils.createTempDir()
     yarnConfig.set("yarn.nodemanager.local-dirs", localDir.getAbsolutePath)
   }
@@ -78,12 +82,10 @@ class YarnShuffleServiceSuite extends SparkFunSuite with Matchers with BeforeAnd
     yarnConfig.setBoolean(SecurityManager.SPARK_AUTH_CONF, true)
     s1.init(yarnConfig)
     val app1Id = ApplicationId.newInstance(0, 1)
-    val app1Data: ApplicationInitializationContext =
-      new ApplicationInitializationContext("user", app1Id, null)
+    val app1Data = makeAppInfo("user", app1Id)
     s1.initializeApplication(app1Data)
     val app2Id = ApplicationId.newInstance(0, 2)
-    val app2Data: ApplicationInitializationContext =
-      new ApplicationInitializationContext("user", app2Id, null)
+    val app2Data = makeAppInfo("user", app2Id)
     s1.initializeApplication(app2Data)
 
     val execStateFile = s1.registeredExecutorFile
@@ -156,12 +158,10 @@ class YarnShuffleServiceSuite extends SparkFunSuite with Matchers with BeforeAnd
     val secretsFile = s1.secretsFile
     secretsFile should be (null)
     val app1Id = ApplicationId.newInstance(0, 1)
-    val app1Data: ApplicationInitializationContext =
-      new ApplicationInitializationContext("user", app1Id, null)
+    val app1Data = makeAppInfo("user", app1Id)
     s1.initializeApplication(app1Data)
     val app2Id = ApplicationId.newInstance(0, 2)
-    val app2Data: ApplicationInitializationContext =
-      new ApplicationInitializationContext("user", app2Id, null)
+    val app2Data = makeAppInfo("user", app2Id)
     s1.initializeApplication(app2Data)
 
     val execStateFile = s1.registeredExecutorFile
@@ -189,8 +189,7 @@ class YarnShuffleServiceSuite extends SparkFunSuite with Matchers with BeforeAnd
     s1 = new YarnShuffleService
     s1.init(yarnConfig)
     val app1Id = ApplicationId.newInstance(0, 1)
-    val app1Data: ApplicationInitializationContext =
-      new ApplicationInitializationContext("user", app1Id, null)
+    val app1Data = makeAppInfo("user", app1Id)
     s1.initializeApplication(app1Data)
 
     val execStateFile = s1.registeredExecutorFile
@@ -223,8 +222,7 @@ class YarnShuffleServiceSuite extends SparkFunSuite with Matchers with BeforeAnd
     s2.initializeApplication(app1Data)
     // however, when we initialize a totally new app2, everything is still happy
     val app2Id = ApplicationId.newInstance(0, 2)
-    val app2Data: ApplicationInitializationContext =
-      new ApplicationInitializationContext("user", app2Id, null)
+    val app2Data = makeAppInfo("user", app2Id)
     s2.initializeApplication(app2Data)
     val shuffleInfo2 = new ExecutorShuffleInfo(Array("/bippy"), 5, "hash")
     resolver2.registerExecutor(app2Id.toString, "exec-2", shuffleInfo2)
@@ -297,13 +295,14 @@ class YarnShuffleServiceSuite extends SparkFunSuite with Matchers with BeforeAnd
     yarnConfig.setBoolean(SecurityManager.SPARK_AUTH_CONF, true)
     s1.init(yarnConfig)
     val app1Id = ApplicationId.newInstance(0, 1)
-    val app1Data: ApplicationInitializationContext =
-      new ApplicationInitializationContext("user", app1Id, null)
+    val app1Data = makeAppInfo("user", app1Id)
     s1.initializeApplication(app1Data)
     val app2Id = ApplicationId.newInstance(0, 2)
-    val app2Data: ApplicationInitializationContext =
-      new ApplicationInitializationContext("user", app2Id, null)
+    val app2Data = makeAppInfo("user", app2Id)
     s1.initializeApplication(app2Data)
+
+    assert(s1.secretManager.getSecretKey(app1Id.toString()) != null)
+    assert(s1.secretManager.getSecretKey(app2Id.toString()) != null)
 
     val execStateFile = s1.registeredExecutorFile
     execStateFile should not be (null)
@@ -334,6 +333,10 @@ class YarnShuffleServiceSuite extends SparkFunSuite with Matchers with BeforeAnd
     s2.setRecoveryPath(recoveryPath)
     s2.init(yarnConfig)
 
+    // Ensure that s2 has loaded known apps from the secrets db.
+    assert(s2.secretManager.getSecretKey(app1Id.toString()) != null)
+    assert(s2.secretManager.getSecretKey(app2Id.toString()) != null)
+
     val execStateFile2 = s2.registeredExecutorFile
     val secretsFile2 = s2.secretsFile
 
@@ -359,4 +362,10 @@ class YarnShuffleServiceSuite extends SparkFunSuite with Matchers with BeforeAnd
 
     s2.stop()
   }
- }
+
+  private def makeAppInfo(user: String, appId: ApplicationId): ApplicationInitializationContext = {
+    val secret = ByteBuffer.wrap(new Array[Byte](0))
+    new ApplicationInitializationContext(user, appId, secret)
+  }
+
+}

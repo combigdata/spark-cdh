@@ -105,7 +105,8 @@ public class YarnShuffleService extends AuxiliaryService {
 
   // An entity that manages the shuffle secret per application
   // This is used only if authentication is enabled
-  private ShuffleSecretManager secretManager;
+  @VisibleForTesting
+  ShuffleSecretManager secretManager;
 
   // The actual server that serves shuffle files
   private TransportServer shuffleServer = null;
