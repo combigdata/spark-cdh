@@ -381,18 +381,10 @@ class Version(object):
     def _validate(self):
         Version._validate_int(self._release_version, "release-version")
 
-        splitted_spark2_version = self._spark2_version.split(".")
-        assert len(splitted_spark2_version) >= 2, \
-                """Expected dotted version vector
-                (upstream.3digit.number.cloudera.number) got %s""" % self._spark2_version
-        # This version is usually like 2.0.0.cloudera1
-        # Let's verify that this in fact in this format -
-        # digits.digits.digits.cloudera followed by some more digits
-        for v in splitted_spark2_version[0:-1]:
-            assert v == "x" or re.match("^\d+$", v), "%s is not a valid version component" % (v,)
-        v = splitted_spark2_version[-1]
-        assert re.match("cloudera\d+$", v), """%s doesn't conform to expected
-        format of spark2-version. It should be 2.0.0.cloudera1 or similar""" % (v,)
+        # Version is expected to be something like "2.0.0.cloudera[something here]".
+        version_re = re.compile(r"[0-9]+\.[0-9]+\.[0-9]+\.cloudera.+")
+        assert version_re.match(self._spark2_version), """Expected dotted version vector
+          (upstream.3digit.number.cloudera*), got %s""" % self._spark2_version
 
         # Now let's validate cdh_version
         splitted_cdh_version = self._cdh_version.split(".")
