@@ -21,6 +21,7 @@ import java.util.concurrent.TimeUnit
 
 import org.apache.spark.launcher.SparkLauncher
 import org.apache.spark.network.util.ByteUnit
+import org.apache.spark.util.Utils
 
 package object config {
 
@@ -137,5 +138,23 @@ package object config {
   // To limit how many applications are shown in the History Server summary ui
   private[spark] val HISTORY_UI_MAX_APPS =
     ConfigBuilder("spark.history.ui.maxApplications").intConf.createWithDefault(Integer.MAX_VALUE)
+
+  private[spark] val DRIVER_HOST_ADDRESS = ConfigBuilder("spark.driver.host")
+    .doc("Address of driver endpoints.")
+    .stringConf
+    .createWithDefault(Utils.localHostName())
+
+  private[spark] val DRIVER_BIND_ADDRESS = ConfigBuilder("spark.driver.bindAddress")
+    .doc("Address where to bind network listen sockets on the driver.")
+    .fallbackConf(DRIVER_HOST_ADDRESS)
+
+  private[spark] val BLOCK_MANAGER_PORT = ConfigBuilder("spark.blockManager.port")
+    .doc("Port to use for the block manager when a more specific setting is not provided.")
+    .intConf
+    .createWithDefault(0)
+
+  private[spark] val DRIVER_BLOCK_MANAGER_PORT = ConfigBuilder("spark.driver.blockManager.port")
+    .doc("Port to use for the block managed on the driver.")
+    .fallbackConf(BLOCK_MANAGER_PORT)
 
 }

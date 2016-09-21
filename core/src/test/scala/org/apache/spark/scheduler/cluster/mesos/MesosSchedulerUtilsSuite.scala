@@ -25,6 +25,7 @@ import org.scalatest._
 import org.scalatest.mock.MockitoSugar
 
 import org.apache.spark.{SparkConf, SparkContext, SparkFunSuite}
+import org.apache.spark.internal.config._
 
 class MesosSchedulerUtilsSuite extends SparkFunSuite with Matchers with MockitoSugar {
 

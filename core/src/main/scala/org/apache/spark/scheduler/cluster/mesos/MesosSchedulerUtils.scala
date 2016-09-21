@@ -31,6 +31,7 @@ import org.apache.mesos.protobuf.{ByteString, GeneratedMessage}
 
 import org.apache.spark.{SparkConf, SparkContext, SparkException}
 import org.apache.spark.internal.Logging
+import org.apache.spark.internal.config._
 import org.apache.spark.util.Utils
 
 /**

@@ -409,6 +409,8 @@ class SparkConf(loadDefaults: Boolean) extends Cloneable with Logging {
       configsWithAlternatives.get(key).toSeq.flatten.exists { alt => contains(alt.key) }
   }
 
+  private[spark] def contains(entry: ConfigEntry[_]): Boolean = contains(entry.key)
+
   /** Copy this object */
   override def clone: SparkConf = {
     val cloned = new SparkConf(false)
