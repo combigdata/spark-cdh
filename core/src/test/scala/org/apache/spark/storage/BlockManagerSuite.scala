@@ -535,10 +535,9 @@ class BlockManagerSuite extends SparkFunSuite with Matchers with BeforeAndAfterE
       assert(list1Get.isDefined, "list1Get expected to be fetched")
       store3.stop()
       store3 = null
-      // exception throw because there is no locations
-      intercept[BlockFetchException] {
-        list1Get = store.getRemoteBytes("list1")
-      }
+      // Fetch should fail because there are no locations, but no exception should be thrown
+      list1Get = store.getRemoteBytes("list1")
+      assert(list1Get.isEmpty, "list1Get expected to fail")
     } finally {
       origTimeoutOpt match {
         case Some(t) => conf.set("spark.network.timeout", t)
@@ -1372,9 +1371,7 @@ class BlockManagerSuite extends SparkFunSuite with Matchers with BeforeAndAfterE
       new MockBlockTransferService(conf.getInt("spark.block.failures.beforeLocationRefresh", 5))
     store = makeBlockManager(8000, "executor1", transferService = Option(mockBlockTransferService))
     store.putSingle("item", 999L, StorageLevel.MEMORY_ONLY, tellMaster = true)
-    intercept[BlockFetchException] {
-      store.getRemoteBytes("item")
-    }
+    assert(store.getRemoteBytes("item").isEmpty)
   }
 
   test("SPARK-13328: refresh block locations (fetch should succeed after location refresh)") {
