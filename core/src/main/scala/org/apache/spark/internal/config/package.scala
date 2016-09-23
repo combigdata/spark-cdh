@@ -157,4 +157,9 @@ package object config {
     .doc("Port to use for the block managed on the driver.")
     .fallbackConf(BLOCK_MANAGER_PORT)
 
+  private[spark] val LISTENER_BUS_EVENT_QUEUE_SIZE =
+    ConfigBuilder("spark.scheduler.listenerbus.eventqueue.size")
+      .intConf
+      .createWithDefault(10000)
+
 }
