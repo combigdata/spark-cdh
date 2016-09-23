@@ -50,6 +50,7 @@ import org.apache.spark.network.sasl.ShuffleSecretManager;
 import org.apache.spark.network.server.TransportServer;
 import org.apache.spark.network.server.TransportServerBootstrap;
 import org.apache.spark.network.shuffle.ExternalShuffleBlockHandler;
+import org.apache.spark.network.util.JavaUtils;
 import org.apache.spark.network.util.TransportConf;
 import org.apache.spark.network.yarn.util.HadoopConfigProvider;
 
@@ -214,9 +215,9 @@ public class YarnShuffleService extends AuxiliaryService {
           break;
         }
         String id = parseDbAppKey(key);
-        ByteBuffer secret = mapper.readValue(e.getValue(), ByteBuffer.class);
+        byte[] secret = mapper.readValue(e.getValue(), byte[].class);
         logger.info("Reloading tokens for app: " + id);
-        secretManager.registerApp(id, secret);
+        secretManager.registerApp(id, ByteBuffer.wrap(secret));
       }
     }
   }
@@ -247,7 +248,8 @@ public class YarnShuffleService extends AuxiliaryService {
         AppId fullId = new AppId(appId);
         if (db != null) {
           byte[] key = dbAppKey(fullId);
-          byte[] value = mapper.writeValueAsString(shuffleSecret).getBytes(StandardCharsets.UTF_8);
+          byte[] value = mapper.writeValueAsString(JavaUtils.bufferToArray(shuffleSecret))
+            .getBytes(StandardCharsets.UTF_8);
           db.put(key, value);
         }
         secretManager.registerApp(appId, shuffleSecret);
