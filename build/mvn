@@ -17,6 +17,8 @@
 # limitations under the License.
 #
 
+set -x
+
 # Determine the current working directory
 _DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 # Preserve the calling directory
@@ -123,12 +125,23 @@ install_zinc() {
   ZINC_BIN="${_DIR}/${zinc_path}"
 }
 
+
+## HACK to workaround bad cloudera-mirrors in cauldron
+## see CDH-45755
+EXTRA_MAVEN_ARGS=()
+if [ -n "$AMPLAB_JENKINS" ]; then
+  wget -nc http://github.mtv.cloudera.com/raw/CDH/cdh/cdh6.x/gbn-m2-settings.xml
+  export CDH_GBN=$(curl 'http://builddb.infra.cloudera.com:8080/query?product=cdh&user=jenkins&version=6.x&tag=official')
+  EXTRA_MAVEN_ARGS+=("-s" "${_DIR}/../gbn-m2-settings.xml")
+fi
+
+
 # Determine the Scala version from the root pom.xml file, set the Scala URL,
 # and, with that, download the specific version of Scala necessary under
 # the build/ folder
 install_scala() {
   # determine the Scala version used in Spark
-  local scala_version=`mvn -f "${_DIR}/../pom.xml" --non-recursive -U help:evaluate -Dexpression=scala.version | \
+  local scala_version=`${MVN_BIN} -B "${EXTRA_MAVEN_ARGS[@]}" -f "${_DIR}/../pom.xml" --non-recursive -U help:evaluate -Dexpression=scala.version | \
                       grep -v "INFO" | tail -n 1`
   echo "Detected Scala version ${scala_version}"
   local scala_bin="${_DIR}/scala-${scala_version}/bin/scala"
@@ -160,8 +173,8 @@ fi
 
 # Install the proper version of Scala, Zinc and Maven for the build
 install_zinc
-install_scala
 install_mvn
+install_scala
 
 if [ -n "${CAULDRON_BUILD}" ]; then
   flock -u 200
@@ -186,4 +199,4 @@ export MAVEN_OPTS=${MAVEN_OPTS:-"$_COMPILE_JVM_OPTS"}
 echo "Using \`mvn\` from path: $MVN_BIN" 1>&2
 
 # Last, call the `mvn` command as usual
-${MVN_BIN} -DzincPort=${ZINC_PORT} "$@"
+${MVN_BIN} "${EXTRA_MAVEN_ARGS[@]}" -DzincPort=${ZINC_PORT} "$@"
