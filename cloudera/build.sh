@@ -1,4 +1,4 @@
-#!/bin/bash -e
+#!/bin/bash -ex
 # Licensed to the Apache Software Foundation (ASF) under one or more
 # contributor license agreements.  See the NOTICE file distributed with
 # this work for additional information regarding copyright ownership.
@@ -58,6 +58,9 @@ CSD_WILDCARD="$SPARK_HOME/csd/target/SPARK2_ON_YARN*.jar"
 PYTHON_VE=$(mktemp -d /tmp/__spark2_ve.XXXXX)
 
 GBN=
+
+# Days after the build will expire if being published
+EXPIRE_DAYS=${EXPIRE_DAYS:-10}
 
 function usage {
   echo "build.sh for building a parcel from source code. Can be called from any working directory."
@@ -278,6 +281,14 @@ function populate_build_json {
     CSD_ARGS=$CSD_ARGS" --csd $(basename $csd)"
   done
 
+  if date --date "+$EXPIRE_DAYS days" '+%Y%m%d-%H%M%S' > /dev/null 2>&1; then
+    # Linux
+    EXPIRY=$(date --date "+$EXPIRE_DAYS days" '+%Y%m%d-%H%M%S')
+  else
+    # God bless BSD
+    EXPIRY=$(date -v "+${EXPIRE_DAYS}d" '+%Y%m%d-%H%M%S')
+  fi
+
   $PYTHON_VE/bin/python ${CDH_CLONE_DIR}/lib/python/cauldron/src/cauldron/tools/buildjson.py \
     -o ${REPO_OUTPUT_DIR}/build.json \
     --product-base spark2:${REPO_NAME} \
@@ -286,6 +297,7 @@ function populate_build_json {
     --user $USER \
     --repo ${SPARK_HOME} \
     --gbn $GBN \
+    --expiry $EXPIRY \
     $OS_ARGS \
     -s ${CDH_CLONE_DIR}/build-schema.json \
     --parcels \
@@ -353,4 +365,6 @@ if [[ "$BUILD_ONLY" != true ]]; then
   fi
 fi
 
+my_echo "GBN=$GBN"
+my_echo "Build output:$REPO_OUTPUT_DIR"
 my_echo "Build completed. Success!"
