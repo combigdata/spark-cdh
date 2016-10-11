@@ -29,7 +29,7 @@
   "parcel" : {
     "repoUrl" : "http://archive.cloudera.com/beta/spark2/parcels/latest/",
     "requiredTags" : ["spark2", "cdh"],
-    "optionalTags" : ["spark2-plugin"]
+    "optionalTags" : ["spark-plugin", "spark2-plugin"]
   },
   "serviceDependencies" : [
     {
