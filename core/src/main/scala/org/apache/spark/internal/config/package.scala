@@ -105,6 +105,54 @@ package object config {
     .checkValues(Set("hive", "in-memory"))
     .createWithDefault("in-memory")
 
+  private[spark] val MAX_TASK_FAILURES =
+    ConfigBuilder("spark.task.maxFailures")
+      .intConf
+      .createWithDefault(4)
+
+  // Blacklist confs
+  private[spark] val BLACKLIST_ENABLED =
+    ConfigBuilder("spark.blacklist.enabled")
+      .booleanConf
+      .createOptional
+
+  private[spark] val MAX_TASK_ATTEMPTS_PER_EXECUTOR =
+    ConfigBuilder("spark.blacklist.task.maxTaskAttemptsPerExecutor")
+      .intConf
+      .createWithDefault(1)
+
+  private[spark] val MAX_TASK_ATTEMPTS_PER_NODE =
+    ConfigBuilder("spark.blacklist.task.maxTaskAttemptsPerNode")
+      .intConf
+      .createWithDefault(2)
+
+  private[spark] val MAX_FAILURES_PER_EXEC_STAGE =
+    ConfigBuilder("spark.blacklist.stage.maxFailedTasksPerExecutor")
+      .intConf
+      .createWithDefault(2)
+
+  private[spark] val MAX_FAILED_EXEC_PER_NODE_STAGE =
+    ConfigBuilder("spark.blacklist.stage.maxFailedExecutorsPerNode")
+      .intConf
+      .createWithDefault(2)
+
+  private[spark] val BLACKLIST_TIMEOUT_CONF =
+    ConfigBuilder("spark.blacklist.timeout")
+      .timeConf(TimeUnit.MILLISECONDS)
+      .createOptional
+
+  private[spark] val BLACKLIST_LEGACY_TIMEOUT_CONF =
+    ConfigBuilder("spark.scheduler.executorTaskBlacklistTime")
+      .internal()
+      .timeConf(TimeUnit.MILLISECONDS)
+      .createOptional
+  // End blacklist confs
+
+  private[spark] val LISTENER_BUS_EVENT_QUEUE_SIZE =
+    ConfigBuilder("spark.scheduler.listenerbus.eventqueue.size")
+      .intConf
+      .createWithDefault(10000)
+
   // This property sets the root namespace for metrics reporting
   private[spark] val METRICS_NAMESPACE = ConfigBuilder("spark.metrics.namespace")
     .stringConf
@@ -156,10 +204,5 @@ package object config {
   private[spark] val DRIVER_BLOCK_MANAGER_PORT = ConfigBuilder("spark.driver.blockManager.port")
     .doc("Port to use for the block managed on the driver.")
     .fallbackConf(BLOCK_MANAGER_PORT)
-
-  private[spark] val LISTENER_BUS_EVENT_QUEUE_SIZE =
-    ConfigBuilder("spark.scheduler.listenerbus.eventqueue.size")
-      .intConf
-      .createWithDefault(10000)
 
 }

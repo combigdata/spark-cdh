@@ -23,6 +23,7 @@ import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
 
 import org.apache.spark._
+import org.apache.spark.internal.config
 import org.apache.spark.internal.Logging
 import org.apache.spark.util.{AccumulatorV2, ManualClock}
 
@@ -101,7 +102,7 @@ class FakeTaskScheduler(sc: SparkContext, liveExecutors: (String, String)* /* ex
     val host = executorIdToHost.get(execId)
     assert(host != None)
     val hostId = host.get
-    val executorsOnHost = executorsByHost(hostId)
+    val executorsOnHost = hostToExecutors(hostId)
     executorsOnHost -= execId
     for (rack <- getRackForHost(hostId); hosts <- hostsByRack.get(rack)) {
       hosts -= hostId
@@ -123,7 +124,7 @@ class FakeTaskScheduler(sc: SparkContext, liveExecutors: (String, String)* /* ex
 
   def addExecutor(execId: String, host: String) {
     executors.put(execId, host)
-    val executorsOnHost = executorsByHost.getOrElseUpdate(host, new mutable.HashSet[String])
+    val executorsOnHost = hostToExecutors.getOrElseUpdate(host, new mutable.HashSet[String])
     executorsOnHost += execId
     executorIdToHost += execId -> host
     for (rack <- getRackForHost(host)) {
@@ -396,7 +397,8 @@ class TaskSetManagerSuite extends SparkFunSuite with LocalSparkContext with Logg
   test("executors should be blacklisted after task failure, in spite of locality preferences") {
     val rescheduleDelay = 300L
     val conf = new SparkConf().
-      set("spark.scheduler.executorTaskBlacklistTime", rescheduleDelay.toString).
+      set(config.BLACKLIST_ENABLED, true).
+      set(config.BLACKLIST_TIMEOUT_CONF, rescheduleDelay).
       // don't wait to jump locality levels in this test
       set("spark.locality.wait", "0")
 
@@ -460,19 +462,24 @@ class TaskSetManagerSuite extends SparkFunSuite with LocalSparkContext with Logg
       assert(manager.resourceOffer("exec2", "host2", ANY).isEmpty)
     }
 
-    // After reschedule delay, scheduling on exec1 should be possible.
+    // Despite advancing beyond the time for expiring executors from within the blacklist,
+    // we *never* expire from *within* the stage blacklist
     clock.advance(rescheduleDelay)
 
     {
       val offerResult = manager.resourceOffer("exec1", "host1", PROCESS_LOCAL)
-      assert(offerResult.isDefined, "Expect resource offer to return a task")
+      assert(offerResult.isEmpty)
+    }
 
+    {
+      val offerResult = manager.resourceOffer("exec3", "host3", ANY)
+      assert(offerResult.isDefined)
       assert(offerResult.get.index === 0)
-      assert(offerResult.get.executorId === "exec1")
+      assert(offerResult.get.executorId === "exec3")
 
-      assert(manager.resourceOffer("exec1", "host1", PROCESS_LOCAL).isEmpty)
+      assert(manager.resourceOffer("exec3", "host3", ANY).isEmpty)
 
-      // Cause exec1 to fail : failure 4
+      // Cause exec3 to fail : failure 4
       manager.handleFailedTask(offerResult.get.taskId, TaskState.FINISHED, TaskResultLost)
     }
 
