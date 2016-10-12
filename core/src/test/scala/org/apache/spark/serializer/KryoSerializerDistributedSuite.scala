@@ -17,6 +17,7 @@
 
 package org.apache.spark.serializer
 
+import org.apache.spark.scheduler.BlacklistConfs
 import org.apache.spark.util.Utils
 
 import com.esotericsoftware.kryo.Kryo
@@ -30,7 +31,8 @@ class KryoSerializerDistributedSuite extends SparkFunSuite {
     val conf = new SparkConf(false)
       .set("spark.serializer", "org.apache.spark.serializer.KryoSerializer")
       .set("spark.kryo.registrator", classOf[AppJarRegistrator].getName)
-      .set("spark.task.maxFailures", "1")
+      .set(BlacklistConfs.MAX_TASK_FAILURES, 1.toString)
+      .set(BlacklistConfs.BLACKLIST_ENABLED, false.toString)
 
     val jar = TestUtils.createJarWithClasses(List(AppJarRegistrator.customClassName))
     conf.setJars(List(jar.getPath))

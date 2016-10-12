@@ -22,10 +22,8 @@ import java.util.{TimerTask, Timer}
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicLong
 
-import scala.collection.mutable.ArrayBuffer
-import scala.collection.mutable.HashMap
-import scala.collection.mutable.HashSet
-import scala.language.postfixOps
+import scala.collection.Set
+import scala.collection.mutable.{ArrayBuffer, HashMap, HashSet}
 import scala.util.Random
 
 import org.apache.spark._
@@ -57,7 +55,7 @@ private[spark] class TaskSchedulerImpl(
     isLocal: Boolean = false)
   extends TaskScheduler with Logging
 {
-  def this(sc: SparkContext) = this(sc, sc.conf.getInt("spark.task.maxFailures", 4))
+  def this(sc: SparkContext) = this(sc, sc.conf.getInt(BlacklistConfs.MAX_TASK_FAILURES, 4))
 
   val conf = sc.conf
 
@@ -93,7 +91,7 @@ private[spark] class TaskSchedulerImpl(
 
   // The set of executors we have on each host; this is used to compute hostsAlive, which
   // in turn is used to decide when we can attain data locality on a given host
-  protected val executorsByHost = new HashMap[String, HashSet[String]]
+  protected val hostToExecutors = new HashMap[String, HashSet[String]]
 
   protected val hostsByRack = new HashMap[String, HashSet[String]]
 
@@ -234,8 +232,8 @@ private[spark] class TaskSchedulerImpl(
       }
     }
     manager.parent.removeSchedulable(manager)
-    logInfo("Removed TaskSet %s, whose tasks have all completed, from pool %s"
-      .format(manager.taskSet.id, manager.parent.name))
+    logInfo(s"Removed TaskSet ${manager.taskSet.id}, whose tasks have all completed, from pool" +
+      s" ${manager.parent.name}")
   }
 
   private def resourceOfferSingleTaskSet(
@@ -282,11 +280,11 @@ private[spark] class TaskSchedulerImpl(
     // Also track if new executor is added
     var newExecAvail = false
     for (o <- offers) {
-      if (!executorsByHost.contains(o.host)) {
-        executorsByHost(o.host) = new HashSet[String]()
+      if (!hostToExecutors.contains(o.host)) {
+        hostToExecutors(o.host) = new HashSet[String]()
       }
       if (!executorIdToTaskCount.contains(o.executorId)) {
-        executorsByHost(o.host) += o.executorId
+        hostToExecutors(o.host) += o.executorId
         executorAdded(o.executorId, o.host)
         executorIdToHost(o.executorId) = o.host
         executorIdToTaskCount(o.executorId) = 0
@@ -325,7 +323,7 @@ private[spark] class TaskSchedulerImpl(
         } while (launchedTaskAtCurrentMaxLocality)
       }
       if (!launchedAnyTask) {
-        taskSet.abortIfCompletelyBlacklisted(executorIdToHost.keys)
+        taskSet.abortIfCompletelyBlacklisted(hostToExecutors)
       }
     }
 
@@ -529,10 +527,10 @@ private[spark] class TaskSchedulerImpl(
     executorIdToTaskCount -= executorId
 
     val host = executorIdToHost(executorId)
-    val execs = executorsByHost.getOrElse(host, new HashSet)
+    val execs = hostToExecutors.getOrElse(host, new HashSet)
     execs -= executorId
     if (execs.isEmpty) {
-      executorsByHost -= host
+      hostToExecutors -= host
       for (rack <- getRackForHost(host); hosts <- hostsByRack.get(rack)) {
         hosts -= host
         if (hosts.isEmpty) {
@@ -552,11 +550,11 @@ private[spark] class TaskSchedulerImpl(
   }
 
   def getExecutorsAliveOnHost(host: String): Option[Set[String]] = synchronized {
-    executorsByHost.get(host).map(_.toSet)
+    hostToExecutors.get(host).map(_.toSet)
   }
 
   def hasExecutorsAliveOnHost(host: String): Boolean = synchronized {
-    executorsByHost.contains(host)
+    hostToExecutors.contains(host)
   }
 
   def hasHostAliveOnRack(rack: String): Boolean = synchronized {
@@ -644,5 +642,4 @@ private[spark] object TaskSchedulerImpl {
 
     retval.toList
   }
-
 }
