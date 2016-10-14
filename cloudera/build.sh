@@ -43,7 +43,7 @@ BUILD_OUTPUT_DIR=$SPARK_HOME/dist/build_output
 # Directory where final repo with parcels and packages will exist
 REPO_OUTPUT_DIR=$SPARK_HOME/dist/repo_output
 REPO_NAME=spark2-repo
-OUTPUT_DIR=$REPO_OUTPUT_DIR/$REPO_NAME/${VERSION/-SNAPSHOT/}
+VERSION_FOR_BUILD=${VERSION/-SNAPSHOT/}
 # Directory where cdh.git will get cloned
 CDH_CLONE_DIR=${SPARK_HOME}/build/cdh-${CDH_GIT_HASH}
 
@@ -116,7 +116,12 @@ function do_build {
   if [[ -z "${DO_MAVEN_DEPLOY}" ]]; then
       MAVEN_INST_DEPLOY=install
   else
-      MAVEN_INST_DEPLOY=$DO_MAVEN_DEPLOY
+     if [[ $PATCH_NUMBER -eq 0 ]]; then
+         MAVEN_INST_DEPLOY=$DO_MAVEN_DEPLOY
+     else
+         my_echo "Cannot deploy with a patch build. Unset DO_MAVEN_DEPLOY"
+         exit 1
+     fi
   fi
 
   BUILD_OPTS="-Divy.home=${HOME}/.ivy2 -Dsbt.ivy.home=${HOME}/.ivy2 -Duser.home=${HOME} \
@@ -292,7 +297,7 @@ function populate_build_json {
   $PYTHON_VE/bin/python ${CDH_CLONE_DIR}/lib/python/cauldron/src/cauldron/tools/buildjson.py \
     -o ${REPO_OUTPUT_DIR}/build.json \
     --product-base spark2:${REPO_NAME} \
-    --version ${VERSION/-SNAPSHOT/} \
+    --version $VERSION_FOR_BUILD \
     --parcel-patch-number $PATCH_NUMBER \
     --user $USER \
     --repo ${SPARK_HOME} \
@@ -337,6 +342,11 @@ while [[ $# -ge 1 ]]; do
   esac
   shift
 done
+
+if [[ $PATCH_NUMBER -ne 0 ]]; then
+   VERSION_FOR_BUILD=${VERSION/-SNAPSHOT/}_p${PATCH_NUMBER}
+fi
+OUTPUT_DIR=$REPO_OUTPUT_DIR/$REPO_NAME/$VERSION_FOR_BUILD
 
 clean
 setup
