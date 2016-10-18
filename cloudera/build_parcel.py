@@ -266,7 +266,7 @@ class Metadata(object):
                 "patchCount": str(self._version.patch_count()),
             },
             "replaces": "SPARK",
-            "depends" : "CDH (>= 5.7), CDH (<< 5.9.9999)",
+            "depends" : "CDH (>= 5.7), CDH (<< 5.11)",
             "setActiveSymlink": True,
             "scripts": {
                 "defines": "spark2_env.sh",
