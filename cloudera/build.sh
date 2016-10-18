@@ -314,6 +314,9 @@ function publish {
   echo ${GBN} > ${REPO_OUTPUT_DIR}/gbn.txt
   $PYTHON_VE/bin/python ${CDH_CLONE_DIR}/lib/python/cauldron/src/cauldron/tools/upload.py  ${REPO_OUTPUT_DIR}:${GBN}
   curl http://${BUILDDB_HOST}/save?gbn=${GBN}
+  if [[ $PATCH_NUMBER -ne 0 ]]; then
+       curl "http://${BUILDDB_HOST}/addtag?gbn=${GBN}&value=released"
+  fi
 }
 
 # This is where the main part begins
