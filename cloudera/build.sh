@@ -30,7 +30,7 @@ fi
 # Commitish from github.mtv.cloudera.com/CDH/cdh.git repo
 # Taken from a point in time from cdh6.x branch of cdh.git, so someone doesn't pull the rug from underneath us
 # If specifying a branch here for testing, specify origin/<branch name>
-CDH_GIT_HASH=${CDH_GIT_HASH:-2b6d1bced515f10f2f03a856952179f4095a95a1}
+CDH_GIT_HASH=${CDH_GIT_HASH:-f4bde1a1850d435dbf9c939049c3b12cb9e52df0}
 
 # Commitish from github.mtv.cloudera.com/Starship/cmf.git repo
 # Taken from a point in time from master branch of cmf.git, so so someone doesn't pull the rug from underneath us
@@ -45,6 +45,7 @@ REPO_OUTPUT_DIR=$SPARK_HOME/dist/repo_output
 REPO_NAME=spark2-repo
 VERSION_FOR_BUILD=${VERSION/-SNAPSHOT/}
 # Directory where cdh.git will get cloned
+# TODO: Fix this if CDH_GIT_HASH contains a slash.
 CDH_CLONE_DIR=${SPARK_HOME}/build/cdh-${CDH_GIT_HASH}
 
 MAKE_MANIFEST_LOCATION=http://github.mtv.cloudera.com/raw/Starship/cmf/${CMF_GIT_HASH}/cli/make_manifest/make_manifest.py
@@ -257,7 +258,7 @@ function build_parcel {
   # util.py needs to exist in $SPARK_HOME/cloudera directory because it's used by
   # a python module (build_parcel.py) from that directory as well. Let's force
   # overwrite to make sure we never the stale version
-  (cd $SPARK_HOME/cloudera; rm -f util.py; cp ${CDH_CLONE_DIR}/bin/parcel/util.py .)
+  (cd $SPARK_HOME/cloudera; rm -f util.py; cp ${CDH_CLONE_DIR}/lib/python/cauldron/src/cauldron/tools/parcel/util.py .)
 
   ${SPARK_HOME}/cloudera/build_parcel.py --input-directory ${BUILD_OUTPUT_DIR} \
   --output-directory ${OUTPUT_DIR}/parcels --release-version 1 \
@@ -305,14 +306,15 @@ function populate_build_json {
     --expiry $EXPIRY \
     $OS_ARGS \
     -s ${CDH_CLONE_DIR}/build-schema.json \
-    --parcels \
+    --build-environment ${HOSTNAME} \
+    --product-parcels spark2:${OUTPUT_DIR}/parcels \
     $CSD_ARGS
 }
 
 function publish {
   # This file with GBN in it seems to be required by upload.py
   echo ${GBN} > ${REPO_OUTPUT_DIR}/gbn.txt
-  $PYTHON_VE/bin/python ${CDH_CLONE_DIR}/lib/python/cauldron/src/cauldron/tools/upload.py  ${REPO_OUTPUT_DIR}:${GBN}
+  $PYTHON_VE/bin/python ${CDH_CLONE_DIR}/lib/python/cauldron/src/cauldron/tools/upload.py s3 ${REPO_OUTPUT_DIR}:${GBN}
   curl http://${BUILDDB_HOST}/save?gbn=${GBN}
   if [[ $PATCH_NUMBER -ne 0 ]]; then
        curl "http://${BUILDDB_HOST}/addtag?gbn=${GBN}&value=released"
@@ -349,6 +351,12 @@ done
 if [[ $PATCH_NUMBER -ne 0 ]]; then
    VERSION_FOR_BUILD=${VERSION/-SNAPSHOT/}_p${PATCH_NUMBER}
 fi
+
+# Override with a custom version if specified
+if [[ -n "$CUSTOM_VERSION" ]]; then
+  VERSION_FOR_BUILD=$CUSTOM_VERSION
+fi
+
 OUTPUT_DIR=$REPO_OUTPUT_DIR/$REPO_NAME/$VERSION_FOR_BUILD
 
 clean
