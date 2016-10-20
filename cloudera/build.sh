@@ -30,7 +30,7 @@ fi
 # Commitish from github.mtv.cloudera.com/CDH/cdh.git repo
 # Taken from a point in time from cdh6.x branch of cdh.git, so someone doesn't pull the rug from underneath us
 # If specifying a branch here for testing, specify origin/<branch name>
-CDH_GIT_HASH=${CDH_GIT_HASH:-f4bde1a1850d435dbf9c939049c3b12cb9e52df0}
+CDH_GIT_HASH=${CDH_GIT_HASH:-97600e529415428054edb09e210ef01c1ba5760e}
 
 # Commitish from github.mtv.cloudera.com/Starship/cmf.git repo
 # Taken from a point in time from master branch of cmf.git, so so someone doesn't pull the rug from underneath us
