@@ -16,6 +16,8 @@
 
 # We shouldn't be skipping the build by default
 SKIP_BUILD=false
+# To make some of the output quieter
+export AMPLAB_JENKINS=1
 SPARK_HOME="$(cd "$(dirname "$0")"/..; pwd)"
 # Let's parse out the pom file to get the version of Spark2 being built
 VERSION=$(cd $SPARK_HOME; build/mvn help:evaluate -Dexpression=project.version \
