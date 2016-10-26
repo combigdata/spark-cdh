@@ -57,3 +57,5 @@ if [ -n "$TMP_PYSPARK_PYTHON" ] && [ -n "$TMP_PYSPARK_DRIVER_PYTHON" ]; then
   export PYSPARK_PYTHON="$TMP_PYSPARK_PYTHON"
   export PYSPARK_DRIVER_PYTHON="$TMP_PYSPARK_DRIVER_PYTHON"
 fi
+
+export SPARK_DIST_CLASSPATH=$(paste -sd: "$SELF/classpath.txt")

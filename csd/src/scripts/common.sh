@@ -37,6 +37,7 @@ log "Detected CDH_VERSION of [$CDH_VERSION]"
 export BIGTOP_DEFAULTS_DIR=""
 
 export HADOOP_HOME=${HADOOP_HOME:-$(readlink -m "$CDH_HADOOP_HOME")}
+export HADOOP_BIN=$HADOOP_HOME/bin/hadoop
 export HDFS_BIN=$HADOOP_HOME/../../bin/hdfs
 export HADOOP_CONF_DIR="$CONF_DIR/yarn-conf"
 export HIVE_CONF_DIR="$CONF_DIR/hive-conf"
@@ -116,15 +117,45 @@ function prepend_protocol {
   fi
 }
 
-# prepare the spark-env.sh file specified in $1 for use.
-# $2 should contain the path to the Spark jar in HDFS. This is for backwards compatibility
-# so that users of CDH 5.1 and earlier have a way to reference it.
+# Adds jars in classpath entry $2 to the classpath file $1, resolving symlinks so that duplicates
+# can be removed. Jars already present in Spark's distribution are also ignored. See CDH-27596.
+function add_to_classpath {
+  local CLASSPATH_FILE="$1"
+  local CLASSPATH="$2"
+  local SPARK_JARS="$SPARK2_HOME/jars"
+
+  # Break the classpath into individual entries
+  IFS=: read -a CLASSPATH_ENTRIES <<< "$CLASSPATH"
+
+  for pattern in "${CLASSPATH_ENTRIES[@]}"; do
+    for entry in $pattern; do
+      entry=$(readlink -m "$entry")
+      name=$(basename $entry)
+      if [ -f "$entry" ] && [ ! -f "$SPARK_HOME/$name" ] && ! grep -q "/$name\$" "$CLASSPATH_FILE"
+      then
+        echo "$entry" >> "$CLASSPATH_FILE"
+      fi
+    done
+  done
+}
+
+# Prepare the spark-env.sh file specified in $1 for use.
 function prepare_spark_env {
-  replace "{{HADOOP_HOME}}" "$HADOOP_HOME" $SPARK_ENV
-  replace "{{SPARK_HOME}}" "$SPARK_HOME" $SPARK_ENV
-  replace "{{SPARK_EXTRA_LIB_PATH}}" "$SPARK_LIBRARY_PATH" $SPARK_ENV
-  replace "{{PYTHON_PATH}}" "$PYTHON_PATH" ""$SPARK_ENV""
-  replace "{{CDH_PYTHON}}" "$CDH_PYTHON" $SPARK_ENV
+  local client="$1"
+  replace "{{HADOOP_HOME}}" "$HADOOP_HOME" "$SPARK_ENV"
+  replace "{{SPARK_HOME}}" "$SPARK_HOME" "$SPARK_ENV"
+  replace "{{SPARK_EXTRA_LIB_PATH}}" "$SPARK_LIBRARY_PATH" "$SPARK_ENV"
+  replace "{{PYTHON_PATH}}" "$PYTHON_PATH" "$SPARK_ENV"
+  replace "{{CDH_PYTHON}}" "$CDH_PYTHON" "$SPARK_ENV"
+
+  local CLASSPATH_FILE="$(dirname $SPARK_ENV)/classpath.txt"
+  local CLASSPATH_FILE_TMP="${CLASSPATH_FILE}.tmp"
+  local HADOOP_CLASSPATH=$($HADOOP_BIN --config "$HADOOP_CONF_DIR" classpath)
+  add_to_classpath "$CLASSPATH_FILE_TMP" "$HADOOP_CLASSPATH"
+
+  # De-duplicate the classpath when creating the target file.
+  cat "$CLASSPATH_FILE_TMP" | sort | uniq > "$CLASSPATH_FILE"
+  rm -f "$CLASSPATH_FILE_TMP"
 }
 
 # Check whether the given config key ($1) exists in the given conf file ($2).
@@ -202,7 +233,7 @@ function start_history_server {
 function deploy_client_config {
   log "Deploying client configuration"
 
-  prepare_spark_env
+  prepare_spark_env "client"
 
   set_config 'spark.master' 'yarn' "$SPARK_DEFAULTS"
   set_config 'spark.submit.deployMode' "$DEPLOY_MODE" "$SPARK_DEFAULTS"
@@ -302,6 +333,12 @@ function deploy_client_config {
     fi
     replace_spark_conf "$key" "$value" "$SPARK_DEFAULTS"
   done
+
+  # Override the YARN / MR classpath configs since we already include them when generating
+  # SPARK_DIST_CLASSPATH. This avoids having the same paths added to the classpath a second
+  # time and wasting file descriptors.
+  replace_spark_conf "spark.hadoop.mapreduce.application.classpath" "" "$SPARK_DEFAULTS"
+  replace_spark_conf "spark.hadoop.yarn.application.classpath" "" "$SPARK_DEFAULTS"
 
   # If using parcels, write extra configuration that tells Spark to replace the parcel
   # path with references to the NM's environment instead, so that users can have different
