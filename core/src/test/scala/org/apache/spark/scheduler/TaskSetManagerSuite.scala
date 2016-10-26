@@ -23,10 +23,12 @@ import scala.collection.Map
 import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
 
-import org.mockito.Mockito.{mock, verify}
+import org.mockito.Matchers.{anyInt, anyString}
+import org.mockito.Mockito.{mock, never, spy, verify, when}
 
 import org.apache.spark._
 import org.apache.spark.executor.TaskMetrics
+import org.apache.spark.storage.BlockManagerId
 import org.apache.spark.util.ManualClock
 
 class FakeDAGScheduler(sc: SparkContext, taskScheduler: FakeTaskScheduler)
@@ -959,6 +961,65 @@ class TaskSetManagerSuite extends SparkFunSuite with LocalSparkContext with Logg
     verify(sched.backend).killTask(origTask2.taskId, "exec2", true)
     assert(manager.tasksSuccessful === 5)
     assert(manager.isZombie)
+  }
+
+  test("SPARK-17894: Verify TaskSetManagers for different stage attempts have unique names") {
+    sc = new SparkContext("local", "test")
+    sched = new FakeTaskScheduler(sc, ("exec1", "host1"))
+    val taskSet = FakeTask.createTaskSet(numTasks = 1, stageId = 0, stageAttemptId = 0)
+    val manager = new TaskSetManager(sched, taskSet, MAX_TASK_FAILURES, new ManualClock)
+    assert(manager.name === "TaskSet_0.0")
+
+    // Make sure a task set with the same stage ID but different attempt ID has a unique name
+    val taskSet2 = FakeTask.createTaskSet(numTasks = 1, stageId = 0, stageAttemptId = 1)
+    val manager2 = new TaskSetManager(sched, taskSet2, MAX_TASK_FAILURES, new ManualClock)
+    assert(manager2.name === "TaskSet_0.1")
+
+    // Make sure a task set with the same attempt ID but different stage ID also has a unique name
+    val taskSet3 = FakeTask.createTaskSet(numTasks = 1, stageId = 1, stageAttemptId = 1)
+    val manager3 = new TaskSetManager(sched, taskSet3, MAX_TASK_FAILURES, new ManualClock)
+    assert(manager3.name === "TaskSet_1.1")
+  }
+
+  test("don't update blacklist for shuffle-fetch failures, preemption, denied commits, " +
+      "or killed tasks") {
+    // Setup a taskset, and fail some tasks for a fetch failure, preemption, denied commit,
+    // and killed task.
+    val conf = new SparkConf().
+      set(BlacklistConfs.BLACKLIST_ENABLED, true.toString)
+    sc = new SparkContext("local", "test", conf)
+    sched = new FakeTaskScheduler(sc, ("exec1", "host1"), ("exec2", "host2"))
+    val taskSet = FakeTask.createTaskSet(4)
+    val tsm = new TaskSetManager(sched, taskSet, 4)
+    // we need a spy so we can attach our mock blacklist
+    val tsmSpy = spy(tsm)
+    val blacklist = mock(classOf[TaskSetBlacklist])
+    when(tsmSpy.taskSetBlacklistHelperOpt).thenReturn(Some(blacklist))
+
+    // make some offers to our taskset, to get tasks we will fail
+    val taskDescs = Seq(
+      "exec1" -> "host1",
+      "exec2" -> "host1"
+    ).flatMap { case (exec, host) =>
+      // offer each executor twice (simulating 2 cores per executor)
+      (0 until 2).flatMap{ _ => tsmSpy.resourceOffer(exec, host, TaskLocality.ANY)}
+    }
+    assert(taskDescs.size === 4)
+
+    // now fail those tasks
+    tsmSpy.handleFailedTask(taskDescs(0).taskId, TaskState.FAILED,
+      FetchFailed(BlockManagerId(taskDescs(0).executorId, "host1", 12345), 0, 0, 0, "ignored"))
+    tsmSpy.handleFailedTask(taskDescs(1).taskId, TaskState.FAILED,
+      ExecutorLostFailure(taskDescs(1).executorId, exitCausedByApp = false, reason = None))
+    tsmSpy.handleFailedTask(taskDescs(2).taskId, TaskState.FAILED,
+      TaskCommitDenied(0, 2, 0))
+    tsmSpy.handleFailedTask(taskDescs(3).taskId, TaskState.KILLED,
+      TaskKilled)
+
+    // Make sure that the blacklist ignored all of the task failures above, since they aren't
+    // the fault of the executor where the task was running.
+    verify(blacklist, never())
+      .updateBlacklistForFailedTask(anyString(), anyString(), anyInt())
   }
 
   private def createTaskResult(id: Int): DirectTaskResult[Int] = {
