@@ -227,6 +227,11 @@
       <properties>
         <hadoop.deps.scope>provided</hadoop.deps.scope>
       </properties>
+      <activation>
+        <property>
+          <name>cdh.build</name>
+        </property>
+      </activation>
     </profile>
     <profile>
       <id>hive-provided</id>
