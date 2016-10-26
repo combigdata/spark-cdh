@@ -144,7 +144,6 @@
     <dependency>
       <groupId>com.twitter</groupId>
       <artifactId>parquet-avro</artifactId>
-      <scope>test</scope>
     </dependency>
     <!--
       This version of avro test-dep is different from the one defined
