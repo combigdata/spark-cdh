@@ -244,6 +244,7 @@ class Metadata(object):
         self._version = version
         self._components = self._scan_components(out_dir)
 
+
     @staticmethod
     def _scan_components(out_dir):
         """Look for cdh_version.properties files in the output directory, parse them,
@@ -346,10 +347,29 @@ export CDH_SPARK2_HOME=$PARCELS_ROOT/$CDH_DIRNAME/lib/spark2
         with open(out_file, "wt") as o:
             json.dump(alternatives, o, sort_keys=True, indent=4, separators=(',', ': '))
 
-    def _write_release_notes(self):
+    def _create_release_notes(self):
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+        if self._version._patch_number == 0:
+            with open(os.path.join(script_dir, 'release-notes.txt'), 'r') as release_notes_file_for_normal_releases:
+                release_notes_txt_normal=release_notes_file_for_normal_releases.read()
+                self._write_release_notes(release_notes_txt_normal)
+        else:
+            if os.path.isfile(os.path.join(script_dir, 'patch-release-notes.txt')):
+                with open(os.path.join(script_dir, 'patch-release-notes.txt'), 'r') as release_notes_file_for_patch:
+                    release_notes_txt_patch=release_notes_file_for_patch.read()
+                    # The following line makes sure that patch-release-notes.txt file is not empty and it doesn't contain only spaces.
+                    if (not release_notes_txt_patch.isspace()) and (release_notes_txt_patch):
+                        self._write_release_notes(release_notes_txt_patch)
+                    else:
+                        raise Exception("""Release notes are required for patch builds. Please write the release notes in $SPARK_HOME/cloudera/patch-release-notes.txt""")
+            # The following line will raise an exception if the release notes files for patches was not provided.
+            else:
+                raise Exception("""Release notes are required for patch builds. Please provide patch-release-notes.txt in $SPARK_HOME/cloudera folder""")
+
+    def _write_release_notes(self, release_notes_content):
         release_notes_file = os.path.join(self._meta_dir, "release-notes.txt")
         with open(release_notes_file, 'w') as release_notes:
-            release_notes.write('<span class="error">Spark2 is currently in Beta and is not supported.</span>')
+            release_notes.write(release_notes_content)
 
     @timer_decorate
     def write_metadata(self):
@@ -358,7 +378,7 @@ export CDH_SPARK2_HOME=$PARCELS_ROOT/$CDH_DIRNAME/lib/spark2
         self._write_parcel_json()
         self._write_env_sh()
         self._write_alternatives_json()
-        self._write_release_notes()
+        self._create_release_notes()
 
 class Version(object):
 
