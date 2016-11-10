@@ -16,6 +16,7 @@
 
 # We shouldn't be skipping the build by default
 SKIP_BUILD=false
+RUN_TESTS=false
 # To make some of the output quieter
 export AMPLAB_JENKINS=1
 SPARK_HOME="$(cd "$(dirname "$0")"/..; pwd)"
@@ -323,6 +324,13 @@ function publish {
   fi
 }
 
+function run_tests {
+  ${SPARK_HOME}/cloudera/post_commit_hook.sh
+  if [[ "$PUBLISH" = true ]]; then
+    curl "http://${BUILDDB_HOST}/addtag?gbn=${GBN}&value=unit_tests_passed"
+  fi
+}
+
 # This is where the main part begins
 while [[ $# -ge 1 ]]; do
   arg=$1
@@ -339,6 +347,9 @@ while [[ $# -ge 1 ]]; do
     ;;
     --build-only)
     BUILD_ONLY=true
+    ;;
+    -t|--with-tests)
+    RUN_TESTS=true
     ;;
     -h|--help)
     usage
@@ -374,6 +385,11 @@ if [[ "$PUBLISH" = true ]] && [[ "$BUILD_ONLY" = true ]]; then
   exit 1
 fi
 
+if [[ "$RUN_TESTS" = true ]] && [[ "$BUILD_ONLY" = true ]]; then
+  my_echo "Can not set --with-tests and --build-only at the same time"
+  exit 1
+fi
+
 if [[ "$SKIP_BUILD" = false ]]; then
   do_build
 fi
@@ -391,3 +407,9 @@ fi
 my_echo "GBN=$GBN"
 my_echo "Build output:$REPO_OUTPUT_DIR"
 my_echo "Build completed. Success!"
+
+if [[ "$RUN_TESTS" = true ]]; then
+  my_echo "Now trying to run unit tests"
+  run_tests
+  my_echo "Unit tests succeeded."
+fi

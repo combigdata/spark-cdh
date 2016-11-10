@@ -32,9 +32,7 @@ export PATH=${JAVA_HOME}/bin:${PATH}
 # To make some of the output quieter
 export AMPLAB_JENKINS=1
 
-# WORKSPACE is an environment variable created by Jenkins, and it is the directory where the build is executed.
-# If not set, then default to $HOME
-MVN_REPO_LOCAL=${WORKSPACE:-$HOME}/.m2/repository
+MVN_REPO_LOCAL=$HOME/.m2/repository${M2_REPO_SUFFIX}
 
 export MAVEN_OPTS="-XX:PermSize=1024m -XX:MaxPermSize=1024m -XX:ReservedCodeCacheSize=512m"
 
