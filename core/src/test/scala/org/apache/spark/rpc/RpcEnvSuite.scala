@@ -476,7 +476,8 @@ abstract class RpcEnvSuite extends SparkFunSuite with BeforeAndAfterAll {
     }
   }
 
-  test("network events") {
+  // CDH-47284 this test is really flaky on our jenkins instances.
+  ignore("network events") {
     val events = new mutable.ArrayBuffer[(Any, Any)] with mutable.SynchronizedBuffer[(Any, Any)]
     env.setupEndpoint("network-events", new ThreadSafeRpcEndpoint {
       override val rpcEnv = env
