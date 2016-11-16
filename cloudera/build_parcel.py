@@ -38,12 +38,13 @@ import sys
 import time
 
 import util
+import cauldron.osinfo as osinfo
 
 # This script requires Python 2.7 or later, so does the make_manifest.py script
 # in the CM repo being called. Also, this hasn't been tested with Python3.
 
 LOG = None
-VALID_DISTROS = OrderedDict()
+SUPPORTED_OSES=[]
 
 TRACE_TIMES = []
 def timer_decorate(func):
@@ -416,11 +417,12 @@ class Version(object):
 
         Version._validate_int(self._patch_number, "patch-number")
         Version._validate_int(self._build_number, "build-number")
-
-        assert self._distro in VALID_DISTROS.keys() + [None], "Unknown distro %s" % self._distro
+        if self._distro:
+            for dist in self._distro[0::]:
+                assert dist in SUPPORTED_OSES, "Unknown distro %s" % self._distro
         # Let's create one parcel, then we will rename and copy it.
-        if self._distro is None:
-            self._distro = VALID_DISTROS.keys()[0]
+        if not self._distro:
+            self._distro = SUPPORTED_OSES
 
     def patch_count(self):
         return self._patch_number
@@ -437,10 +439,7 @@ class Version(object):
     def full_version(self):
         # Ex. "2.0.0.cloudera1-1.cdh5.7.0.p593.106617-el6"
         fmt = "%s-%s"
-        if self._distro is None:
-            distro = VALID_DISTROS.keys()[0]
-        else:
-            distro = self._distro
+        distro = osinfo.parse_name(self._distro[0]).parcel_label()
         return fmt % (self.version(), distro)
 
     @staticmethod
@@ -473,9 +472,10 @@ class Version(object):
                             help="Global build number." + \
                                 " This is the unique Global Build Number (GBN) for this build.")
         parser.add_argument('--distro',
+                            action='append',
+                            dest="distro",
                             required=False,
-                            help="Target distribution, e.g. el6, precise, etc." +\
-                                " Found via `lsb_release -sc` or from `rpm --eval '%%{?dist}'`." +\
+                            help="Target distribution, e.g. RedHat6, Ubuntu1204, etc." +\
                                 " If none specified, it's assumed that the bits contain no native content" +\
                                 " and all supported parcels are generated as renamed copies of each other.")
 
@@ -532,14 +532,19 @@ class Archiver(object):
     @timer_decorate
     def _copy_if_necessary(self):
         """ If no particular distro was specified, this makes copies of the parcels for each of the supported OSs"""
-        if self._distro is None:
-            src_archive = os.path.join(self._out_dir, "SPARK2-" + self._version.full_version() + ".parcel")
+        if not self._distro:
+            self._parcel_copy(SUPPORTED_OSES)
+        else:
+            self._parcel_copy(self._distro)
 
-            for dist in VALID_DISTROS.keys()[1::]:
-                dest_version = "%s-%s" % (self._version.version(), dist)
-                dest_archive = os.path.join(self._out_dir, "SPARK2-" + dest_version + ".parcel")
-                # TODO: Is this the right copy function to use? There are wayyyyyy to many to chose from.
-                shutil.copy(src_archive, dest_archive)
+    @timer_decorate
+    def _parcel_copy(self,distributions):
+        src_archive = os.path.join(self._out_dir, "SPARK2-" + self._version.full_version() + ".parcel")
+        for dist in distributions[1::]:
+            dest_version = "%s-%s" % (self._version.version(), osinfo.parse_name(dist).parcel_label())
+            dest_archive = os.path.join(self._out_dir, "SPARK2-" + dest_version + ".parcel")
+            # TODO: Is this the right copy function to use? There are wayyyyyy to many to chose from.
+            shutil.copy(src_archive, dest_archive)
 
     @timer_decorate
     def _cleanup(self):
@@ -603,12 +608,13 @@ def main():
     LOG = logging.getLogger(__name__)
     util.configure_logger(LOG)
 
-    global VALID_DISTROS
+    global SUPPORTED_OSES
     script_dir = os.path.dirname(os.path.abspath(__file__))
     with open(os.path.join(script_dir, 'supported_oses.txt'), 'r') as f:
       for line in f:
-        result = line.rstrip('\n').split(' ')
-        VALID_DISTROS[result[0]]=result[1]
+        result = line.rstrip('\n')
+        SUPPORTED_OSES.append(result)
+
 
     args = parse_args()
 

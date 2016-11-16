@@ -57,6 +57,7 @@ MAKE_MANIFEST_LOCATION=http://github.mtv.cloudera.com/raw/Starship/cmf/${CMF_GIT
 PATCH_NUMBER=0
 
 BUILDDB_HOST=${BUILDDB_HOST:-"mostrows-builddb.vpc.cloudera.com:8080"}
+STORAGE_HOST=${STORAGE_HOST:-"console.aws.amazon.com/s3/home?region=us-west-1#&bucket=cloudera-build&prefix=build"}
 
 CSD_WILDCARD="$SPARK_HOME/csd/target/SPARK2_ON_YARN*.jar"
 PYTHON_VE=$(mktemp -d /tmp/__spark2_ve.XXXXX)
@@ -76,6 +77,7 @@ function usage {
   echo "-p <patch number> or --patch-num <patch number> when building a patch"
   echo "--publish for publishing to S3"
   echo "--build-only for only doing the build (i.e. only building distribution tar.gz, no parcel etc.)"
+  echo "--os for choosing the os that the parcel should be built for. The OS name should be the long name (like Redhat6). For each os a seperate --os should be used. If the --os is not provided, the parcel will be built for all the supported distributions."
 }
 
 function my_echo {
@@ -262,11 +264,15 @@ function build_parcel {
   # a python module (build_parcel.py) from that directory as well. Let's force
   # overwrite to make sure we never the stale version
   (cd $SPARK_HOME/cloudera; rm -f util.py; cp ${CDH_CLONE_DIR}/lib/python/cauldron/src/cauldron/tools/parcel/util.py .)
+  CMD="${SPARK_HOME}/cloudera/build_parcel.py --input-directory ${BUILD_OUTPUT_DIR} \
+          --output-directory ${OUTPUT_DIR}/parcels --release-version 1 \
+          --spark2-version $VERSION --cdh-version $CDH_VERSION --build-number $GBN \
+          --patch-number ${PATCH_NUMBER} --verbose --force-clean"
 
-  ${SPARK_HOME}/cloudera/build_parcel.py --input-directory ${BUILD_OUTPUT_DIR} \
-  --output-directory ${OUTPUT_DIR}/parcels --release-version 1 \
-  --spark2-version $VERSION --cdh-version $CDH_VERSION --build-number $GBN \
-  --patch-number ${PATCH_NUMBER} --verbose --force-clean
+  if [[  ${OS_ARGS_PARCELS} ]]; then
+    CMD="$CMD""$OS_ARGS_PARCELS"
+  fi
+  eval $CMD
 
   mkdir -p ${OUTPUT_DIR}/csd
   cp ${CSD_WILDCARD} ${OUTPUT_DIR}/csd
@@ -280,10 +286,11 @@ function populate_manifest {
 }
 
 function populate_build_json {
-  OS_ARGS=""
-  for os in $(awk '{print $2}' $SPARK_HOME/cloudera/supported_oses.txt); do
-    OS_ARGS=$OS_ARGS" --os $os"
-  done
+  if [[ -z ${OS_ARGS} ]]; then
+    for os in $(awk '{print $1}' $SPARK_HOME/cloudera/supported_oses.txt); do
+        OS_ARGS=$OS_ARGS" --os $os"
+    done
+  fi
 
   CSD_ARGS=""
   for csd in ${CSD_WILDCARD}; do
@@ -331,13 +338,20 @@ function run_tests {
   fi
 }
 
-# This is where the main part begins
+# This is where the main part begins.
+# OS_ARGS includes the list of operating systems for buildjson.py and
+# OS_ARGS_PARCELS includes the OSes for build_parcel.py
+OS_ARGS=""
 while [[ $# -ge 1 ]]; do
   arg=$1
   case $arg in
     -p|--patch-num)
     PATCH_NUMBER="$2"
     shift
+    ;;
+    --os)
+    OS_ARGS=$OS_ARGS" --os $2"
+    OS_ARGS_PARCELS=$OS_ARGS_PARCELS" --distro $2"
     ;;
     -s|--skip-build)
     SKIP_BUILD=true
@@ -407,6 +421,10 @@ fi
 my_echo "GBN=$GBN"
 my_echo "Build output:$REPO_OUTPUT_DIR"
 my_echo "Build completed. Success!"
+if [[ "$PUBLISH" = true ]]; then
+    my_echo "Parcels are stored at the following location:"
+    my_echo "https://${STORAGE_HOST}/${GBN}"
+fi
 
 if [[ "$RUN_TESTS" = true ]]; then
   my_echo "Now trying to run unit tests"
