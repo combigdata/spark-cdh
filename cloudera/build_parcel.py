@@ -351,9 +351,10 @@ export CDH_SPARK2_HOME=$PARCELS_ROOT/$CDH_DIRNAME/lib/spark2
     def _create_release_notes(self):
         script_dir = os.path.dirname(os.path.abspath(__file__))
         if self._version._patch_number == 0:
-            with open(os.path.join(script_dir, 'release-notes.txt'), 'r') as release_notes_file_for_normal_releases:
-                release_notes_txt_normal=release_notes_file_for_normal_releases.read()
-                self._write_release_notes(release_notes_txt_normal)
+            if os.path.isfile(os.path.join(script_dir, 'release-notes.txt')):
+              with open(os.path.join(script_dir, 'release-notes.txt'), 'r') as release_notes_file_for_normal_releases:
+                  release_notes_txt_normal=release_notes_file_for_normal_releases.read()
+                  self._write_release_notes(release_notes_txt_normal)
         else:
             if os.path.isfile(os.path.join(script_dir, 'patch-release-notes.txt')):
                 with open(os.path.join(script_dir, 'patch-release-notes.txt'), 'r') as release_notes_file_for_patch:

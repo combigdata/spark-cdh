@@ -1,1 +1,0 @@
-<span class="error">Spark2 is currently in Beta and is not supported.</span>

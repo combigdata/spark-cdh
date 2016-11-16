@@ -77,6 +77,7 @@ function usage {
   echo "-p <patch number> or --patch-num <patch number> when building a patch"
   echo "--publish for publishing to S3"
   echo "--build-only for only doing the build (i.e. only building distribution tar.gz, no parcel etc.)"
+  echo "-t or --with-tests to run unit tests after the build (and optional publishing) is complete."
   echo "--os for choosing the os that the parcel should be built for. The OS name should be the long name (like Redhat6). For each os a seperate --os should be used. If the --os is not provided, the parcel will be built for all the supported distributions."
 }
 
