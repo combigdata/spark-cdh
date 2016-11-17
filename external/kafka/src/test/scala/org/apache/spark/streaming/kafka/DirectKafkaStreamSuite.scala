@@ -232,7 +232,8 @@ class DirectKafkaStreamSuite
   }
 
   // Test to verify the offset ranges can be recovered from the checkpoints
-  test("offset recovery") {
+  // CDH-47284 this test is really flaky on our jenkins instances.
+  ignore("offset recovery") {
     val topic = "recovery"
     kafkaTestUtils.createTopic(topic)
     testDir = Utils.createTempDir()
