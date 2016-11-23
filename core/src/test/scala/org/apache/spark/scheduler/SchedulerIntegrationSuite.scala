@@ -26,6 +26,9 @@ import scala.concurrent.duration.{Duration, SECONDS}
 import scala.reflect.ClassTag
 
 import org.scalactic.TripleEquals
+import org.scalatest.concurrent.Eventually._
+import org.scalatest.concurrent.PatienceConfiguration
+import org.scalatest.time.SpanSugar._
 import org.scalatest.Assertions.AssertionsHelper
 
 import org.apache.spark._
@@ -164,8 +167,16 @@ abstract class SchedulerIntegrationSuite[T <: MockBackend: ClassTag] extends Spa
       }
       // When a job fails, we terminate before waiting for all the task end events to come in,
       // so there might still be a running task set.  So we only check these conditions
-      // when the job succeeds
-      assert(taskScheduler.runningTaskSets.isEmpty)
+      // when the job succeeds.
+      // When the final task of a taskset completes, we post
+      // the event to the DAGScheduler event loop before we finish processing in the taskscheduler
+      // thread.  Its possible the DAGScheduler thread processes the event, finishes the job,
+      // and notifies the job waiter before our original thread in the task scheduler finishes
+      // handling the event and marks the taskset as complete.  So its ok if we need to wait a
+      // *little* bit longer for the original taskscheduler thread to finish up to deal w/ the race.
+      eventually(timeout(1 second), interval(100 millis)) {
+        assert(taskScheduler.runningTaskSets.isEmpty)
+      }
       assert(!backend.hasTasks)
     } else {
       assert(failure != null)
@@ -286,12 +297,6 @@ private[spark] abstract class MockBackend(
     ThreadUtils.newDaemonSingleThreadScheduledExecutor("driver-revive-thread")
   private val reviveIntervalMs = conf.getTimeAsMs("spark.scheduler.revive.interval", "10ms")
 
-  reviveThread.scheduleAtFixedRate(new Runnable {
-    override def run(): Unit = Utils.tryLogNonFatalError {
-      reviveOffers()
-    }
-  }, 0, reviveIntervalMs, TimeUnit.MILLISECONDS)
-
   /**
    * Test backends should call this to get a task that has been assigned to them by the scheduler.
    * Each task should be responded to with either [[taskSuccess]] or [[taskFailed]].
@@ -311,7 +316,9 @@ private[spark] abstract class MockBackend(
   def taskSuccess(task: TaskDescription, result: Any): Unit = {
     val ser = env.serializer.newInstance()
     val resultBytes = ser.serialize(result)
-    val directResult = new DirectTaskResult(resultBytes, Map(), new TaskMetrics())
+    val metrics = new TaskMetrics()
+    metrics.setHostname(task.executorId)
+    val directResult = new DirectTaskResult(resultBytes, Map(), metrics)
     taskUpdate(task, TaskState.FINISHED, directResult)
   }
 
