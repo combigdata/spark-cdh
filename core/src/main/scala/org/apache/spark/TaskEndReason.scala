@@ -91,15 +91,6 @@ case class FetchFailed(
     s"FetchFailed($bmAddressString, shuffleId=$shuffleId, mapId=$mapId, reduceId=$reduceId, " +
       s"message=\n$message\n)"
   }
-
-  /**
-   * Fetch failures lead to a different failure handling path: (1) we don't abort the stage after
-   * 4 task failures, instead we immediately go back to the stage which generated the map output,
-   * and regenerate the missing data.  (2) we don't count fetch failures for blacklisting, since
-   * presumably its not the fault of the executor where the task ran, but the executor which
-   * stored the data.
-   */
-  override def countTowardsTaskFailures: Boolean = false
 }
 
 /**
@@ -205,7 +196,6 @@ case object TaskResultLost extends TaskFailedReason {
 @DeveloperApi
 case object TaskKilled extends TaskFailedReason {
   override def toErrorString: String = "TaskKilled (killed intentionally)"
-  override val countTowardsTaskFailures: Boolean = false
 }
 
 /**
@@ -224,7 +214,7 @@ case class TaskCommitDenied(
    * towards failing the stage. This is intended to prevent spurious stage failures in cases
    * where many speculative tasks are launched and denied to commit.
    */
-  override val countTowardsTaskFailures: Boolean = false
+  override def countTowardsTaskFailures: Boolean = false
 }
 
 /**
