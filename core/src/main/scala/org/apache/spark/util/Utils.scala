@@ -2295,6 +2295,17 @@ private[spark] object Utils extends Logging {
     log.info(s"Started daemon with process name: ${Utils.getProcessName()}")
     SignalLogger.register(log)
   }
+
+  private[util] val REDACTION_REPLACEMENT_TEXT = "*********(redacted)"
+
+  def redact(conf: SparkConf, kvs: Seq[(String, String)]): Seq[(String, String)] = {
+    val redactionPattern = conf.get("spark.redaction.regex", "(?i)secret|password").r
+    kvs.map { kv =>
+      redactionPattern.findFirstIn(kv._1)
+        .map { ignore => (kv._1, REDACTION_REPLACEMENT_TEXT) }
+        .getOrElse(kv)
+    }
+  }
 }
 
 /**
