@@ -878,12 +878,7 @@ private[spark] class Client(
     val securityManager = new SecurityManager(sparkConf)
     amContainer.setApplicationACLs(
       YarnSparkHadoopUtil.getApplicationAclsForYarn(securityManager).asJava)
-
-    if (CryptoConf.isShuffleEncryptionEnabled(sparkConf)) {
-      CryptoConf.initSparkShuffleCredentials(sparkConf, credentials)
-    }
     setupSecurityToken(amContainer)
-
     amContainer
   }
 

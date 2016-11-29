@@ -18,7 +18,7 @@
 package org.apache.spark.shuffle
 
 import org.apache.spark._
-import org.apache.spark.crypto._
+import org.apache.spark.crypto.CryptoStreamUtils
 import org.apache.spark.deploy.SparkHadoopUtil
 import org.apache.spark.serializer.Serializer
 import org.apache.spark.storage.{BlockManager, ShuffleBlockFetcherIterator}
@@ -56,12 +56,8 @@ private[spark] class BlockStoreShuffleReader[K, C](
     // Wrap the streams for compression and encryption based on configuration
     val wrappedStreams = blockFetcherItr.map { case (blockId, inputStream) =>
       val sparkConf = blockManager.conf
-      if (CryptoConf.isShuffleEncryptionEnabled(sparkConf)) {
-        val cis = CryptoStreamUtils.createCryptoInputStream(inputStream, sparkConf)
-        blockManager.wrapForCompression(blockId, cis)
-      } else {
-        blockManager.wrapForCompression(blockId, inputStream)
-      }
+      blockManager.wrapForCompression(blockId,
+        CryptoStreamUtils.wrapForEncryption(inputStream, sparkConf))
     }
 
     // Create a key/value iterator for each stream
