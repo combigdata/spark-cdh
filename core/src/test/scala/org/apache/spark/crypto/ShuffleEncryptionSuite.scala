@@ -16,18 +16,18 @@
  */
 package org.apache.spark.crypto
 
-import java.security.PrivilegedExceptionAction
+import java.io.{ByteArrayInputStream, ByteArrayOutputStream}
+import java.nio.charset.StandardCharsets.UTF_8
 
-import org.apache.hadoop.security.{Credentials, UserGroupInformation}
+import com.google.common.io.ByteStreams
 
-import org.apache.spark.{SparkConf, SparkFunSuite}
+import org.apache.spark.{SparkConf, SparkContext, SparkEnv, SparkFunSuite}
 import org.apache.spark.crypto.CryptoConf._
 import org.apache.spark.crypto.CryptoStreamUtils._
 
 private[spark] class ShuffleEncryptionSuite extends SparkFunSuite {
-  val ugi = UserGroupInformation.createUserForTesting("testuser", Array("testgroup"))
 
-  test("Test Chimera configuration conversion") {
+  test("chimera configuration conversion") {
     val sparkKey1 = s"${SPARK_CHIMERA_CONF_PREFIX}a.b.c"
     val sparkVal1 = "val1"
     val chimeraKey1 = s"${CHIMERA_CONF_PREFIX}a.b.c"
@@ -45,65 +45,59 @@ private[spark] class ShuffleEncryptionSuite extends SparkFunSuite {
     assert(!props.contains(chimeraKey2))
   }
 
-  test("Test shuffle encryption is disabled by default"){
-    ugi.doAs(new PrivilegedExceptionAction[Unit]() {
-      override def run(): Unit = {
-        val credentials = UserGroupInformation.getCurrentUser.getCredentials()
-        val conf = new SparkConf()
-        initCredentials(conf, credentials)
-        assert(credentials.getSecretKey(SPARK_SHUFFLE_TOKEN) === null)
-      }
-    })
+  test("shuffle encryption key length should be 128 by default") {
+    val conf = createConf()
+    var key = CryptoStreamUtils.createKey(conf)
+    val actual = key.length * (java.lang.Byte.SIZE)
+    assert(actual === 128)
   }
 
-  test("Test shuffle encryption key length should be 128 by default") {
-    ugi.doAs(new PrivilegedExceptionAction[Unit]() {
-      override def run(): Unit = {
-        val credentials = UserGroupInformation.getCurrentUser.getCredentials()
-        val conf = new SparkConf()
-        conf.set(SPARK_SHUFFLE_ENCRYPTION_ENABLED, true.toString)
-        initCredentials(conf, credentials)
-        var key = credentials.getSecretKey(SPARK_SHUFFLE_TOKEN)
-        assert(key !== null)
-        val actual = key.length * (java.lang.Byte.SIZE)
-        assert(actual === DEFAULT_SPARK_SHUFFLE_ENCRYPTION_KEY_SIZE_BITS)
-      }
-    })
-  }
-
-  test("Test initial credentials with key length in 256") {
-    ugi.doAs(new PrivilegedExceptionAction[Unit]() {
-      override def run(): Unit = {
-        val credentials = UserGroupInformation.getCurrentUser.getCredentials()
-        val conf = new SparkConf()
-        conf.set(SPARK_SHUFFLE_ENCRYPTION_KEY_SIZE_BITS, 256.toString)
-        conf.set(SPARK_SHUFFLE_ENCRYPTION_ENABLED, true.toString)
-        initCredentials(conf, credentials)
-        var key = credentials.getSecretKey(SPARK_SHUFFLE_TOKEN)
-        assert(key !== null)
-        val actual = key.length * (java.lang.Byte.SIZE)
-        assert(actual === 256)
-      }
-    })
+  test("create 256-bit key") {
+    val conf = createConf(SPARK_SHUFFLE_ENCRYPTION_KEY_SIZE_BITS -> "256")
+    var key = CryptoStreamUtils.createKey(conf)
+    val actual = key.length * (java.lang.Byte.SIZE)
+    assert(actual === 256)
   }
 
   test("Test initial credentials with invalid key length") {
-    ugi.doAs(new PrivilegedExceptionAction[Unit]() {
-      override def run(): Unit = {
-        val credentials = UserGroupInformation.getCurrentUser.getCredentials()
-        val conf = new SparkConf()
-        conf.set(SPARK_SHUFFLE_ENCRYPTION_KEY_SIZE_BITS, 328.toString)
-        conf.set(SPARK_SHUFFLE_ENCRYPTION_ENABLED, true.toString)
-        val thrown = intercept[IllegalArgumentException] {
-          initCredentials(conf, credentials)
-        }
-      }
-    })
-  }
-
-  private[this] def initCredentials(conf: SparkConf, credentials: Credentials): Unit = {
-    if (CryptoConf.isShuffleEncryptionEnabled(conf)) {
-      CryptoConf.initSparkShuffleCredentials(conf, credentials)
+    intercept[IllegalArgumentException] {
+      val conf = createConf(
+        SPARK_SHUFFLE_ENCRYPTION_KEYGEN_ALGORITHM -> "AES",
+        SPARK_SHUFFLE_ENCRYPTION_KEY_SIZE_BITS -> "328")
+      CryptoStreamUtils.createKey(conf)
     }
   }
+
+  test("encryption key propagation to executors") {
+    val conf = createConf().setAppName("Crypto Test").setMaster("local-cluster[1,1,1024]")
+    val sc = new SparkContext(conf)
+    try {
+      val content = "This is the content to be encrypted."
+      val encrypted = sc.parallelize(Seq(1))
+        .map { str =>
+          val bytes = new ByteArrayOutputStream()
+          val out = CryptoStreamUtils.wrapForEncryption(bytes, SparkEnv.get.conf)
+          out.write(content.getBytes(UTF_8))
+          out.close()
+          bytes.toByteArray()
+        }.collect()(0)
+
+      assert(content != encrypted)
+
+      val in = CryptoStreamUtils.wrapForEncryption(new ByteArrayInputStream(encrypted),
+        sc.conf)
+      val decrypted = new String(ByteStreams.toByteArray(in), UTF_8)
+      assert(content === decrypted)
+    } finally {
+      sc.stop()
+    }
+  }
+
+  private def createConf(extra: (String, String)*): SparkConf = {
+    val conf = new SparkConf()
+    extra.foreach { case (k, v) => conf.set(k, v) }
+    conf.set(SPARK_SHUFFLE_ENCRYPTION_ENABLED, true.toString)
+    conf
+  }
+
 }

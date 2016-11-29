@@ -29,6 +29,7 @@ import com.google.common.collect.MapMaker
 import org.apache.spark.annotation.DeveloperApi
 import org.apache.spark.api.python.PythonWorkerFactory
 import org.apache.spark.broadcast.BroadcastManager
+import org.apache.spark.crypto.{CryptoConf, CryptoStreamUtils}
 import org.apache.spark.metrics.MetricsSystem
 import org.apache.spark.memory.{MemoryManager, StaticMemoryManager, UnifiedMemoryManager}
 import org.apache.spark.network.BlockTransferService
@@ -190,14 +191,19 @@ object SparkEnv extends Logging {
     assert(conf.contains("spark.driver.port"), "spark.driver.port is not set on the driver!")
     val hostname = conf.get("spark.driver.host")
     val port = conf.get("spark.driver.port").toInt
+    val ioEncryptionKey = if (conf.getBoolean(CryptoConf.SPARK_SHUFFLE_ENCRYPTION_ENABLED, false)) {
+      Some(CryptoStreamUtils.createKey(conf))
+    } else {
+      None
+    }
     create(
       conf,
       SparkContext.DRIVER_IDENTIFIER,
       hostname,
       port,
-      isDriver = true,
-      isLocal = isLocal,
-      numUsableCores = numCores,
+      isLocal,
+      numCores,
+      ioEncryptionKey,
       listenerBus = listenerBus,
       mockOutputCommitCoordinator = mockOutputCommitCoordinator
     )
@@ -213,15 +219,16 @@ object SparkEnv extends Logging {
       hostname: String,
       port: Int,
       numCores: Int,
+      ioEncryptionKey: Option[Array[Byte]],
       isLocal: Boolean): SparkEnv = {
     val env = create(
       conf,
       executorId,
       hostname,
       port,
-      isDriver = false,
-      isLocal = isLocal,
-      numUsableCores = numCores
+      isLocal,
+      numCores,
+      ioEncryptionKey
     )
     SparkEnv.set(env)
     env
@@ -235,18 +242,26 @@ object SparkEnv extends Logging {
       executorId: String,
       hostname: String,
       port: Int,
-      isDriver: Boolean,
       isLocal: Boolean,
       numUsableCores: Int,
+      ioEncryptionKey: Option[Array[Byte]],
       listenerBus: LiveListenerBus = null,
       mockOutputCommitCoordinator: Option[OutputCommitCoordinator] = None): SparkEnv = {
+
+    val isDriver = executorId == SparkContext.DRIVER_IDENTIFIER
 
     // Listener bus is only used on the driver
     if (isDriver) {
       assert(listenerBus != null, "Attempted to create driver SparkEnv with null listener bus!")
     }
 
-    val securityManager = new SecurityManager(conf)
+    val securityManager = new SecurityManager(conf, ioEncryptionKey)
+    ioEncryptionKey.foreach { _ =>
+      if (!securityManager.isSaslEncryptionEnabled()) {
+        logWarning("I/O encryption enabled without RPC encryption: keys will be visible on the " +
+          "wire.")
+      }
+    }
 
     // Create the ActorSystem for Akka and get the port it binds to.
     val actorSystemName = if (isDriver) driverActorSystemName else executorActorSystemName

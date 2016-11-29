@@ -16,11 +16,6 @@
  */
 package org.apache.spark.crypto
 
-import javax.crypto.KeyGenerator
-
-import org.apache.hadoop.io.Text
-import org.apache.hadoop.security.Credentials
-
 import org.apache.spark.SparkConf
 
 /**
@@ -30,7 +25,6 @@ private[spark] object CryptoConf {
   /**
    * Constants and variables for spark shuffle file encryption
    */
-  val SPARK_SHUFFLE_TOKEN = new Text("SPARK_SHUFFLE_TOKEN")
   val SPARK_SHUFFLE_ENCRYPTION_ENABLED = "spark.shuffle.encryption.enabled"
   val SPARK_SHUFFLE_ENCRYPTION_KEYGEN_ALGORITHM = "spark.shuffle.encryption.keygen.algorithm"
   val DEFAULT_SPARK_SHUFFLE_ENCRYPTION_KEYGEN_ALGORITHM = "HmacSHA1"
@@ -48,24 +42,5 @@ private[spark] object CryptoConf {
     }
   }
 
-  /**
-   * Setup the cryptographic key used by file shuffle encryption in credentials. The key is
-   * generated using [[KeyGenerator]]. The algorithm and key length is specified by the
-   * [[SparkConf]].
-   */
-  def initSparkShuffleCredentials(conf: SparkConf, credentials: Credentials): Unit = {
-    if (credentials.getSecretKey(SPARK_SHUFFLE_TOKEN) == null) {
-      val keyLen = conf.getInt(SPARK_SHUFFLE_ENCRYPTION_KEY_SIZE_BITS,
-        DEFAULT_SPARK_SHUFFLE_ENCRYPTION_KEY_SIZE_BITS)
-      require(keyLen == 128 || keyLen == 192 || keyLen == 256)
-      val shuffleKeyGenAlgorithm = conf.get(SPARK_SHUFFLE_ENCRYPTION_KEYGEN_ALGORITHM,
-        DEFAULT_SPARK_SHUFFLE_ENCRYPTION_KEYGEN_ALGORITHM)
-      val keyGen = KeyGenerator.getInstance(shuffleKeyGenAlgorithm)
-      keyGen.init(keyLen)
-
-      val shuffleKey = keyGen.generateKey()
-      credentials.addSecretKey(SPARK_SHUFFLE_TOKEN, shuffleKey.getEncoded)
-    }
-  }
 }
 
