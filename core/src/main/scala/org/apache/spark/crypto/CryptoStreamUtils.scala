@@ -18,12 +18,13 @@ package org.apache.spark.crypto
 
 import java.io.{InputStream, OutputStream}
 import java.util.Properties
+import javax.crypto.KeyGenerator
 
 import com.intel.chimera.cipher._
 import com.intel.chimera.random._
 import com.intel.chimera.stream._
 
-import org.apache.spark.SparkConf
+import org.apache.spark.{SparkConf, SparkEnv}
 import org.apache.spark.crypto.CryptoConf._
 import org.apache.spark.deploy.SparkHadoopUtil
 
@@ -39,14 +40,41 @@ private[spark] object CryptoStreamUtils {
   val CHIMERA_CONF_PREFIX = "chimera.crypto."
 
   /**
+   * Wrap an output stream for encryption if there's a key registered with the app's
+   * SecurityManager.
+   */
+  def wrapForEncryption(os: OutputStream, conf: SparkConf): OutputStream = {
+    Option(SparkEnv.get).flatMap(_.securityManager.getIOEncryptionKey()) match {
+      case Some(key) =>
+        createCryptoOutputStream(os, conf, key)
+      case None =>
+        os
+    }
+  }
+
+  /**
+   * Wrap an input stream for encryption if there's a key registered with the app's
+   * SecurityManager.
+   */
+  def wrapForEncryption(is: InputStream, conf: SparkConf): InputStream = {
+    Option(SparkEnv.get).flatMap(_.securityManager.getIOEncryptionKey()) match {
+      case Some(key) =>
+        createCryptoInputStream(is, conf, key)
+      case None =>
+        is
+    }
+  }
+
+  /**
    * Helper method to wrap [[OutputStream]] with [[CryptoOutputStream]] for encryption.
    */
-  def createCryptoOutputStream(os: OutputStream, sparkConf: SparkConf): CryptoOutputStream = {
+  def createCryptoOutputStream(
+      os: OutputStream,
+      sparkConf: SparkConf,
+      key: Array[Byte]): CryptoOutputStream = {
     val properties = toChimeraConf(sparkConf)
     val iv: Array[Byte] = createInitializationVector(properties)
     os.write(iv)
-    val credentials = SparkHadoopUtil.get.getCurrentUserCredentials()
-    val key = credentials.getSecretKey(SPARK_SHUFFLE_TOKEN)
     val transformationType = getCipherTransformationType(sparkConf)
     new CryptoOutputStream(transformationType, properties, os, key, iv)
   }
@@ -54,12 +82,13 @@ private[spark] object CryptoStreamUtils {
   /**
    * Helper method to wrap [[InputStream]] with [[CryptoInputStream]] for decryption.
    */
-  def createCryptoInputStream(is: InputStream, sparkConf: SparkConf): CryptoInputStream = {
+  def createCryptoInputStream(
+      is: InputStream,
+      sparkConf: SparkConf,
+      key: Array[Byte]): CryptoInputStream = {
     val properties = toChimeraConf(sparkConf)
     val iv = new Array[Byte](IV_LENGTH_IN_BYTES)
     is.read(iv, 0, iv.length)
-    val credentials = SparkHadoopUtil.get.getCurrentUserCredentials()
-    val key = credentials.getSecretKey(SPARK_SHUFFLE_TOKEN)
     val transformationType = getCipherTransformationType(sparkConf)
     new CryptoInputStream(transformationType, properties, is, key, iv)
   }
@@ -75,6 +104,19 @@ private[spark] object CryptoStreamUtils {
       }
     }
     props
+  }
+
+  /**
+   * Creates a new encryption key.
+   */
+  def createKey(conf: SparkConf): Array[Byte] = {
+    val keyLen = conf.getInt(SPARK_SHUFFLE_ENCRYPTION_KEY_SIZE_BITS,
+      DEFAULT_SPARK_SHUFFLE_ENCRYPTION_KEY_SIZE_BITS)
+    val keyGenAlgorithm = conf.get(SPARK_SHUFFLE_ENCRYPTION_KEYGEN_ALGORITHM,
+      DEFAULT_SPARK_SHUFFLE_ENCRYPTION_KEYGEN_ALGORITHM)
+    val keyGen = KeyGenerator.getInstance(keyGenAlgorithm)
+    keyGen.init(keyLen)
+    keyGen.generateKey().getEncoded()
   }
 
   /**
