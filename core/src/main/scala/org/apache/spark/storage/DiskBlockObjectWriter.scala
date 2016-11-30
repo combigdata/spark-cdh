@@ -22,7 +22,7 @@ import java.nio.channels.FileChannel
 
 import org.apache.spark.executor.ShuffleWriteMetrics
 import org.apache.spark.internal.Logging
-import org.apache.spark.serializer.{SerializationStream, SerializerInstance}
+import org.apache.spark.serializer.{SerializationStream, SerializerInstance, SerializerManager}
 import org.apache.spark.util.Utils
 
 /**
@@ -35,9 +35,9 @@ import org.apache.spark.util.Utils
  */
 private[spark] class DiskBlockObjectWriter(
     val file: File,
+    serializerManager: SerializerManager,
     serializerInstance: SerializerInstance,
     bufferSize: Int,
-    wrapStream: OutputStream => OutputStream,
     syncWrites: Boolean,
     // These write metrics concurrently shared with other active DiskBlockObjectWriters who
     // are themselves performing writes. All updates must be relative.
@@ -88,7 +88,7 @@ private[spark] class DiskBlockObjectWriter(
     fos = new FileOutputStream(file, true)
     ts = new TimeTrackingOutputStream(writeMetrics, fos)
     channel = fos.getChannel()
-    bs = wrapStream(new BufferedOutputStream(ts, bufferSize))
+    bs = serializerManager.wrapStream(blockId, new BufferedOutputStream(ts, bufferSize))
     objOut = serializerInstance.serializeStream(bs)
     initialized = true
     this
