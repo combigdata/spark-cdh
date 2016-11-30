@@ -28,6 +28,7 @@ import com.google.common.io.ByteStreams
 
 import org.apache.spark.{Logging, SparkEnv, TaskContext}
 import org.apache.spark.annotation.DeveloperApi
+import org.apache.spark.crypto.CryptoStreamUtils
 import org.apache.spark.memory.TaskMemoryManager
 import org.apache.spark.serializer.{DeserializationStream, Serializer}
 import org.apache.spark.storage.{BlockId, BlockManager}
@@ -492,7 +493,8 @@ class ExternalAppendOnlyMap[K, V, C](
           ", batchOffsets = " + batchOffsets.mkString("[", ", ", "]"))
 
         val bufferedStream = new BufferedInputStream(ByteStreams.limit(fileStream, end - start))
-        val compressedStream = blockManager.wrapForCompression(blockId, bufferedStream)
+        val decrypted = CryptoStreamUtils.wrapForEncryption(bufferedStream, sparkConf)
+        val compressedStream = blockManager.wrapForCompression(blockId, decrypted)
         ser.deserializeStream(compressedStream)
       } else {
         // No more batches left
