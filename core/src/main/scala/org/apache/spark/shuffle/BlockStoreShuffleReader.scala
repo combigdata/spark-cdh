@@ -17,11 +17,13 @@
 
 package org.apache.spark.shuffle
 
+import java.io.InputStream
+
 import org.apache.spark._
 import org.apache.spark.crypto.CryptoStreamUtils
 import org.apache.spark.deploy.SparkHadoopUtil
 import org.apache.spark.serializer.Serializer
-import org.apache.spark.storage.{BlockManager, ShuffleBlockFetcherIterator}
+import org.apache.spark.storage.{BlockId, BlockManager, ShuffleBlockFetcherIterator}
 import org.apache.spark.util.CompletionIterator
 import org.apache.spark.util.collection.ExternalSorter
 
@@ -42,26 +44,26 @@ private[spark] class BlockStoreShuffleReader[K, C](
 
   /** Read the combined key-values for this reduce task */
   override def read(): Iterator[Product2[K, C]] = {
-    val blockFetcherItr = new ShuffleBlockFetcherIterator(
+    val streamWrapper: (BlockId, InputStream) => InputStream = { (blockId, in) =>
+      blockManager.wrapForCompression(blockId,
+        CryptoStreamUtils.wrapForEncryption(in, blockManager.conf))
+    }
+
+    val wrappedStreams = new ShuffleBlockFetcherIterator(
       context,
       blockManager.shuffleClient,
       blockManager,
       mapOutputTracker.getMapSizesByExecutorId(handle.shuffleId, startPartition, endPartition),
+      streamWrapper,
       // Note: we use getSizeAsMb when no suffix is provided for backwards compatibility
-      SparkEnv.get.conf.getSizeAsMb("spark.reducer.maxSizeInFlight", "48m") * 1024 * 1024)
+      SparkEnv.get.conf.getSizeAsMb("spark.reducer.maxSizeInFlight", "48m") * 1024 * 1024,
+      SparkEnv.get.conf.getBoolean("spark.shuffle.detectCorrupt", true))
 
     val ser = Serializer.getSerializer(dep.serializer)
     val serializerInstance = ser.newInstance()
 
-    // Wrap the streams for compression and encryption based on configuration
-    val wrappedStreams = blockFetcherItr.map { case (blockId, inputStream) =>
-      val sparkConf = blockManager.conf
-      blockManager.wrapForCompression(blockId,
-        CryptoStreamUtils.wrapForEncryption(inputStream, sparkConf))
-    }
-
     // Create a key/value iterator for each stream
-    val recordIter = wrappedStreams.flatMap { wrappedStream =>
+    val recordIter = wrappedStreams.flatMap { case (blockId, wrappedStream) =>
       // Note: the asKeyValueIterator below wraps a key/value iterator inside of a
       // NextIterator. The NextIterator makes sure that close() is called on the
       // underlying InputStream when all records have been read.
