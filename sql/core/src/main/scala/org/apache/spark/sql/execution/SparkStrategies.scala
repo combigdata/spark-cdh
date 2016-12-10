@@ -55,9 +55,14 @@ private[sql] abstract class SparkStrategies extends QueryPlanner[SparkPlan] {
   object CanBroadcast {
     def unapply(plan: LogicalPlan): Option[LogicalPlan] = plan match {
       case BroadcastHint(p) => Some(p)
-      case p if sqlContext.conf.autoBroadcastJoinThreshold > 0 &&
-        p.statistics.sizeInBytes <= sqlContext.conf.autoBroadcastJoinThreshold => Some(p)
+      case p if canBroadcast(p) => Some(p)
       case _ => None
+    }
+
+    private def canBroadcast(plan: LogicalPlan): Boolean = {
+      sqlContext.conf.autoBroadcastJoinThreshold > 0 &&
+        plan.statistics.sizeInBytes >= 0 &&
+        plan.statistics.sizeInBytes <= sqlContext.conf.autoBroadcastJoinThreshold
     }
   }
 
