@@ -367,7 +367,8 @@ case class InsertIntoHiveTable(
             partitionSpec,
             isOverwrite = doHiveOverwrite,
             holdDDLTime = holdDDLTime,
-            inheritTableSpecs = inheritTableSpecs)
+            inheritTableSpecs = inheritTableSpecs,
+            isSrcLocal = false)
         }
       }
     } else {
@@ -376,7 +377,8 @@ case class InsertIntoHiveTable(
         table.catalogTable.identifier.table,
         outputPath.toString, // TODO: URI
         overwrite,
-        holdDDLTime)
+        holdDDLTime,
+        isSrcLocal = false)
     }
 
     // Attempt to delete the staging directory and the inclusive files. If failed, the files are

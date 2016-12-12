@@ -215,7 +215,8 @@ class VersionsSuite extends SparkFunSuite with SQLTestUtils with TestHiveSinglet
         emptyDir,
         tableName = "src",
         replace = false,
-        holdDDLTime = false)
+        holdDDLTime = false,
+        isSrcLocal = false)
     }
 
     test(s"$version: tableExists") {
@@ -353,7 +354,8 @@ class VersionsSuite extends SparkFunSuite with SQLTestUtils with TestHiveSinglet
         partSpec,
         replace = false,
         holdDDLTime = false,
-        inheritTableSpecs = false)
+        inheritTableSpecs = false,
+        isSrcLocal = false)
     }
 
     test(s"$version: loadDynamicPartitions") {
