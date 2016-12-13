@@ -21,11 +21,13 @@
 # 106597 --patch-number 0 --verbose --force-clean
 
 from __future__ import with_statement
+from __future__ import print_function
 import argparse
 from collections import defaultdict, OrderedDict
 import distutils.spawn
 import getpass
 import glob
+import hashlib
 import json
 import logging
 import multiprocessing
@@ -548,6 +550,22 @@ class Archiver(object):
             shutil.copy(src_archive, dest_archive)
 
     @timer_decorate
+    def _generate_sha1_files(self):
+        """ Generate sha1 files for parcels, placed right beside them."""
+        # At this point, all the parcels have been generated. So we simply iterate through the parcels
+        # generate corresponding sha1sum files and place the .sha1 files right beside the parcels.
+        files = os.listdir(self._out_dir)
+        for f in files:
+            if not f.endswith('.parcel'):
+                continue
+
+            LOG.info("Generating sha1sum file for %s", f)
+            parcel_path = os.path.join(self._out_dir, f)
+            with open(parcel_path, 'rb') as fp:
+                with open(parcel_path + ".sha1", 'w') as sha1file:
+                    print(hashlib.sha1(fp.read()).hexdigest(), file=sha1file)
+
+    @timer_decorate
     def _cleanup(self):
         # Cleanup
         util.rmtree(self._build_dir)
@@ -560,6 +578,7 @@ class Archiver(object):
         if not self._skip_archive:
             self._archive_parcel()
             self._copy_if_necessary()
+            self._generate_sha1_files()
         self._cleanup()
 
 def parse_args():
