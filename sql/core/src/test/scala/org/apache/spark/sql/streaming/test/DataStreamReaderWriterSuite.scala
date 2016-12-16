@@ -340,7 +340,7 @@ class DataStreamReaderWriterSuite extends StreamTest with BeforeAndAfter with Pr
       .start()
     q.stop()
 
-    assert(q.asInstanceOf[StreamExecution].trigger == ProcessingTime(10000))
+    assert(q.asInstanceOf[StreamingQueryWrapper].streamingQuery.trigger == ProcessingTime(10000))
 
     q = df.writeStream
       .format("org.apache.spark.sql.streaming.test")
@@ -349,7 +349,7 @@ class DataStreamReaderWriterSuite extends StreamTest with BeforeAndAfter with Pr
       .start()
     q.stop()
 
-    assert(q.asInstanceOf[StreamExecution].trigger == ProcessingTime(100000))
+    assert(q.asInstanceOf[StreamingQueryWrapper].streamingQuery.trigger == ProcessingTime(100000))
   }
 
   test("source metadataPath") {

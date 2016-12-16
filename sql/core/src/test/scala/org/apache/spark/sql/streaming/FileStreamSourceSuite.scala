@@ -751,7 +751,8 @@ class FileStreamSourceSuite extends FileStreamSourceTest {
         .format("memory")
         .queryName("file_data")
         .start()
-        .asInstanceOf[StreamExecution]
+        .asInstanceOf[StreamingQueryWrapper]
+        .streamingQuery
       q.processAllAvailable()
       val memorySink = q.sink.asInstanceOf[MemorySink]
       val fileSource = q.logicalPlan.collect {
@@ -851,7 +852,8 @@ class FileStreamSourceSuite extends FileStreamSourceTest {
       df.explain()
 
       val q = df.writeStream.queryName("file_explain").format("memory").start()
-        .asInstanceOf[StreamExecution]
+        .asInstanceOf[StreamingQueryWrapper]
+        .streamingQuery
       try {
         assert("No physical plan. Waiting for data." === q.explainInternal(false))
         assert("No physical plan. Waiting for data." === q.explainInternal(true))
