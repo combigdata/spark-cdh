@@ -157,9 +157,7 @@ class SparkSubmitSuite
     val (childArgs, classpath, sysProps, mainClass) = prepareSubmitEnvironment(appArgs)
     val childArgsStr = childArgs.mkString(" ")
     childArgsStr should include ("--class org.SomeClass")
-    childArgsStr should include ("--executor-memory 5g")
     childArgsStr should include ("--driver-memory 4g")
-    childArgsStr should include ("--executor-cores 5")
     childArgsStr should include ("--arg arg1 --arg arg2")
     childArgsStr should include ("--queue thequeue")
     childArgsStr should include regex ("--jar .*thejar.jar")
@@ -171,6 +169,8 @@ class SparkSubmitSuite
     sysProps("spark.app.name") should be ("beauty")
     sysProps("spark.ui.enabled") should be ("false")
     sysProps("SPARK_SUBMIT") should be ("true")
+    sysProps("spark.executor.memory") should be ("5g")
+    sysProps("spark.executor.cores") should be ("5")
     sysProps.keys should not contain ("spark.jars")
   }
 
