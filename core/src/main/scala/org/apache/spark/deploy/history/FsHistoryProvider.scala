@@ -92,6 +92,11 @@ private[history] class FsHistoryProvider(conf: SparkConf, clock: Clock)
     .map { d => Utils.resolveURI(d).toString }
     .getOrElse(DEFAULT_LOG_DIR)
 
+  private val HISTORY_UI_ACLS_ENABLE = conf.getBoolean("spark.history.ui.acls.enable", false)
+  private val HISTORY_UI_ADMIN_ACLS = conf.get("spark.history.ui.admin.acls", "")
+  logInfo(s"History server ui acls " + (if (HISTORY_UI_ACLS_ENABLE) "enabled" else "disabled") +
+    "; users with admin permissions: " + HISTORY_UI_ADMIN_ACLS.toString)
+
   private val hadoopConf = SparkHadoopUtil.get.newConfiguration(conf)
   private val fs = Utils.getHadoopFileSystem(logDir, hadoopConf)
 
@@ -232,10 +237,10 @@ private[history] class FsHistoryProvider(conf: SparkConf, clock: Clock)
           val appAttemptInfo = replay(fs.getFileStatus(new Path(logDir, attempt.logPath)),
             replayBus)
           appAttemptInfo.map { info =>
-            val uiAclsEnabled = conf.getBoolean("spark.history.ui.acls.enable", false)
-            ui.getSecurityManager.setAcls(uiAclsEnabled)
+            ui.getSecurityManager.setAcls(HISTORY_UI_ACLS_ENABLE)
             // make sure to set admin acls before view acls so they are properly picked up
-            ui.getSecurityManager.setAdminAcls(appListener.adminAcls.getOrElse(""))
+            val adminAcls = HISTORY_UI_ADMIN_ACLS + "," + appListener.adminAcls.getOrElse("")
+            ui.getSecurityManager.setAdminAcls(adminAcls)
             ui.getSecurityManager.setViewAcls(attempt.sparkUser,
               appListener.viewAcls.getOrElse(""))
             LoadedAppUI(ui, updateProbe(appId, attemptId, attempt.fileSize))

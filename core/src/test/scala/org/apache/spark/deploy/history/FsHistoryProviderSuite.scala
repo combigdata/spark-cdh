@@ -38,7 +38,7 @@ import org.scalatest.BeforeAndAfter
 import org.scalatest.Matchers
 import org.scalatest.concurrent.Eventually._
 
-import org.apache.spark.{Logging, SparkConf, SparkFunSuite}
+import org.apache.spark.{Logging, SecurityManager, SparkConf, SparkFunSuite}
 import org.apache.spark.io._
 import org.apache.spark.scheduler._
 import org.apache.spark.util.{Clock, JsonProtocol, ManualClock, Utils}
@@ -459,6 +459,79 @@ class FsHistoryProviderSuite extends SparkFunSuite with BeforeAndAfter with Matc
       provider.stop()
     }
   }
+
+  test("support history server ui admin acls") {
+    def createAndCheck(conf: SparkConf, properties: (String, String)*)
+      (checkFn: SecurityManager => Unit): Unit = {
+      // Empty the testDir for each test.
+      if (testDir.exists() && testDir.isDirectory) {
+        testDir.listFiles().foreach { f => if (f.isFile) f.delete() }
+      }
+
+      var provider: FsHistoryProvider = null
+      try {
+        provider = new FsHistoryProvider(conf)
+        val log = newLogFile("app1", Some("attempt1"), inProgress = false)
+        writeFile(log, true, None,
+          SparkListenerApplicationStart("app1", Some("app1"), System.currentTimeMillis(),
+            "test", Some("attempt1")),
+          SparkListenerEnvironmentUpdate(Map(
+            "Spark Properties" -> properties.toSeq,
+            "JVM Information" -> Seq.empty,
+            "System Properties" -> Seq.empty,
+            "Classpath Entries" -> Seq.empty
+          )),
+          SparkListenerApplicationEnd(System.currentTimeMillis()))
+
+        provider.checkForLogs()
+        val appUi = provider.getAppUI("app1", Some("attempt1"))
+
+        assert(appUi.nonEmpty)
+        val securityManager = appUi.get.ui.securityManager
+        checkFn(securityManager)
+      } finally {
+        if (provider != null) {
+          provider.stop()
+        }
+      }
+    }
+
+    // Test both history ui admin acls and application acls are configured.
+    val conf1 = createTestConf()
+      .set("spark.history.ui.acls.enable", "true")
+      .set("spark.history.ui.admin.acls", "user1,user2")
+
+    createAndCheck(conf1, ("spark.admin.acls", "user")) {
+      securityManager =>
+        // Test whether user has permission to access UI.
+        securityManager.checkUIViewPermissions("user1") should be (true)
+        securityManager.checkUIViewPermissions("user2") should be (true)
+        securityManager.checkUIViewPermissions("user") should be (true)
+        securityManager.checkUIViewPermissions("abc") should be (false)
+    }
+
+    // Test only history ui admin acls are configured.
+    val conf2 = createTestConf()
+      .set("spark.history.ui.acls.enable", "true")
+      .set("spark.history.ui.admin.acls", "user1,user2")
+    createAndCheck(conf2) { securityManager =>
+      // Test whether user has permission to access UI.
+      securityManager.checkUIViewPermissions("user1") should be (true)
+      securityManager.checkUIViewPermissions("user2") should be (true)
+      // Check the unknown "user" should return false
+      securityManager.checkUIViewPermissions("user") should be (false)
+    }
+
+    // Test neither history ui admin acls nor application acls are configured.
+     val conf3 = createTestConf()
+      .set("spark.history.ui.acls.enable", "true")
+    createAndCheck(conf3) { securityManager =>
+      // Test whether user has permission to access UI.
+      securityManager.checkUIViewPermissions("user1") should be (false)
+      securityManager.checkUIViewPermissions("user2") should be (false)
+      securityManager.checkUIViewPermissions("user") should be (false)
+    }
+ }
 
   /**
    * Asks the provider to check for logs and calls a function to perform checks on the updated
