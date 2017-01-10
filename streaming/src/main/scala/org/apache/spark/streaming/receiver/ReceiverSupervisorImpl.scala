@@ -174,6 +174,12 @@ private[streaming] class ReceiverSupervisorImpl(
   }
 
   override protected def onStop(message: String, error: Option[Throwable]) {
+    receivedBlockHandler match {
+      case handler: WriteAheadLogBasedBlockHandler =>
+        // Write ahead log should be closed.
+        handler.stop()
+      case _ =>
+    }
     registeredBlockGenerators.foreach { _.stop() }
     env.rpcEnv.stop(endpoint)
   }
