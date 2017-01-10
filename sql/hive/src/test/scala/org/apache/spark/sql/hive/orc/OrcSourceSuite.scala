@@ -57,7 +57,7 @@ abstract class OrcSuite extends QueryTest with TestHiveSingleton with BeforeAndA
          |  stringField STRING
          |)
          |STORED AS ORC
-         |LOCATION '${orcTableAsDir.getCanonicalPath}'
+         |LOCATION '${orcTableAsDir.toURI}'
        """.stripMargin)
 
     sql(
@@ -162,7 +162,7 @@ class OrcSourceSuite extends OrcSuite {
       s"""CREATE TEMPORARY TABLE normal_orc_source
          |USING org.apache.spark.sql.hive.orc
          |OPTIONS (
-         |  PATH '${new File(orcTableAsDir.getAbsolutePath).getCanonicalPath}'
+         |  PATH '${new File(orcTableAsDir.getAbsolutePath).toURI}'
          |)
        """.stripMargin)
 
@@ -170,7 +170,7 @@ class OrcSourceSuite extends OrcSuite {
       s"""CREATE TEMPORARY TABLE normal_orc_as_source
          |USING org.apache.spark.sql.hive.orc
          |OPTIONS (
-         |  PATH '${new File(orcTableAsDir.getAbsolutePath).getCanonicalPath}'
+         |  PATH '${new File(orcTableAsDir.getAbsolutePath).toURI}'
          |)
        """.stripMargin)
   }
