@@ -17,7 +17,7 @@
 
 package org.apache.spark.streaming
 
-import java.io.{ByteArrayInputStream, ByteArrayOutputStream, File, ObjectOutputStream}
+import java.io._
 
 import scala.collection.mutable.{ArrayBuffer, SynchronizedBuffer}
 import scala.reflect.ClassTag
@@ -607,8 +607,9 @@ class CheckpointSuite extends TestSuiteBase with DStreamCheckpointTester {
     def recordedFiles(ssc: StreamingContext): Seq[Int] = {
       val fileInputDStream =
         ssc.graph.getInputStreams().head.asInstanceOf[FileInputDStream[_, _, _]]
-      val filenames = fileInputDStream.batchTimeToSelectedFiles.values.flatten
-      filenames.map(_.split(File.separator).last.toInt).toSeq.sorted
+      val filenames = fileInputDStream.batchTimeToSelectedFiles.synchronized
+         { fileInputDStream.batchTimeToSelectedFiles.values.flatten }
+      filenames.map(_.split("/").last.toInt).toSeq.sorted
     }
 
     try {
@@ -732,7 +733,15 @@ class CheckpointSuite extends TestSuiteBase with DStreamCheckpointTester {
         assert(outputBuffer.flatten.toSet === expectedOutput.toSet)
       }
     } finally {
-      Utils.deleteRecursively(testDir)
+      try {
+        // As the driver shuts down in the middle of processing and the thread above sleeps
+        // for a while, `testDir` can be not closed correctly at this point which causes the
+        // test failure on Windows.
+        Utils.deleteRecursively(testDir)
+      } catch {
+        case e: IOException if Utils.isWindows =>
+          logWarning(e.getMessage)
+      }
     }
   }
 
