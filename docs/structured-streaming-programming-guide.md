@@ -374,7 +374,7 @@ The "Output" is defined as what gets written out to the external storage. The ou
 
   - *Append Mode* - Only the new rows appended in the Result Table since the last trigger will be written to the external storage. This is applicable only on the queries where existing rows in the Result Table are not expected to change.
   
-  - *Update Mode* - Only the rows that were updated in the Result Table since the last trigger will be written to the external storage (not available yet in Spark 2.0). Note that this is different from the Complete Mode in that this mode does not output the rows that are not changed.
+  - *Update Mode* - Only the rows that were updated in the Result Table since the last trigger will be written to the external storage (available since Spark 2.1.1). Note that this is different from the Complete Mode in that this mode only outputs the rows that have changed since the last trigger. If the query doesn't contain aggregations, it will be equivalent to Append mode.
 
 Note that each mode is applicable on certain types of queries. This is discussed in detail [later](#output-modes).
 
@@ -768,6 +768,63 @@ There are two types of output mode currently implemented.
 - **Append mode (default)** - This is the default mode, where only the new rows added to the result table since the last trigger will be outputted to the sink. This is only applicable to queries that *do not have any aggregations* (e.g. queries with only `select`, `where`, `map`, `flatMap`, `filter`, `join`, etc.).
 
 - **Complete mode** - The whole result table will be outputted to the sink.This is only applicable to queries that *have aggregations*. 
+
+- **Update mode** - (*Available since Spark 2.1.1*) Only the rows in the Result Table that were 
+updated since the last trigger will be outputted to the sink. 
+More information to be added in future releases.
+
+Different types of streaming queries support different output modes.
+Here is the compatibility matrix.
+
+<table class="table">
+  <tr>
+    <th>Query Type</th>
+    <th></th>
+    <th>Supported Output Modes</th>
+    <th>Notes</th>        
+  </tr>
+  <tr>
+    <td colspan="2" style="vertical-align: middle;">Queries without aggregation</td>
+    <td style="vertical-align: middle;">Append, Update</td>
+    <td style="vertical-align: middle;">
+        Complete mode not supported as it is infeasible to keep all data in the Result Table.
+    </td>
+  </tr>
+  <tr>
+    <td rowspan="2" style="vertical-align: middle;">Queries with aggregation</td>
+    <td style="vertical-align: middle;">Aggregation on event-time with watermark</td>
+    <td style="vertical-align: middle;">Append, Update, Complete</td>
+    <td>
+        Append mode uses watermark to drop old aggregation state. But the output of a 
+        windowed aggregation is delayed the late threshold specified in `withWatermark()` as by
+        the modes semantics, rows can be added to the Result Table only once after they are 
+        finalized (i.e. after watermark is crossed). See the
+        <a href="#handling-late-data-and-watermarking">Late Data</a> section for more details.
+        <br/><br/>
+        Update mode uses watermark to drop old aggregation state.
+        <br/><br/>
+        Complete mode does drop not old aggregation state since by definition this mode
+        preserves all data in the Result Table.
+    </td>    
+  </tr>
+  <tr>
+    <td style="vertical-align: middle;">Other aggregations</td>
+    <td style="vertical-align: middle;">Complete, Update</td>
+    <td>
+        Since no watermark is defined (only defined in other category), 
+        old aggregation state is not dropped.
+        <br/><br/>
+        Append mode is not supported as aggregates can update thus violating the semantics of 
+        this mode.
+    </td>  
+  </tr>
+  <tr>
+    <td></td>
+    <td></td>
+    <td></td>
+    <td></td>
+  </tr>
+</table>
 
 #### Output Sinks
 There are a few types of built-in output sinks.
