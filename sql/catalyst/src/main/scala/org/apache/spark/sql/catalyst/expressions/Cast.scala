@@ -242,7 +242,7 @@ case class Cast(child: Expression, dataType: DataType)
   // LongConverter
   private[this] def castToLong(from: DataType): Any => Any = from match {
     case StringType =>
-      buildCast[UTF8String](_, s => try s.toString.toLong catch {
+      buildCast[UTF8String](_, s => try s.toLong catch {
         case _: NumberFormatException => null
       })
     case BooleanType =>
@@ -258,7 +258,7 @@ case class Cast(child: Expression, dataType: DataType)
   // IntConverter
   private[this] def castToInt(from: DataType): Any => Any = from match {
     case StringType =>
-      buildCast[UTF8String](_, s => try s.toString.toInt catch {
+      buildCast[UTF8String](_, s => try s.toInt catch {
         case _: NumberFormatException => null
       })
     case BooleanType =>
@@ -274,7 +274,7 @@ case class Cast(child: Expression, dataType: DataType)
   // ShortConverter
   private[this] def castToShort(from: DataType): Any => Any = from match {
     case StringType =>
-      buildCast[UTF8String](_, s => try s.toString.toShort catch {
+      buildCast[UTF8String](_, s => try s.toShort catch {
         case _: NumberFormatException => null
       })
     case BooleanType =>
@@ -290,7 +290,7 @@ case class Cast(child: Expression, dataType: DataType)
   // ByteConverter
   private[this] def castToByte(from: DataType): Any => Any = from match {
     case StringType =>
-      buildCast[UTF8String](_, s => try s.toString.toByte catch {
+      buildCast[UTF8String](_, s => try s.toByte catch {
         case _: NumberFormatException => null
       })
     case BooleanType =>
@@ -493,7 +493,7 @@ case class Cast(child: Expression, dataType: DataType)
     s"""
       boolean $resultNull = $childNull;
       ${ctx.javaType(resultType)} $resultPrim = ${ctx.defaultValue(resultType)};
-      if (!${childNull}) {
+      if (!$childNull) {
         ${cast(childPrim, resultPrim, resultNull)}
       }
     """
@@ -695,7 +695,7 @@ case class Cast(child: Expression, dataType: DataType)
       (c, evPrim, evNull) =>
         s"""
           try {
-            $evPrim = Byte.valueOf($c.toString());
+            $evPrim = $c.toByte();
           } catch (java.lang.NumberFormatException e) {
             $evNull = true;
           }
@@ -717,7 +717,7 @@ case class Cast(child: Expression, dataType: DataType)
       (c, evPrim, evNull) =>
         s"""
           try {
-            $evPrim = Short.valueOf($c.toString());
+            $evPrim = $c.toShort();
           } catch (java.lang.NumberFormatException e) {
             $evNull = true;
           }
@@ -739,7 +739,7 @@ case class Cast(child: Expression, dataType: DataType)
       (c, evPrim, evNull) =>
         s"""
           try {
-            $evPrim = Integer.valueOf($c.toString());
+            $evPrim = $c.toInt();
           } catch (java.lang.NumberFormatException e) {
             $evNull = true;
           }
@@ -761,7 +761,7 @@ case class Cast(child: Expression, dataType: DataType)
       (c, evPrim, evNull) =>
         s"""
           try {
-            $evPrim = Long.valueOf($c.toString());
+            $evPrim = $c.toLong();
           } catch (java.lang.NumberFormatException e) {
             $evNull = true;
           }
