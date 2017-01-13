@@ -41,7 +41,6 @@ object HiveTypeCoercion {
       PromoteStrings ::
       DecimalPrecision ::
       BooleanEquality ::
-      StringToIntegralCasts ::
       FunctionArgumentConversion ::
       CaseWhenCoercion ::
       IfCoercion ::
@@ -544,15 +543,7 @@ object HiveTypeCoercion {
    * type the jvm will throw a `java.lang.NumberFormatException`.  Hive, in contrast, returns the
    * truncated version of this number.
    */
-  object StringToIntegralCasts extends Rule[LogicalPlan] {
-    def apply(plan: LogicalPlan): LogicalPlan = plan resolveExpressions {
-      // Skip nodes who's children have not been resolved yet.
-      case e if !e.childrenResolved => e
 
-      case Cast(e @ StringType(), t: IntegralType) =>
-        Cast(Cast(e, DecimalType.forType(LongType)), t)
-    }
-  }
 
   /**
    * This ensure that the types for various functions are as expected.
