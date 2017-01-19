@@ -715,7 +715,7 @@ private[spark] object JsonProtocol {
       return TaskMetrics.empty
     }
     val metrics = new TaskMetrics
-    metrics.setHostname((json \ "Host Name").extract[String])
+    metrics.setHostname(Utils.jsonOption(json \ "Host Name").map(_.extract[String]).getOrElse(""))
     metrics.setExecutorDeserializeTime((json \ "Executor Deserialize Time").extract[Long])
     metrics.setExecutorRunTime((json \ "Executor Run Time").extract[Long])
     metrics.setResultSize((json \ "Result Size").extract[Long])
@@ -764,7 +764,9 @@ private[spark] object JsonProtocol {
 
   def inputMetricsFromJson(json: JValue): InputMetrics = {
     val metrics = new InputMetrics(
-      DataReadMethod.withName((json \ "Data Read Method").extract[String]))
+      Utils.jsonOption(json \ "Data Read Method").map {
+        m => DataReadMethod.withName(m.extract[String])
+      }.getOrElse(DataReadMethod.Memory))
     metrics.incBytesRead((json \ "Bytes Read").extract[Long])
     metrics.incRecordsRead((json \ "Records Read").extractOpt[Long].getOrElse(0))
     metrics
@@ -772,7 +774,9 @@ private[spark] object JsonProtocol {
 
   def outputMetricsFromJson(json: JValue): OutputMetrics = {
     val metrics = new OutputMetrics(
-      DataWriteMethod.withName((json \ "Data Write Method").extract[String]))
+      Utils.jsonOption(json \ "Data Write Method").map{
+        m => DataWriteMethod.withName(m.extract[String])
+      }.getOrElse(DataWriteMethod.Hadoop))
     metrics.setBytesWritten((json \ "Bytes Written").extract[Long])
     metrics.setRecordsWritten((json \ "Records Written").extractOpt[Long].getOrElse(0))
     metrics
@@ -869,7 +873,7 @@ private[spark] object JsonProtocol {
     val memSize = (json \ "Memory Size").extract[Long]
     // fallback to tachyon for backward compatibility
     val externalBlockStoreSize = (json \ "ExternalBlockStore Size").toSome
-      .getOrElse(json \ "Tachyon Size").extract[Long]
+      .orElse((json \ "Tachyon Size").toSome).map(_.extract[Long]).getOrElse(0L)
     val diskSize = (json \ "Disk Size").extract[Long]
 
     val rddInfo = new RDDInfo(rddId, name, numPartitions, storageLevel, parentIds, callsite, scope)
@@ -885,7 +889,7 @@ private[spark] object JsonProtocol {
     val useMemory = (json \ "Use Memory").extract[Boolean]
     // fallback to tachyon for backward compatability
     val useExternalBlockStore = (json \ "Use ExternalBlockStore").toSome
-      .getOrElse(json \ "Use Tachyon").extract[Boolean]
+      .orElse((json \ "Use Tachyon").toSome).map(_.extract[Boolean]).getOrElse(false)
     val deserialized = (json \ "Deserialized").extract[Boolean]
     val replication = (json \ "Replication").extract[Int]
     StorageLevel(useDisk, useMemory, useExternalBlockStore, deserialized, replication)
@@ -897,7 +901,7 @@ private[spark] object JsonProtocol {
     val diskSize = (json \ "Disk Size").extract[Long]
     // fallback to tachyon for backward compatability
     val externalBlockStoreSize = (json \ "ExternalBlockStore Size").toSome
-      .getOrElse(json \ "Tachyon Size").extract[Long]
+      .orElse((json \ "Tachyon Size").toSome).map(_.extract[Long]).getOrElse(0L)
     BlockStatus(storageLevel, memorySize, diskSize, externalBlockStoreSize)
   }
 

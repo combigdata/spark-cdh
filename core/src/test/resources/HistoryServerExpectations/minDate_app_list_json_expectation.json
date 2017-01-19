@@ -1,4 +1,22 @@
 [ {
+  "id" : "app-20161116163331-0000",
+  "name" : "Spark shell",
+  "attempts" : [ {
+    "startTime" : "2016-11-16T22:33:29.916GMT",
+    "endTime" : "2016-11-16T22:33:40.587GMT",
+    "sparkUser" : "jose",
+    "completed" : true
+  } ]
+}, {
+  "id" : "app-20161115172038-0000",
+  "name" : "Spark shell",
+  "attempts" : [ {
+    "startTime" : "2016-11-15T23:20:37.079GMT",
+    "endTime" : "2016-11-15T23:22:18.874GMT",
+    "sparkUser" : "jose",
+    "completed" : true
+  } ]
+}, {
   "id" : "local-1430917381534",
   "name" : "Spark shell",
   "attempts" : [ {
@@ -7,7 +25,7 @@
     "sparkUser" : "irashid",
     "completed" : true
   } ]
-},  {
+}, {
   "id" : "local-1430917381535",
   "name" : "Spark shell",
   "attempts" : [ {
@@ -40,14 +58,12 @@
     "completed" : true
   } ]
 }, {
-    "id": "local-1425081759269",
-    "name": "Spark shell",
-    "attempts": [
-      {
-        "startTime": "2015-02-28T00:02:38.277GMT",
-        "endTime": "2015-02-28T00:02:46.912GMT",
-        "sparkUser": "irashid",
-        "completed": true
-      }
-    ]
+  "id" : "local-1425081759269",
+  "name" : "Spark shell",
+  "attempts" : [ {
+    "startTime" : "2015-02-28T00:02:38.277GMT",
+    "endTime" : "2015-02-28T00:02:46.912GMT",
+    "sparkUser" : "irashid",
+    "completed" : true
+  } ]
 } ]

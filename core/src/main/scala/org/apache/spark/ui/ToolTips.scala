@@ -90,4 +90,8 @@ private[spark] object ToolTips {
 
   val TASK_TIME =
   "Shaded red when garbage collection (GC) time is over 10% of task time"
+
+  val BLACKLISTED =
+  "Shows if this executor has been blacklisted by the scheduler due to task failures."
+
 }

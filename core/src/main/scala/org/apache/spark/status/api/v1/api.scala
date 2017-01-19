@@ -67,6 +67,7 @@ class ExecutorSummary private[spark](
     val totalInputBytes: Long,
     val totalShuffleRead: Long,
     val totalShuffleWrite: Long,
+    val isBlacklisted: Boolean,
     val maxMemory: Long,
     val executorLogs: Map[String, String])
 

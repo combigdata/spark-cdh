@@ -17,7 +17,7 @@
 
 package org.apache.spark.ui.exec
 
-import scala.collection.mutable.HashMap
+import scala.collection.mutable.{HashMap, HashSet}
 
 import org.apache.spark.{ExceptionFailure, Resubmitted, SparkConf, SparkContext}
 import org.apache.spark.annotation.DeveloperApi
@@ -59,13 +59,15 @@ class ExecutorsListener(storageStatusListener: StorageStatusListener, conf: Spar
   val executorToShuffleRead = HashMap[String, Long]()
   val executorToShuffleWrite = HashMap[String, Long]()
   val executorToLogUrls = HashMap[String, Map[String, String]]()
+  val blacklistedExecutors = HashSet[String]()
   val executorIdToData = HashMap[String, ExecutorUIData]()
 
   def activeStorageStatusList: Seq[StorageStatus] = storageStatusListener.storageStatusList
 
   def deadStorageStatusList: Seq[StorageStatus] = storageStatusListener.deadStorageStatusList
 
-  override def onExecutorAdded(executorAdded: SparkListenerExecutorAdded): Unit = synchronized {
+  override def onExecutorAdded(
+      executorAdded: SparkListenerExecutorAdded): Unit = synchronized {
     val eid = executorAdded.executorId
     executorToLogUrls(eid) = executorAdded.executorInfo.logUrlMap
     executorToTotalCores(eid) = executorAdded.executorInfo.totalCores
@@ -81,7 +83,8 @@ class ExecutorsListener(storageStatusListener: StorageStatusListener, conf: Spar
     uiData.finishReason = Some(executorRemoved.reason)
   }
 
-  override def onApplicationStart(applicationStart: SparkListenerApplicationStart): Unit = {
+  override def onApplicationStart(
+      applicationStart: SparkListenerApplicationStart): Unit = {
     applicationStart.driverLogs.foreach { logs =>
       val storageStatus = activeStorageStatusList.find { s =>
         s.blockManagerId.executorId == SparkContext.LEGACY_DRIVER_IDENTIFIER ||
@@ -91,12 +94,14 @@ class ExecutorsListener(storageStatusListener: StorageStatusListener, conf: Spar
     }
   }
 
-  override def onTaskStart(taskStart: SparkListenerTaskStart): Unit = synchronized {
+  override def onTaskStart(
+      taskStart: SparkListenerTaskStart): Unit = synchronized {
     val eid = taskStart.taskInfo.executorId
     executorToTasksActive(eid) = executorToTasksActive.getOrElse(eid, 0) + 1
   }
 
-  override def onTaskEnd(taskEnd: SparkListenerTaskEnd): Unit = synchronized {
+  override def onTaskEnd(
+      taskEnd: SparkListenerTaskEnd): Unit = synchronized {
     val info = taskEnd.taskInfo
     if (info != null) {
       val eid = info.executorId
@@ -144,4 +149,49 @@ class ExecutorsListener(storageStatusListener: StorageStatusListener, conf: Spar
     }
   }
 
+  private def updateExecutorBlacklist(
+      eid: String,
+      isBlacklisted: Boolean): Unit = {
+    if (isBlacklisted) {
+      blacklistedExecutors += eid
+    } else {
+      blacklistedExecutors -= eid
+    }
+  }
+
+  override def onExecutorBlacklisted(
+      executorBlacklisted: SparkListenerExecutorBlacklisted)
+  : Unit = synchronized {
+    updateExecutorBlacklist(executorBlacklisted.executorId, true)
+  }
+
+  override def onExecutorUnblacklisted(
+      executorUnblacklisted: SparkListenerExecutorUnblacklisted)
+  : Unit = synchronized {
+    updateExecutorBlacklist(executorUnblacklisted.executorId, false)
+  }
+
+  override def onNodeBlacklisted(
+      nodeBlacklisted: SparkListenerNodeBlacklisted)
+  : Unit = synchronized {
+    // Implicitly blacklist every executor associated with this node, and show this in the UI.
+    activeStorageStatusList.foreach { status =>
+      if (status.blockManagerId.host == nodeBlacklisted.hostId) {
+        updateExecutorBlacklist(status.blockManagerId.executorId, true)
+      }
+    }
+  }
+
+  override def onNodeUnblacklisted(
+      nodeUnblacklisted: SparkListenerNodeUnblacklisted)
+  : Unit = synchronized {
+    // Implicitly unblacklist every executor associated with this node, regardless of how
+    // they may have been blacklisted initially (either explicitly through executor blacklisting
+    // or implicitly through node blacklisting). Show this in the UI.
+    activeStorageStatusList.foreach { status =>
+      if (status.blockManagerId.host == nodeUnblacklisted.hostId) {
+        updateExecutorBlacklist(status.blockManagerId.executorId, false)
+      }
+    }
+  }
 }

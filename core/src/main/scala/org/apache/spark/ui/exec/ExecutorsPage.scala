@@ -41,6 +41,7 @@ private[ui] case class ExecutorSummaryInfo(
     totalInputBytes: Long,
     totalShuffleRead: Long,
     totalShuffleWrite: Long,
+    isBlacklisted: Int,
     maxMemory: Long,
     executorLogs: Map[String, String])
 
@@ -129,7 +130,9 @@ private[ui] class ExecutorsPage(
     val memoryUsed = info.memoryUsed
     val diskUsed = info.diskUsed
     val executorStatus =
-      if (info.isActive) {
+      if (info.isBlacklisted) {
+        "Blacklisted"
+      } else if (info.isActive) {
         "Active"
       } else {
         "Dead"
@@ -201,6 +204,7 @@ private[ui] class ExecutorsPage(
     val totalInputBytes = execInfo.map(_.totalInputBytes).sum
     val totalShuffleRead = execInfo.map(_.totalShuffleRead).sum
     val totalShuffleWrite = execInfo.map(_.totalShuffleWrite).sum
+    val blacklistedCount = execInfo.count(_.isBlacklisted)
 
     <tr>
       <td><b>{rowName}({execInfo.size})</b></td>
@@ -229,6 +233,7 @@ private[ui] class ExecutorsPage(
       <td sorttable_customkey={totalShuffleWrite.toString}>
         {Utils.bytesToString(totalShuffleWrite)}
       </td>
+      <td>{blacklistedCount}</td>
     </tr>
   }
 
@@ -257,6 +262,9 @@ private[ui] class ExecutorsPage(
           <span data-toggle="tooltip" data-placement="left" title={ToolTips.SHUFFLE_WRITE}>
             Shuffle Write
           </span>
+        </th>
+        <th>
+          <span data-toggle="tooltip" title={ToolTips.BLACKLISTED}>Blacklisted</span>
         </th>
       </thead>
       <tbody>
@@ -360,6 +368,7 @@ private[spark] object ExecutorsPage {
     val totalShuffleRead = listener.executorToShuffleRead.getOrElse(execId, 0L)
     val totalShuffleWrite = listener.executorToShuffleWrite.getOrElse(execId, 0L)
     val executorLogs = listener.executorToLogUrls.getOrElse(execId, Map.empty)
+    val isBlacklisted = listener.blacklistedExecutors.contains(execId)
 
     new ExecutorSummary(
       execId,
@@ -379,6 +388,7 @@ private[spark] object ExecutorsPage {
       totalInputBytes,
       totalShuffleRead,
       totalShuffleWrite,
+      isBlacklisted,
       maxMem,
       executorLogs
     )
