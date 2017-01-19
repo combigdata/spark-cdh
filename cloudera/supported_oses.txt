@@ -1,0 +1,9 @@
+RedHat5
+RedHat6
+RedHat7
+Ubuntu1404
+Ubuntu1204
+Debian8
+Debian7
+SLES11
+SLES12
