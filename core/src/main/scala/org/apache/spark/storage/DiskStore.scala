@@ -17,13 +17,15 @@
 
 package org.apache.spark.storage
 
-import java.io.{IOException, File, FileOutputStream, RandomAccessFile}
+import java.io.{IOException, File, FileOutputStream, OutputStream, RandomAccessFile}
 import java.nio.ByteBuffer
+import java.nio.channels.{Channels, WritableByteChannel}
 import java.nio.channels.FileChannel.MapMode
 
 import org.apache.spark.Logging
+import org.apache.spark.crypto.CryptoStreamUtils
 import org.apache.spark.serializer.Serializer
-import org.apache.spark.util.Utils
+import org.apache.spark.util.{ByteBufferInputStream, Utils}
 
 /**
  * Stores BlockManager blocks on disk.
@@ -44,7 +46,7 @@ private[spark] class DiskStore(blockManager: BlockManager, diskManager: DiskBloc
     logDebug(s"Attempting to put block $blockId")
     val startTime = System.currentTimeMillis
     val file = diskManager.getFile(blockId)
-    val channel = new FileOutputStream(file).getChannel
+    val channel = Channels.newChannel(newOutputStream(file))
     Utils.tryWithSafeFinally {
       while (bytes.remaining > 0) {
         channel.write(bytes)
@@ -71,11 +73,10 @@ private[spark] class DiskStore(blockManager: BlockManager, diskManager: DiskBloc
       values: Iterator[Any],
       level: StorageLevel,
       returnValues: Boolean): PutResult = {
-
     logDebug(s"Attempting to write values for block $blockId")
     val startTime = System.currentTimeMillis
     val file = diskManager.getFile(blockId)
-    val outputStream = new FileOutputStream(file)
+    val outputStream = newOutputStream(file)
     try {
       Utils.tryWithSafeFinally {
         blockManager.dataSerializeStream(blockId, outputStream, values)
@@ -108,23 +109,33 @@ private[spark] class DiskStore(blockManager: BlockManager, diskManager: DiskBloc
     }
   }
 
-  private def getBytes(file: File, offset: Long, length: Long): Option[ByteBuffer] = {
+  private def newOutputStream(file: File): OutputStream = {
+    val out = new FileOutputStream(file)
+    try {
+      CryptoStreamUtils.wrapForEncryption(out, blockManager.conf)
+    } catch {
+      case e: Exception =>
+        out.close()
+        throw e
+    }
+  }
+
+  private def getBytes(file: File): Option[ByteBuffer] = {
     val channel = new RandomAccessFile(file, "r").getChannel
     Utils.tryWithSafeFinally {
       // For small files, directly read rather than memory map
-      if (length < minMemoryMapBytes) {
-        val buf = ByteBuffer.allocate(length.toInt)
-        channel.position(offset)
+      if (file.length() < minMemoryMapBytes) {
+        val buf = ByteBuffer.allocate(file.length().toInt)
         while (buf.remaining() != 0) {
           if (channel.read(buf) == -1) {
             throw new IOException("Reached EOF before filling buffer\n" +
-              s"offset=$offset\nfile=${file.getAbsolutePath}\nbuf.remaining=${buf.remaining}")
+              s"file=${file.getAbsolutePath}\nbuf.remaining=${buf.remaining}")
           }
         }
         buf.flip()
         Some(buf)
       } else {
-        Some(channel.map(MapMode.READ_ONLY, offset, length))
+        Some(channel.map(MapMode.READ_ONLY, 0, file.length()))
       }
     } {
       channel.close()
@@ -133,15 +144,15 @@ private[spark] class DiskStore(blockManager: BlockManager, diskManager: DiskBloc
 
   override def getBytes(blockId: BlockId): Option[ByteBuffer] = {
     val file = diskManager.getFile(blockId.name)
-    getBytes(file, 0, file.length)
-  }
-
-  def getBytes(segment: FileSegment): Option[ByteBuffer] = {
-    getBytes(segment.file, segment.offset, segment.length)
+    getBytes(file)
   }
 
   override def getValues(blockId: BlockId): Option[Iterator[Any]] = {
-    getBytes(blockId).map(buffer => blockManager.dataDeserialize(blockId, buffer))
+    getBytes(blockId).map { buffer =>
+      val in = new ByteBufferInputStream(buffer)
+      val decrypted = CryptoStreamUtils.wrapForEncryption(in, blockManager.conf)
+      blockManager.dataDeserializeStream(blockId, decrypted)
+    }
   }
 
   override def remove(blockId: BlockId): Boolean = {

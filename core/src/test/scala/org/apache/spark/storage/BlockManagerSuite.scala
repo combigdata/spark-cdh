@@ -21,6 +21,7 @@ import java.nio.{ByteBuffer, MappedByteBuffer}
 import java.util.Arrays
 import java.util.concurrent.CountDownLatch
 
+import com.google.common.io.ByteStreams
 import scala.collection.mutable.ArrayBuffer
 import scala.concurrent.duration._
 import scala.concurrent.Future
@@ -34,6 +35,7 @@ import org.scalatest.concurrent.Timeouts._
 
 import org.apache.spark._
 import org.apache.spark.broadcast.BroadcastManager
+import org.apache.spark.crypto.CryptoStreamUtils
 import org.apache.spark.executor.DataReadMethod
 import org.apache.spark.memory.StaticMemoryManager
 
@@ -41,6 +43,7 @@ import org.apache.spark.network.{BlockDataManager, BlockTransferService}
 import org.apache.spark.network.buffer.{ManagedBuffer, NioManagedBuffer}
 import org.apache.spark.network.netty.NettyBlockTransferService
 import org.apache.spark.network.shuffle.BlockFetchingListener
+import org.apache.spark.network.util.JavaUtils
 import org.apache.spark.rpc.RpcEnv
 import org.apache.spark.scheduler.LiveListenerBus
 import org.apache.spark.serializer.{JavaSerializer, KryoSerializer}
@@ -646,77 +649,116 @@ class BlockManagerSuite extends SparkFunSuite with Matchers with BeforeAndAfterE
     }
   }
 
-  test("on-disk storage") {
-    store = makeBlockManager(1200)
-    val a1 = new Array[Byte](400)
-    val a2 = new Array[Byte](400)
-    val a3 = new Array[Byte](400)
-    store.putSingle("a1", a1, StorageLevel.DISK_ONLY)
-    store.putSingle("a2", a2, StorageLevel.DISK_ONLY)
-    store.putSingle("a3", a3, StorageLevel.DISK_ONLY)
-    assert(store.getSingle("a2").isDefined, "a2 was in store")
-    assert(store.getSingle("a3").isDefined, "a3 was in store")
-    assert(store.getSingle("a1").isDefined, "a1 was in store")
-  }
+  Seq(false, true).foreach { encrypt =>
+    def encryptionTest(name: String)(fn: => Unit) {
+      test(s"$name (encrypt = $encrypt)") {
+        if (encrypt) {
+          val env = mock(classOf[SparkEnv])
+          val sm = new SecurityManager(conf, Some(new Array[Byte](16)))
+          when(env.securityManager).thenReturn(sm)
+          SparkEnv.set(env)
+        }
+        try {
+          fn
+        } finally {
+          SparkEnv.set(null)
+        }
+      }
+    }
 
-  test("disk and memory storage") {
-    store = makeBlockManager(12000)
-    val a1 = new Array[Byte](4000)
-    val a2 = new Array[Byte](4000)
-    val a3 = new Array[Byte](4000)
-    store.putSingle("a1", a1, StorageLevel.MEMORY_AND_DISK)
-    store.putSingle("a2", a2, StorageLevel.MEMORY_AND_DISK)
-    store.putSingle("a3", a3, StorageLevel.MEMORY_AND_DISK)
-    assert(store.getSingle("a2").isDefined, "a2 was not in store")
-    assert(store.getSingle("a3").isDefined, "a3 was not in store")
-    assert(store.memoryStore.getValues("a1") == None, "a1 was in memory store")
-    assert(store.getSingle("a1").isDefined, "a1 was not in store")
-    assert(store.memoryStore.getValues("a1").isDefined, "a1 was not in memory store")
-  }
+    def testDiskBlock(store: BlockManager, block: BlockId): Unit = {
+      val data = store.diskStore.getBytes(block).get
+      if (encrypt) {
+        // When encrypting, the block on disk should not have all zeros like the source data past
+        // the initialization vector.
+        val encrypted = JavaUtils.bufferToArray(data.duplicate())
+        assert(!encrypted.drop(CryptoStreamUtils.IV_LENGTH_IN_BYTES).forall(_ == 0))
+      }
 
-  test("disk and memory storage with getLocalBytes") {
-    store = makeBlockManager(12000)
-    val a1 = new Array[Byte](4000)
-    val a2 = new Array[Byte](4000)
-    val a3 = new Array[Byte](4000)
-    store.putSingle("a1", a1, StorageLevel.MEMORY_AND_DISK)
-    store.putSingle("a2", a2, StorageLevel.MEMORY_AND_DISK)
-    store.putSingle("a3", a3, StorageLevel.MEMORY_AND_DISK)
-    assert(store.getLocalBytes("a2").isDefined, "a2 was not in store")
-    assert(store.getLocalBytes("a3").isDefined, "a3 was not in store")
-    assert(store.memoryStore.getValues("a1") == None, "a1 was in memory store")
-    assert(store.getLocalBytes("a1").isDefined, "a1 was not in store")
-    assert(store.memoryStore.getValues("a1").isDefined, "a1 was not in memory store")
-  }
+      // Decrypt the data (which should be a no-op if encryption is disabled) and make sure it's
+      // all zeros.
+      val bytes = store.dataDeserialize(block, data).next.asInstanceOf[Array[Byte]]
+      assert(bytes.forall(_ == 0))
+    }
 
-  test("disk and memory storage with serialization") {
-    store = makeBlockManager(12000)
-    val a1 = new Array[Byte](4000)
-    val a2 = new Array[Byte](4000)
-    val a3 = new Array[Byte](4000)
-    store.putSingle("a1", a1, StorageLevel.MEMORY_AND_DISK_SER)
-    store.putSingle("a2", a2, StorageLevel.MEMORY_AND_DISK_SER)
-    store.putSingle("a3", a3, StorageLevel.MEMORY_AND_DISK_SER)
-    assert(store.getSingle("a2").isDefined, "a2 was not in store")
-    assert(store.getSingle("a3").isDefined, "a3 was not in store")
-    assert(store.memoryStore.getValues("a1") == None, "a1 was in memory store")
-    assert(store.getSingle("a1").isDefined, "a1 was not in store")
-    assert(store.memoryStore.getValues("a1").isDefined, "a1 was not in memory store")
-  }
+    encryptionTest("on-disk storage") {
+      store = makeBlockManager(1200)
+      val a1 = new Array[Byte](400)
+      val a2 = new Array[Byte](400)
+      val a3 = new Array[Byte](400)
+      store.putSingle("a1", a1, StorageLevel.DISK_ONLY)
+      store.putSingle("a2", a2, StorageLevel.DISK_ONLY)
+      store.putSingle("a3", a3, StorageLevel.DISK_ONLY)
+      assert(store.getSingle("a2").isDefined, "a2 was in store")
+      assert(store.getSingle("a3").isDefined, "a3 was in store")
+      assert(store.getSingle("a1").isDefined, "a1 was in store")
+      testDiskBlock(store, "a1")
+    }
 
-  test("disk and memory storage with serialization and getLocalBytes") {
-    store = makeBlockManager(12000)
-    val a1 = new Array[Byte](4000)
-    val a2 = new Array[Byte](4000)
-    val a3 = new Array[Byte](4000)
-    store.putSingle("a1", a1, StorageLevel.MEMORY_AND_DISK_SER)
-    store.putSingle("a2", a2, StorageLevel.MEMORY_AND_DISK_SER)
-    store.putSingle("a3", a3, StorageLevel.MEMORY_AND_DISK_SER)
-    assert(store.getLocalBytes("a2").isDefined, "a2 was not in store")
-    assert(store.getLocalBytes("a3").isDefined, "a3 was not in store")
-    assert(store.memoryStore.getValues("a1") == None, "a1 was in memory store")
-    assert(store.getLocalBytes("a1").isDefined, "a1 was not in store")
-    assert(store.memoryStore.getValues("a1").isDefined, "a1 was not in memory store")
+    encryptionTest("disk and memory storage") {
+      store = makeBlockManager(12000)
+      val a1 = new Array[Byte](4000)
+      val a2 = new Array[Byte](4000)
+      val a3 = new Array[Byte](4000)
+      store.putSingle("a1", a1, StorageLevel.MEMORY_AND_DISK)
+      store.putSingle("a2", a2, StorageLevel.MEMORY_AND_DISK)
+      store.putSingle("a3", a3, StorageLevel.MEMORY_AND_DISK)
+      assert(store.getSingle("a2").isDefined, "a2 was not in store")
+      assert(store.getSingle("a3").isDefined, "a3 was not in store")
+      assert(store.memoryStore.getValues("a1") == None, "a1 was in memory store")
+      assert(store.getSingle("a1").isDefined, "a1 was not in store")
+      testDiskBlock(store, "a1")
+      assert(store.memoryStore.getValues("a1").isDefined, "a1 was not in memory store")
+    }
+
+    encryptionTest("disk and memory storage with getLocalBytes") {
+      store = makeBlockManager(12000)
+      val a1 = new Array[Byte](4000)
+      val a2 = new Array[Byte](4000)
+      val a3 = new Array[Byte](4000)
+      store.putSingle("a1", a1, StorageLevel.MEMORY_AND_DISK)
+      store.putSingle("a2", a2, StorageLevel.MEMORY_AND_DISK)
+      store.putSingle("a3", a3, StorageLevel.MEMORY_AND_DISK)
+      assert(store.getLocalBytes("a2").isDefined, "a2 was not in store")
+      assert(store.getLocalBytes("a3").isDefined, "a3 was not in store")
+      assert(store.memoryStore.getValues("a1") == None, "a1 was in memory store")
+      assert(store.getLocalBytes("a1").isDefined, "a1 was not in store")
+      testDiskBlock(store, "a1")
+      assert(store.memoryStore.getValues("a1").isDefined, "a1 was not in memory store")
+    }
+
+    encryptionTest("disk and memory storage with serialization") {
+      store = makeBlockManager(12000)
+      val a1 = new Array[Byte](4000)
+      val a2 = new Array[Byte](4000)
+      val a3 = new Array[Byte](4000)
+      store.putSingle("a1", a1, StorageLevel.MEMORY_AND_DISK_SER)
+      store.putSingle("a2", a2, StorageLevel.MEMORY_AND_DISK_SER)
+      store.putSingle("a3", a3, StorageLevel.MEMORY_AND_DISK_SER)
+      assert(store.getSingle("a2").isDefined, "a2 was not in store")
+      assert(store.getSingle("a3").isDefined, "a3 was not in store")
+      assert(store.memoryStore.getValues("a1") == None, "a1 was in memory store")
+      assert(store.getSingle("a1").isDefined, "a1 was not in store")
+      testDiskBlock(store, "a1")
+      assert(store.memoryStore.getValues("a1").isDefined, "a1 was not in memory store")
+    }
+
+    encryptionTest("disk and memory storage with serialization and getLocalBytes") {
+      store = makeBlockManager(12000)
+      val a1 = new Array[Byte](4000)
+      val a2 = new Array[Byte](4000)
+      val a3 = new Array[Byte](4000)
+      store.putSingle("a1", a1, StorageLevel.MEMORY_AND_DISK_SER)
+      store.putSingle("a2", a2, StorageLevel.MEMORY_AND_DISK_SER)
+      store.putSingle("a3", a3, StorageLevel.MEMORY_AND_DISK_SER)
+      assert(store.getLocalBytes("a2").isDefined, "a2 was not in store")
+      assert(store.getLocalBytes("a3").isDefined, "a3 was not in store")
+      assert(store.memoryStore.getValues("a1") == None, "a1 was in memory store")
+      assert(store.getLocalBytes("a1").isDefined, "a1 was not in store")
+      testDiskBlock(store, "a1")
+      assert(store.memoryStore.getValues("a1").isDefined, "a1 was not in memory store")
+    }
+
   }
 
   test("LRU with mixed storage levels") {

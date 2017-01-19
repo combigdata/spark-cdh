@@ -92,7 +92,7 @@ private[spark] class MemoryStore(blockManager: BlockManager, memoryManager: Memo
     val bytes = _bytes.duplicate()
     bytes.rewind()
     if (level.deserialized) {
-      val values = blockManager.dataDeserialize(blockId, bytes)
+      val values = blockManager.dataDeserialize(blockId, bytes, skipEncryption = true)
       putIterator(blockId, values, level, returnValues = true)
     } else {
       val droppedBlocks = new ArrayBuffer[(BlockId, BlockStatus)]
@@ -208,7 +208,7 @@ private[spark] class MemoryStore(blockManager: BlockManager, memoryManager: Memo
       Some(entry.value.asInstanceOf[Array[Any]].iterator)
     } else {
       val buffer = entry.value.asInstanceOf[ByteBuffer].duplicate() // Doesn't actually copy data
-      Some(blockManager.dataDeserialize(blockId, buffer))
+      Some(blockManager.dataDeserialize(blockId, buffer, skipEncryption = true))
     }
   }
 

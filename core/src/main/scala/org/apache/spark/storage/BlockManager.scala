@@ -19,6 +19,7 @@ package org.apache.spark.storage
 
 import java.io._
 import java.nio.{ByteBuffer, MappedByteBuffer}
+import java.nio.channels.Channels
 import java.util.concurrent.ConcurrentHashMap
 
 import scala.collection.mutable.{ArrayBuffer, HashMap}
@@ -31,6 +32,7 @@ import scala.collection.JavaConverters._
 import sun.nio.ch.DirectBuffer
 
 import org.apache.spark._
+import org.apache.spark.crypto.CryptoStreamUtils
 import org.apache.spark.executor.{DataReadMethod, ShuffleWriteMetrics}
 import org.apache.spark.io.CompressionCodec
 import org.apache.spark.memory.MemoryManager
@@ -541,7 +543,17 @@ private[spark] class BlockManager(
                 // put it into MemoryStore, copyForMemory should not be created. That's why this
                 // action is put into a `() => ByteBuffer` and created lazily.
                 val copyForMemory = ByteBuffer.allocate(bytes.limit)
-                copyForMemory.put(bytes)
+                val in = CryptoStreamUtils.wrapForEncryption(
+                  new ByteBufferInputStream(bytes, true), conf)
+                val channel = Channels.newChannel(in)
+                Utils.tryWithSafeFinally {
+                  while (copyForMemory.remaining() > 0 && channel.read(copyForMemory) >= 0) {
+                    // Nothing here.
+                  }
+                } {
+                  channel.close()
+                }
+                copyForMemory
               })
               bytes.rewind()
             }
@@ -1296,9 +1308,14 @@ private[spark] class BlockManager(
    * Deserializes a ByteBuffer into an iterator of values and disposes of it when the end of
    * the iterator is reached.
    */
-  def dataDeserialize(blockId: BlockId, bytes: ByteBuffer): Iterator[Any] = {
+  def dataDeserialize(
+      blockId: BlockId,
+      bytes: ByteBuffer,
+      skipEncryption: Boolean = false): Iterator[Any] = {
     bytes.rewind()
-    dataDeserializeStream(blockId, new ByteBufferInputStream(bytes, true))
+    val in = new ByteBufferInputStream(bytes, true)
+    val decrypted = if (skipEncryption) in else CryptoStreamUtils.wrapForEncryption(in, conf)
+    dataDeserializeStream(blockId, decrypted)
   }
 
   /**
