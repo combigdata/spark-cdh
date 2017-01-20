@@ -289,7 +289,8 @@ private[spark] class ApplicationMaster(
     // be run up front, to avoid printing this out for every single executor being launched.
     // Use placeholders for information that changes such as executor IDs.
     logInfo {
-      val executorMemory = _sparkConf.getSizeAsMb("spark.executor.memory", "1024m").toInt
+      val executorMemory = Utils.memoryStringToMb(
+        _sparkConf.get("spark.executor.memory", "1g")).toInt
       val executorCores = _sparkConf.getInt("spark.executor.cores", 1)
       val dummyRunner = new ExecutorRunnable(None, yarnConf, _sparkConf, driverUrl, "<executorId>",
         "<hostname>", executorMemory, executorCores, appId, securityMgr)
