@@ -274,14 +274,14 @@ private[spark] class Client(
   /**
    * Fail fast if we have requested more resources per container than is available in the cluster.
    */
-  private def verifyClusterResources(newAppResponse: GetNewApplicationResponse): Unit = {
+  private[spark] def verifyClusterResources(newAppResponse: GetNewApplicationResponse): Unit = {
     import YarnSparkHadoopUtil._
 
     // This may not be accurate in cluster mode. If the user is setting the config via SparkConf,
     // that value is not visible here, so the check might fail (in case the user is setting a
     // smaller value). But that should be rare.
     val executorMemory = args.executorMemory.getOrElse(
-      sparkConf.getSizeAsMb("spark.executor.memory", "1g").toInt)
+      Utils.memoryStringToMb(sparkConf.get("spark.executor.memory", "1g")).toInt)
     val executorMemoryOverhead = sparkConf.getInt("spark.yarn.executor.memoryOverhead",
       math.max((MEMORY_OVERHEAD_FACTOR * executorMemory).toInt, MEMORY_OVERHEAD_MIN))
 
