@@ -38,7 +38,7 @@ import org.apache.spark.deploy.yarn.YarnSparkHadoopUtil._
 import org.apache.spark.rpc.{RpcCallContext, RpcEndpointRef}
 import org.apache.spark.scheduler.{ExecutorExited, ExecutorLossReason}
 import org.apache.spark.scheduler.cluster.CoarseGrainedClusterMessages.RemoveExecutor
-import org.apache.spark.util.ThreadUtils
+import org.apache.spark.util.{ThreadUtils, Utils}
 
 /**
  * YarnAllocator is charged with requesting containers from the YARN ResourceManager and deciding
@@ -108,7 +108,8 @@ private[yarn] class YarnAllocator(
   private val containerIdToExecutorId = new HashMap[ContainerId, String]
 
   // Executor memory in MB.
-  protected val executorMemory = sparkConf.getSizeAsMb("spark.executor.memory", "1g").toInt
+  protected val executorMemory = Utils.memoryStringToMb(
+    sparkConf.get("spark.executor.memory", "1g")).toInt
   // Additional memory overhead.
   protected val memoryOverhead: Int = sparkConf.getInt("spark.yarn.executor.memoryOverhead",
     math.max((MEMORY_OVERHEAD_FACTOR * executorMemory).toInt, MEMORY_OVERHEAD_MIN))

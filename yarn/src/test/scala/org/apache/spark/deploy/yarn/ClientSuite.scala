@@ -39,6 +39,7 @@ import org.mockito.Mockito._
 import org.scalatest.{BeforeAndAfterAll, Matchers}
 
 import org.apache.spark.{SparkConf, SparkFunSuite}
+import org.apache.spark.network.util.ByteUnit
 import org.apache.spark.util.Utils
 
 class ClientSuite extends SparkFunSuite with Matchers with BeforeAndAfterAll {
@@ -204,6 +205,48 @@ class ClientSuite extends SparkFunSuite with Matchers with BeforeAndAfterAll {
       tags.asScala.filter(_.nonEmpty).size should be (4)
     }
     appContext.getMaxAppAttempts should be (42)
+  }
+
+  test("cluster memory validation") {
+    val response = mock(classOf[GetNewApplicationResponse])
+    val resource = mock(classOf[Resource])
+    when(resource.getMemory()).thenReturn(2000)
+    when(response.getMaximumResourceCapability()).thenReturn(resource)
+
+    def makeClient(mem: Int, overhead: String): Client = {
+      val memory = ByteUnit.MiB.convertTo(mem, ByteUnit.BYTE).toString()
+      val conf = new SparkConf()
+        .set("spark.executor.memory", memory)
+        .set("spark.yarn.am.memory", memory)
+      if (overhead != null) {
+        conf.set("spark.yarn.executor.memoryOverhead", overhead)
+          .set("spark.yarn.am.memoryOverhead", overhead)
+      }
+      new Client(new ClientArguments(Array(), conf), new Configuration(), conf)
+    }
+
+    // Tuples of (memory in MB, optional overhead). The values are adjusted to be large because
+    // the minimum overhead is 384m.
+    val valid = Seq(
+      (1000, "500"),
+      (1500, null),
+      (1600, "400"),
+      (1800, "100"))
+    val invalid = Seq(
+      (1000, "1500"),
+      (1500, "600"),
+      (1700, null))
+
+    valid.foreach { case (mem, overhead) =>
+      makeClient(mem, overhead).verifyClusterResources(response)
+    }
+
+    invalid.foreach { case (mem, overhead) =>
+      intercept[IllegalArgumentException] {
+        makeClient(mem, overhead).verifyClusterResources(response)
+      }
+    }
+
   }
 
   object Fixtures {

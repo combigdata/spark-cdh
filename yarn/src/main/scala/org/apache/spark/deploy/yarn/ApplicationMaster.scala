@@ -281,6 +281,7 @@ private[spark] class ApplicationMaster(
         SparkEnv.driverActorSystemName,
         RpcAddress(_sparkConf.get("spark.driver.host"), _sparkConf.get("spark.driver.port").toInt),
         CoarseGrainedSchedulerBackend.ENDPOINT_NAME)
+
     allocator = client.register(driverUrl,
       driverRef,
       yarnConf,
