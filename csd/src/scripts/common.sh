@@ -353,20 +353,6 @@ function deploy_client_config {
     echo "spark.yarn.appMasterEnv.PYSPARK_DRIVER_PYTHON=$CDH_PYTHON" >> "$SPARK_DEFAULTS"
   fi
 
-  # Modify the YARN configuration to use the topology script from Spark's config directory.
-  # Also need to manually fix the permissions so that the script is executable.
-  # If the config doesn't exist (e.g. for standalone, which depends on HDFS and not YARN),
-  # we need to add the "|| true" hack to avoid an error in the caller (because of set -e).
-  OLD_TOPOLOGY_SCRIPT=$(get_hadoop_conf "$HADOOP_CLIENT_CONF_DIR" "net.topology.script.file.name" || true)
-  if [ -n "$OLD_TOPOLOGY_SCRIPT" ]; then
-    SCRIPT_NAME=$(basename "$OLD_TOPOLOGY_SCRIPT")
-    NEW_TOPOLOGY_SCRIPT="$TARGET_HADOOP_CONF_DIR/$SCRIPT_NAME"
-    CORE_SITE="$HADOOP_CLIENT_CONF_DIR/core-site.xml"
-    chmod 755 "$HADOOP_CLIENT_CONF_DIR/$SCRIPT_NAME"
-    sed "s,$OLD_TOPOLOGY_SCRIPT,$NEW_TOPOLOGY_SCRIPT," "$CORE_SITE" > "$CORE_SITE.tmp"
-    mv "$CORE_SITE.tmp" "$CORE_SITE"
-  fi
-
   # These values cannot be declared in the descriptor, since the CSD framework will
   # treat them as config references and fail. So add them here unless they've already
   # been set by the user in the safety valve.
