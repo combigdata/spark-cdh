@@ -268,17 +268,19 @@ private[hive] class HiveClientImpl(
    */
   def withHiveState[A](f: => A): A = retryLocked {
     val original = Thread.currentThread().getContextClassLoader
-    // Set the thread local metastore client to the client associated with this HiveClientImpl.
-    Hive.set(client)
     // The classloader in clientLoader could be changed after addJar, always use the latest
     // classloader
     state.getConf.setClassLoader(clientLoader.classLoader)
+    Thread.currentThread().setContextClassLoader(clientLoader.classLoader)
+    // Set the thread local metastore client to the client associated with this ClientWrapper.
+    Hive.set(client)
     // setCurrentSessionState will use the classLoader associated
     // with the HiveConf in `state` to override the context class loader of the current
     // thread.
     shim.setCurrentSessionState(state)
     val ret = try f finally {
       Thread.currentThread().setContextClassLoader(original)
+      state.getConf.setClassLoader(original)
     }
     ret
   }
