@@ -30,6 +30,7 @@ import org.eclipse.jetty.server.handler._
 import org.eclipse.jetty.server.nio.SelectChannelConnector
 import org.eclipse.jetty.server.ssl.SslSelectChannelConnector
 import org.eclipse.jetty.servlet._
+import org.eclipse.jetty.util.component.LifeCycle
 import org.eclipse.jetty.util.thread.QueuedThreadPool
 import org.json4s.JValue
 import org.json4s.jackson.JsonMethods.{pretty, render}
@@ -41,6 +42,9 @@ import org.apache.spark.util.Utils
  * Utilities for launching a web server using Jetty's HTTP Server class
  */
 private[spark] object JettyUtils extends Logging {
+
+  val SPARK_CONNECTOR_NAME = "Spark"
+  val REDIRECT_CONNECTOR_NAME = "HttpsRedirect"
 
   // Base type for a function that returns something based on an HTTP request. Allows for
   // implicit conversion from many types of functions to jetty Handlers.
@@ -232,45 +236,53 @@ private[spark] object JettyUtils extends Logging {
       conf: SparkConf,
       serverName: String = ""): ServerInfo = {
 
-    val collection = new ContextHandlerCollection
     addFilters(handlers, conf)
 
     val gzipHandlers = handlers.map { h =>
+      h.setConnectorNames(Array(SPARK_CONNECTOR_NAME))
+
       val gzipHandler = new GzipHandler
       gzipHandler.setHandler(h)
       gzipHandler
     }
 
     // Bind to the given port, or throw a java.net.BindException if the port is occupied
-    def connect(currentPort: Int): (Server, Int) = {
+    def connect(currentPort: Int): ((Server, Option[Int]), Int) = {
       val server = new Server
-      val connectors = new ArrayBuffer[Connector]
+      val connectors = new ArrayBuffer[Connector]()
+      val collection = new ContextHandlerCollection
+
       // Create a connector on port currentPort to listen for HTTP requests
       val httpConnector = new SelectChannelConnector()
       httpConnector.setPort(currentPort)
       connectors += httpConnector
 
-      sslOptions.createJettySslContextFactory().foreach { factory =>
-        // If the new port wraps around, do not try a privileged port.
-        val securePort =
-          if (currentPort != 0) {
-            (currentPort + 400 - 1024) % (65536 - 1024) + 1024
-          } else {
-            0
-          }
-        val scheme = "https"
-        // Create a connector on port securePort to listen for HTTPS requests
-        val connector = new SslSelectChannelConnector(factory)
-        connector.setPort(securePort)
-        connectors += connector
+      val httpsConnector = sslOptions.createJettySslContextFactory() match {
+        case Some(factory) =>
+          // If the new port wraps around, do not try a privileged port.
+          val securePort =
+            if (currentPort != 0) {
+              (currentPort + 400 - 1024) % (65536 - 1024) + 1024
+            } else {
+              0
+            }
+          val scheme = "https"
+          // Create a connector on port securePort to listen for HTTPS requests
+          val connector = new SslSelectChannelConnector(factory)
+          connector.setPort(securePort)
+          connector.setName(SPARK_CONNECTOR_NAME)
+          connectors += connector
 
-        // redirect the HTTP requests to HTTPS port
-        collection.addHandler(createRedirectHttpsHandler(securePort, scheme))
+          // redirect the HTTP requests to HTTPS port
+          httpConnector.setName(REDIRECT_CONNECTOR_NAME)
+          collection.addHandler(createRedirectHttpsHandler(securePort, scheme))
+          Some(connector)
+
+        case None =>
+          // No SSL, so the HTTP connector becomes the official one where all contexts bind.
+          httpConnector.setName(SPARK_CONNECTOR_NAME)
+          None
       }
-
-      gzipHandlers.foreach(collection.addHandler)
-      connectors.foreach(_.setHost(hostName))
-      server.setConnectors(connectors.toArray)
 
       val pool = new QueuedThreadPool
       pool.setDaemon(true)
@@ -278,10 +290,14 @@ private[spark] object JettyUtils extends Logging {
       val errorHandler = new ErrorHandler()
       errorHandler.setShowStacks(true)
       server.addBean(errorHandler)
+
+      gzipHandlers.foreach(collection.addHandler)
       server.setHandler(collection)
+
+      server.setConnectors(connectors.toArray)
       try {
         server.start()
-        (server, server.getConnectors.head.getLocalPort)
+        ((server, httpsConnector.map(_.getLocalPort())), httpConnector.getLocalPort)
       } catch {
         case e: Exception =>
           server.stop()
@@ -290,13 +306,16 @@ private[spark] object JettyUtils extends Logging {
       }
     }
 
-    val (server, boundPort) = Utils.startServiceOnPort[Server](port, connect, conf, serverName)
-    ServerInfo(server, boundPort, collection)
+    val ((server, securePort), boundPort) = Utils.startServiceOnPort(port, connect, conf,
+      serverName)
+    ServerInfo(server, boundPort, securePort,
+      server.getHandler().asInstanceOf[ContextHandlerCollection])
   }
 
   private def createRedirectHttpsHandler(securePort: Int, scheme: String): ContextHandler = {
     val redirectHandler: ContextHandler = new ContextHandler
     redirectHandler.setContextPath("/")
+    redirectHandler.setConnectorNames(Array(REDIRECT_CONNECTOR_NAME))
     redirectHandler.setHandler(new AbstractHandler {
       override def handle(
           target: String,
@@ -334,4 +353,31 @@ private[spark] object JettyUtils extends Logging {
 private[spark] case class ServerInfo(
     server: Server,
     boundPort: Int,
-    rootHandler: ContextHandlerCollection)
+    securePort: Option[Int],
+    private val rootHandler: ContextHandlerCollection) {
+
+  def addHandler(handler: ContextHandler): Unit = {
+    handler.setConnectorNames(Array(JettyUtils.SPARK_CONNECTOR_NAME))
+    rootHandler.addHandler(handler)
+    if (!handler.isStarted()) {
+      handler.start()
+    }
+  }
+
+  def removeHandler(handler: ContextHandler): Unit = {
+    rootHandler.removeHandler(handler)
+    if (handler.isStarted) {
+      handler.stop()
+    }
+  }
+
+  def stop(): Unit = {
+    server.stop()
+    // Stop the ThreadPool if it supports stop() method (through LifeCycle).
+    // It is needed because stopping the Server won't stop the ThreadPool it uses.
+    val threadPool = server.getThreadPool
+    if (threadPool != null && threadPool.isInstanceOf[LifeCycle]) {
+      threadPool.asInstanceOf[LifeCycle].stop
+    }
+  }
+}
