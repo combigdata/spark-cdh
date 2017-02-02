@@ -100,6 +100,7 @@
     <module>sql/catalyst</module>
     <module>sql/core</module>
     <module>sql/hive</module>
+    <module>sql/hive-exec</module>
     <module>assembly</module>
     <module>external/flume</module>
     <module>external/flume-sink</module>
@@ -1354,7 +1355,7 @@
         <groupId>${hive.group}</groupId>
         <artifactId>hive-common</artifactId>
         <version>${hive.version}</version>
-        <scope>${hive.deps.scope}</scope>
+        <scope>provided</scope>
         <exclusions>
           <exclusion>
             <groupId>${hive.group}</groupId>
@@ -1390,11 +1391,9 @@
       <dependency>
         <groupId>${hive.group}</groupId>
         <artifactId>hive-exec</artifactId>
-<!--
         <classifier>core</classifier>
--->
         <version>${hive.version}</version>
-        <scope>${hive.deps.scope}</scope>
+        <scope>provided</scope>
         <exclusions>
 
           <!-- pull this in when needed; the explicit definition culls the surplis-->
