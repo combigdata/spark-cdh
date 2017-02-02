@@ -37,4 +37,4 @@ MVN_REPO_LOCAL=$HOME/.m2/repository${M2_REPO_SUFFIX}
 export MAVEN_OPTS="-XX:PermSize=1024m -XX:MaxPermSize=1024m -XX:ReservedCodeCacheSize=512m"
 
 export APACHE_MIRROR=http://mirror.infra.cloudera.com/apache
-./build/mvn --force -B -Dcdh.build=true -P-hive test -fae -Dmaven.repo.local="$MVN_REPO_LOCAL"
+./build/mvn --force -B -Dcdh.build=true -P-hive package -fae -Dmaven.repo.local="$MVN_REPO_LOCAL"

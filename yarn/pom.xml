@@ -187,9 +187,25 @@
      It doesn't need the spark hive modules, so the -Phive flag is not checked.
       -->
     <dependency>
-      <groupId>${hive.group}</groupId>
-      <artifactId>hive-exec</artifactId>
+      <groupId>org.apache.spark</groupId>
+      <artifactId>spark-hive-exec_${scala.binary.version}</artifactId>
+      <version>${project.version}</version>
       <scope>test</scope>
+      <exclusions>
+        <!-- Exclude shaded dependencies to avoid them showing up during testing. -->
+        <exclusion>
+          <groupId>${hive.group}</groupId>
+          <artifactId>hive-common</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>${hive.group}</groupId>
+          <artifactId>hive-exec</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>com.esotericsoftware.kryo</groupId>
+          <artifactId>kryo</artifactId>
+        </exclusion>
+      </exclusions>
     </dependency>
     <dependency>
       <groupId>${hive.group}</groupId>

@@ -80,11 +80,24 @@
     </dependency>
 -->
     <dependency>
-      <groupId>${hive.group}</groupId>
-      <artifactId>hive-exec</artifactId>
-<!--
-      <classifier>core</classifier>
--->
+      <groupId>org.apache.spark</groupId>
+      <artifactId>spark-hive-exec_${scala.binary.version}</artifactId>
+      <version>${project.version}</version>
+      <exclusions>
+        <!-- Exclude shaded dependencies to avoid them showing up during testing. -->
+        <exclusion>
+          <groupId>${hive.group}</groupId>
+          <artifactId>hive-common</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>${hive.group}</groupId>
+          <artifactId>hive-exec</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>com.esotericsoftware.kryo</groupId>
+          <artifactId>kryo</artifactId>
+        </exclusion>
+      </exclusions>
     </dependency>
     <dependency>
       <groupId>${hive.group}</groupId>
