@@ -317,7 +317,7 @@ private[spark] class BlockManager(
    * Put the block locally, using the given storage level.
    */
   override def putBlockData(blockId: BlockId, data: ManagedBuffer, level: StorageLevel): Unit = {
-    putBytes(blockId, data.nioByteBuffer(), level)
+    putBytes(blockId, data.nioByteBuffer(), level, alreadyEncrypted = true)
   }
 
   /**
@@ -543,17 +543,7 @@ private[spark] class BlockManager(
                 // put it into MemoryStore, copyForMemory should not be created. That's why this
                 // action is put into a `() => ByteBuffer` and created lazily.
                 val copyForMemory = ByteBuffer.allocate(bytes.limit)
-                val in = CryptoStreamUtils.wrapForEncryption(
-                  new ByteBufferInputStream(bytes, true), conf)
-                val channel = Channels.newChannel(in)
-                Utils.tryWithSafeFinally {
-                  while (copyForMemory.remaining() > 0 && channel.read(copyForMemory) >= 0) {
-                    // Nothing here.
-                  }
-                } {
-                  channel.close()
-                }
-                copyForMemory
+                copyForMemory.put(bytes)
               })
               bytes.rewind()
             }
@@ -741,9 +731,11 @@ private[spark] class BlockManager(
       bytes: ByteBuffer,
       level: StorageLevel,
       tellMaster: Boolean = true,
-      effectiveStorageLevel: Option[StorageLevel] = None): Seq[(BlockId, BlockStatus)] = {
+      effectiveStorageLevel: Option[StorageLevel] = None,
+      alreadyEncrypted: Boolean = false): Seq[(BlockId, BlockStatus)] = {
     require(bytes != null, "Bytes is null")
-    doPut(blockId, ByteBufferValues(bytes), level, tellMaster, effectiveStorageLevel)
+    doPut(blockId, ByteBufferValues(bytes), level, tellMaster, effectiveStorageLevel,
+      alreadyEncrypted = alreadyEncrypted)
   }
 
   /**
@@ -759,7 +751,8 @@ private[spark] class BlockManager(
       data: BlockValues,
       level: StorageLevel,
       tellMaster: Boolean = true,
-      effectiveStorageLevel: Option[StorageLevel] = None)
+      effectiveStorageLevel: Option[StorageLevel] = None,
+      alreadyEncrypted: Boolean = false)
     : Seq[(BlockId, BlockStatus)] = {
 
     require(blockId != null, "BlockId is null")
@@ -856,7 +849,7 @@ private[spark] class BlockManager(
             blockStore.putArray(blockId, array, putLevel, returnValues)
           case ByteBufferValues(bytes) =>
             bytes.rewind()
-            blockStore.putBytes(blockId, bytes, putLevel)
+            blockStore.putBytes(blockId, bytes, putLevel, alreadyEncrypted)
         }
         size = result.size
         result.data match {
@@ -911,7 +904,7 @@ private[spark] class BlockManager(
               throw new SparkException(
                 "Underlying put returned neither an Iterator nor bytes! This shouldn't happen.")
             }
-            bytesAfterPut = dataSerialize(blockId, valuesAfterPut)
+            bytesAfterPut = dataSerialize(blockId, valuesAfterPut, encrypt = true)
           }
           replicate(blockId, bytesAfterPut, putLevel)
           logDebug("Put block %s remotely took %s"
@@ -1104,7 +1097,7 @@ private[spark] class BlockManager(
               case Left(elements) =>
                 diskStore.putArray(blockId, elements, level, returnValues = false)
               case Right(bytes) =>
-                diskStore.putBytes(blockId, bytes, level)
+                diskStore.putBytes(blockId, bytes, level, true)
             }
             blockIsUpdated = true
           }
@@ -1298,10 +1291,18 @@ private[spark] class BlockManager(
   }
 
   /** Serializes into a byte buffer. */
-  def dataSerialize(blockId: BlockId, values: Iterator[Any]): ByteBuffer = {
-    val byteStream = new ByteArrayOutputStream(4096)
-    dataSerializeStream(blockId, byteStream, values)
-    ByteBuffer.wrap(byteStream.toByteArray)
+  def dataSerialize(
+      blockId: BlockId,
+      values: Iterator[Any],
+      encrypt: Boolean = false): ByteBuffer = {
+    val bytes = new ByteArrayOutputStream(4096)
+    val encrypted = if (encrypt) CryptoStreamUtils.wrapForEncryption(bytes, conf) else bytes
+    try {
+      dataSerializeStream(blockId, encrypted, values)
+    } finally {
+      encrypted.close()
+    }
+    ByteBuffer.wrap(bytes.toByteArray)
   }
 
   /**

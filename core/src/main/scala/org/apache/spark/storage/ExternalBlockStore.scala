@@ -47,7 +47,11 @@ private[spark] class ExternalBlockStore(blockManager: BlockManager, executorId: 
     }
   }
 
-  override def putBytes(blockId: BlockId, bytes: ByteBuffer, level: StorageLevel): PutResult = {
+  override def putBytes(
+      blockId: BlockId,
+      bytes: ByteBuffer,
+      level: StorageLevel,
+      bytesEncrypted: Boolean): PutResult = {
     putIntoExternalBlockStore(blockId, bytes, returnValues = true)
   }
 

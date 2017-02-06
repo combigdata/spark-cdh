@@ -39,14 +39,18 @@ private[spark] class DiskStore(blockManager: BlockManager, diskManager: DiskBloc
     diskManager.getFile(blockId.name).length
   }
 
-  override def putBytes(blockId: BlockId, _bytes: ByteBuffer, level: StorageLevel): PutResult = {
+  override def putBytes(
+      blockId: BlockId,
+      _bytes: ByteBuffer,
+      level: StorageLevel,
+      bytesEncrypted: Boolean): PutResult = {
     // So that we do not modify the input offsets !
     // duplicate does not copy buffer, so inexpensive
     val bytes = _bytes.duplicate()
     logDebug(s"Attempting to put block $blockId")
     val startTime = System.currentTimeMillis
     val file = diskManager.getFile(blockId)
-    val channel = Channels.newChannel(newOutputStream(file))
+    val channel = Channels.newChannel(newOutputStream(file, !bytesEncrypted))
     Utils.tryWithSafeFinally {
       while (bytes.remaining > 0) {
         channel.write(bytes)
@@ -76,7 +80,7 @@ private[spark] class DiskStore(blockManager: BlockManager, diskManager: DiskBloc
     logDebug(s"Attempting to write values for block $blockId")
     val startTime = System.currentTimeMillis
     val file = diskManager.getFile(blockId)
-    val outputStream = newOutputStream(file)
+    val outputStream = newOutputStream(file, true)
     try {
       Utils.tryWithSafeFinally {
         blockManager.dataSerializeStream(blockId, outputStream, values)
@@ -109,14 +113,18 @@ private[spark] class DiskStore(blockManager: BlockManager, diskManager: DiskBloc
     }
   }
 
-  private def newOutputStream(file: File): OutputStream = {
+  private def newOutputStream(file: File, encrypt: Boolean): OutputStream = {
     val out = new FileOutputStream(file)
-    try {
-      CryptoStreamUtils.wrapForEncryption(out, blockManager.conf)
-    } catch {
-      case e: Exception =>
-        out.close()
-        throw e
+    if (encrypt) {
+      try {
+        CryptoStreamUtils.wrapForEncryption(out, blockManager.conf)
+      } catch {
+        case e: Exception =>
+          out.close()
+          throw e
+      }
+    } else {
+      out
     }
   }
 

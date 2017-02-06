@@ -17,9 +17,11 @@
 package org.apache.spark.crypto
 
 import java.io.{InputStream, OutputStream}
+import java.nio.ByteBuffer
 import java.util.Properties
 import javax.crypto.KeyGenerator
 
+import com.google.common.io.ByteStreams
 import com.intel.chimera.cipher._
 import com.intel.chimera.random._
 import com.intel.chimera.stream._
@@ -27,6 +29,7 @@ import com.intel.chimera.stream._
 import org.apache.spark.{SparkConf, SparkEnv}
 import org.apache.spark.crypto.CryptoConf._
 import org.apache.spark.deploy.SparkHadoopUtil
+import org.apache.spark.util.{ByteBufferInputStream, ByteBufferOutputStream}
 
 /**
  * A util class for manipulating file shuffle encryption and decryption streams.
@@ -117,6 +120,22 @@ private[spark] object CryptoStreamUtils {
     val keyGen = KeyGenerator.getInstance(keyGenAlgorithm)
     keyGen.init(keyLen)
     keyGen.generateKey().getEncoded()
+  }
+
+  /**
+   * Encrypt a buffer with the key stored in the active security manager.
+   */
+  def encrypt(bytes: ByteBuffer, conf: SparkConf): ByteBuffer = {
+    val in = new ByteBufferInputStream(bytes, true)
+    val byteBufOut = new ByteBufferOutputStream(bytes.remaining())
+    val out = CryptoStreamUtils.wrapForEncryption(byteBufOut, conf)
+    try {
+      ByteStreams.copy(in, out)
+    } finally {
+      in.close()
+      out.close()
+    }
+    byteBufOut.toByteBuffer
   }
 
   /**

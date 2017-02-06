@@ -24,8 +24,9 @@ import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
 
 import org.apache.spark.TaskContext
+import org.apache.spark.crypto._
 import org.apache.spark.memory.MemoryManager
-import org.apache.spark.util.{SizeEstimator, Utils}
+import org.apache.spark.util._
 import org.apache.spark.util.collection.SizeTrackingVector
 
 private case class MemoryEntry(value: Any, size: Long, deserialized: Boolean)
@@ -87,16 +88,21 @@ private[spark] class MemoryStore(blockManager: BlockManager, memoryManager: Memo
     }
   }
 
-  override def putBytes(blockId: BlockId, _bytes: ByteBuffer, level: StorageLevel): PutResult = {
+  override def putBytes(
+      blockId: BlockId,
+      _bytes: ByteBuffer,
+      level: StorageLevel,
+      bytesEncrypted: Boolean): PutResult = {
     // Work on a duplicate - since the original input might be used elsewhere.
     val bytes = _bytes.duplicate()
     bytes.rewind()
     if (level.deserialized) {
-      val values = blockManager.dataDeserialize(blockId, bytes, skipEncryption = true)
+      val values = blockManager.dataDeserialize(blockId, bytes, skipEncryption = !bytesEncrypted)
       putIterator(blockId, values, level, returnValues = true)
     } else {
       val droppedBlocks = new ArrayBuffer[(BlockId, BlockStatus)]
-      tryToPut(blockId, bytes, bytes.limit, deserialized = false, droppedBlocks)
+      val encrypted = if (!bytesEncrypted) encrypt(bytes) else bytes
+      tryToPut(blockId, encrypted, encrypted.limit, deserialized = false, droppedBlocks)
       PutResult(bytes.limit(), Right(bytes.duplicate()), droppedBlocks)
     }
   }
@@ -105,7 +111,8 @@ private[spark] class MemoryStore(blockManager: BlockManager, memoryManager: Memo
    * Use `size` to test if there is enough space in MemoryStore. If so, create the ByteBuffer and
    * put it into MemoryStore. Otherwise, the ByteBuffer won't be created.
    *
-   * The caller should guarantee that `size` is correct.
+   * The caller should guarantee that `size` is correct and, if I/O encryption is enabled, that
+   * the data is already encrypted.
    */
   def putBytes(blockId: BlockId, size: Long, _bytes: () => ByteBuffer): PutResult = {
     // Work on a duplicate - since the original input might be used elsewhere.
@@ -133,7 +140,7 @@ private[spark] class MemoryStore(blockManager: BlockManager, memoryManager: Memo
       tryToPut(blockId, values, sizeEstimate, deserialized = true, droppedBlocks)
       PutResult(sizeEstimate, Left(values.iterator), droppedBlocks)
     } else {
-      val bytes = blockManager.dataSerialize(blockId, values.iterator)
+      val bytes = blockManager.dataSerialize(blockId, values.iterator, encrypt = true)
       tryToPut(blockId, bytes, bytes.limit, deserialized = false, droppedBlocks)
       PutResult(bytes.limit(), Right(bytes.duplicate()), droppedBlocks)
     }
@@ -192,7 +199,8 @@ private[spark] class MemoryStore(blockManager: BlockManager, memoryManager: Memo
     if (entry == null) {
       None
     } else if (entry.deserialized) {
-      Some(blockManager.dataSerialize(blockId, entry.value.asInstanceOf[Array[Any]].iterator))
+      Some(blockManager.dataSerialize(blockId, entry.value.asInstanceOf[Array[Any]].iterator,
+        encrypt = true))
     } else {
       Some(entry.value.asInstanceOf[ByteBuffer].duplicate()) // Doesn't actually copy the data
     }
@@ -208,7 +216,7 @@ private[spark] class MemoryStore(blockManager: BlockManager, memoryManager: Memo
       Some(entry.value.asInstanceOf[Array[Any]].iterator)
     } else {
       val buffer = entry.value.asInstanceOf[ByteBuffer].duplicate() // Doesn't actually copy data
-      Some(blockManager.dataDeserialize(blockId, buffer, skipEncryption = true))
+      Some(blockManager.dataDeserialize(blockId, buffer))
     }
   }
 
@@ -583,4 +591,16 @@ private[spark] class MemoryStore(blockManager: BlockManager, memoryManager: Memo
     )
     logMemoryUsage()
   }
+
+  /**
+   * Encrypt the data in the given byte buffer if encryption is enabled.
+   */
+  private def encrypt(bytes: ByteBuffer): ByteBuffer = {
+    if (CryptoConf.isShuffleEncryptionEnabled(blockManager.conf)) {
+      CryptoStreamUtils.encrypt(bytes, blockManager.conf)
+    } else {
+      bytes
+    }
+  }
+
 }

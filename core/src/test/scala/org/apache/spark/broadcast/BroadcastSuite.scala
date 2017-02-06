@@ -19,9 +19,11 @@ package org.apache.spark.broadcast
 
 import scala.util.Random
 
+import org.mockito.Mockito._
 import org.scalatest.Assertions
 
 import org.apache.spark._
+import org.apache.spark.crypto._
 import org.apache.spark.io.SnappyCompressionCodec
 import org.apache.spark.rdd.RDD
 import org.apache.spark.serializer.JavaSerializer
@@ -92,19 +94,26 @@ class BroadcastSuite extends SparkFunSuite with LocalSparkContext {
     assert(results.collect().toSet === (1 to 10).map(x => (x, 10)).toSet)
   }
 
-  test("Accessing TorrentBroadcast variables in a local cluster") {
+  encryptionTest("Accessing TorrentBroadcast variables in a local cluster") { conf =>
     val numSlaves = 4
-    val conf = torrentConf.clone
+    conf.setAll(torrentConf.getAll)
     conf.set("spark.serializer", "org.apache.spark.serializer.KryoSerializer")
     conf.set("spark.broadcast.compress", "true")
+    conf.set("spark.broadcast.blockSize", "1k")
     sc = new SparkContext("local-cluster[%d, 1, 1024]".format(numSlaves), "test", conf)
-    val list = List[Int](1, 2, 3, 4)
+    val list = (1 to 1024).toList
     val broadcast = sc.broadcast(list)
-    val results = sc.parallelize(1 to numSlaves).map(x => (x, broadcast.value.sum))
-    assert(results.collect().toSet === (1 to numSlaves).map(x => (x, 10)).toSet)
+
+    // Run the test twice; the first time will cause remote broadcast blocks to be added to the
+    // local block manager's store too; the second time makes sure the local blocks are being
+    // properly stored when encryption is on.
+    (1 to 2).foreach { _ =>
+      val results = sc.parallelize(1 to numSlaves).map(x => (x, broadcast.value.sum))
+      assert(results.collect().toSet === (1 to numSlaves).map(x => (x, list.sum)).toSet)
+    }
   }
 
-  test("TorrentBroadcast's blockifyObject and unblockifyObject are inverses") {
+  mockEncryptionTest(s"TorrentBroadcast's blockifyObject and unblockifyObject") { encrypt =>
     import org.apache.spark.broadcast.TorrentBroadcast._
     val blockSize = 1024
     val conf = new SparkConf()
@@ -113,11 +122,20 @@ class BroadcastSuite extends SparkFunSuite with LocalSparkContext {
     val seed = 42
     val rand = new Random(seed)
     for (trial <- 1 to 100) {
-      val size = 1 + rand.nextInt(1024 * 10)
+      val size = blockSize + rand.nextInt(1024 * 10)
       val data: Array[Byte] = new Array[Byte](size)
       rand.nextBytes(data)
-      val blocks = blockifyObject(data, blockSize, serializer, compressionCodec)
-      val unblockified = unBlockifyObject[Array[Byte]](blocks, serializer, compressionCodec)
+      val blocks = blockifyObject(data, blockSize, serializer, compressionCodec).map { b =>
+        if (encrypt) {
+          // Blocks are encrypted by the BlockManager, so the test code need to manually do
+          // encryption here.
+          CryptoStreamUtils.encrypt(b, conf)
+        } else {
+          b
+        }
+      }
+      val unblockified = unBlockifyObject[Array[Byte]](blocks, conf, serializer,
+        compressionCodec)
       assert(unblockified === data)
     }
   }

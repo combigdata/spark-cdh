@@ -17,8 +17,14 @@
 
 package org.apache.spark
 
+import java.util.Random
+
 // scalastyle:off
+import org.mockito.Mockito._
 import org.scalatest.{FunSuite, Outcome}
+
+import org.apache.spark._
+import org.apache.spark.crypto.CryptoConf
 
 /**
  * Base abstract class for all unit tests in Spark for handling common functionality.
@@ -44,5 +50,48 @@ private[spark] abstract class SparkFunSuite extends FunSuite with Logging {
       logInfo(s"\n\n===== FINISHED $shortSuiteName: '$testName' =====\n")
     }
   }
+
+  /**
+   * Runs a test twice, first time normally, second time with a mock SparkEnv with shuffle (I/O)
+   * encryption turned on.
+   *
+   * The boolean parameter tells the test whether encryption is enabled for the run.
+   */
+  final protected def mockEncryptionTest(name: String)(fn: Boolean => Unit) {
+    Seq(false, true).foreach { encrypt =>
+      test(s"$name (encrypt = $encrypt)") {
+        if (encrypt) {
+          val conf = new SparkConf()
+            .set(CryptoConf.SPARK_SHUFFLE_ENCRYPTION_ENABLED, encrypt.toString)
+          val env = mock(classOf[SparkEnv])
+          val key = new Array[Byte](16)
+          new Random().nextBytes(key)
+          val sm = new SecurityManager(conf, Some(key))
+          when(env.securityManager).thenReturn(sm)
+          SparkEnv.set(env)
+        }
+        try {
+          fn(encrypt)
+        } finally {
+          SparkEnv.set(null)
+        }
+      }
+    }
+  }
+
+  /**
+   * Runs a test twice, initializing a SparkConf object with encryption off, then on. It's ok
+   * for the test to modify the provided SparkConf.
+   */
+  final protected def encryptionTest(name: String)(fn: SparkConf => Unit) {
+    Seq(false, true).foreach { encrypt =>
+      test(s"$name (encrypt = $encrypt)") {
+        val conf = new SparkConf()
+          .set(CryptoConf.SPARK_SHUFFLE_ENCRYPTION_ENABLED, encrypt.toString)
+        fn(conf)
+      }
+    }
+  }
+
 
 }

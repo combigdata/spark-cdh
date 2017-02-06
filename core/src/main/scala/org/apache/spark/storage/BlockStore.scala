@@ -28,7 +28,16 @@ import org.apache.spark.Logging
  */
 private[spark] abstract class BlockStore(val blockManager: BlockManager) extends Logging {
 
-  def putBytes(blockId: BlockId, bytes: ByteBuffer, level: StorageLevel): PutResult
+  /**
+   * Put a block of bytes into the store. The data should be encrypted when stored, in case
+   * I/O encryption is enabled. If "bytesEncrypted" is true, the data has already been encrypted
+   * by the caller.
+   */
+  def putBytes(
+    blockId: BlockId,
+    bytes: ByteBuffer,
+    level: StorageLevel,
+    bytesEncrypted: Boolean): PutResult
 
   /**
    * Put in a block and, possibly, also return its content as either bytes or another Iterator.

@@ -25,6 +25,7 @@ import scala.reflect.ClassTag
 import scala.util.Random
 
 import org.apache.spark.{Logging, SparkConf, SparkEnv, SparkException}
+import org.apache.spark.crypto.CryptoStreamUtils
 import org.apache.spark.io.CompressionCodec
 import org.apache.spark.serializer.Serializer
 import org.apache.spark.storage.{BroadcastBlockId, StorageLevel}
@@ -131,7 +132,8 @@ private[spark] class TorrentBroadcast[T: ClassTag](obj: T, id: Long)
           pieceId,
           block,
           StorageLevel.MEMORY_AND_DISK_SER,
-          tellMaster = true)
+          tellMaster = true,
+          alreadyEncrypted = true)
         block
       }
       val block: ByteBuffer = getLocal.orElse(getRemote).getOrElse(
@@ -176,7 +178,7 @@ private[spark] class TorrentBroadcast[T: ClassTag](obj: T, id: Long)
           logInfo("Reading broadcast variable " + id + " took" + Utils.getUsedTimeMs(startTimeMs))
 
           val obj = TorrentBroadcast.unBlockifyObject[T](
-            blocks, SparkEnv.get.serializer, compressionCodec)
+            blocks, SparkEnv.get.conf, SparkEnv.get.serializer, compressionCodec)
           // Store the merged copy in BlockManager so other tasks on this executor don't
           // need to re-fetch it.
           SparkEnv.get.blockManager.putSingle(
@@ -206,11 +208,14 @@ private object TorrentBroadcast extends Logging {
 
   def unBlockifyObject[T: ClassTag](
       blocks: Array[ByteBuffer],
+      conf: SparkConf,
       serializer: Serializer,
       compressionCodec: Option[CompressionCodec]): T = {
     require(blocks.nonEmpty, "Cannot unblockify an empty array of blocks")
     val is = new SequenceInputStream(
-      blocks.iterator.map(new ByteBufferInputStream(_)).asJavaEnumeration)
+      blocks.iterator.map { buf =>
+        CryptoStreamUtils.wrapForEncryption(new ByteBufferInputStream(buf), conf)
+      }.asJavaEnumeration)
     val in: InputStream = compressionCodec.map(c => c.compressedInputStream(is)).getOrElse(is)
     val ser = serializer.newInstance()
     val serIn = ser.deserializeStream(in)
