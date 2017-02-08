@@ -24,7 +24,8 @@ import scala.collection.JavaConverters._
 import org.apache.spark.annotation.Experimental
 import org.apache.spark.sql.catalyst.{SqlParser, TableIdentifier}
 import org.apache.spark.sql.catalyst.analysis.{UnresolvedAttribute, UnresolvedRelation}
-import org.apache.spark.sql.catalyst.plans.logical.{Project, InsertIntoTable}
+import org.apache.spark.sql.catalyst.plans.logical.{InsertIntoTable, Project}
+import org.apache.spark.sql.execution.QueryExecution
 import org.apache.spark.sql.execution.datasources.jdbc.JdbcUtils
 import org.apache.spark.sql.execution.datasources.{CreateTableUsingAsSelect, ResolvedDataSource}
 import org.apache.spark.sql.sources.HadoopFsRelation
@@ -130,6 +131,37 @@ final class DataFrameWriter private[sql](df: DataFrame) {
   }
 
   /**
+   * Executes the query and calls the {@link org.apache.spark.sql.util.QueryExecutionListener}
+   * methods. The method takes all the values in the extraOptions map adds the source variable to it
+   * and then the elements in the otherOptions map before calling the methods of the
+   * QueryExecutionListener
+   *
+   * @param funcName A identifier for the method executing the query
+   * @param qe the {@link org.apache.spark.sql.execution.QueryExecution} object associated with the
+   *        query
+   * @param otherOptions a map that gets added to the map passed to the listener methods
+   * @param action the function that executes the query after which the listener methods gets
+   *               called.
+   */
+  private def executeAndCallQEListener(
+      funcName: String,
+      qe: QueryExecution,
+      otherOptions: Map[String, String] = Map())
+      (action: => Unit) = {
+      val options = extraOptions.clone() += ("source" -> source) ++= otherOptions
+      try {
+        val start = System.nanoTime()
+        action
+        val end = System.nanoTime()
+        df.sqlContext.listenerManager.onSuccess(funcName, qe, end - start, options.toMap)
+      } catch {
+        case e: Exception =>
+            df.sqlContext.listenerManager.onFailure(funcName, qe, e, options.toMap)
+            throw e
+      }
+  }
+
+  /**
    * Saves the content of the [[DataFrame]] at the specified path.
    *
    * @since 1.4.0
@@ -145,13 +177,14 @@ final class DataFrameWriter private[sql](df: DataFrame) {
    * @since 1.4.0
    */
   def save(): Unit = {
-    ResolvedDataSource(
+    lazy val dataSource = ResolvedDataSource(
       df.sqlContext,
       source,
       partitioningColumns.map(_.toArray).getOrElse(Array.empty[String]),
       mode,
       extraOptions.toMap,
       df)
+    executeAndCallQEListener("save", df.queryExecution)(dataSource)
   }
 
   /**
@@ -180,13 +213,14 @@ final class DataFrameWriter private[sql](df: DataFrame) {
       Project(inputDataCols ++ inputPartCols, df.logicalPlan)
     }.getOrElse(df.logicalPlan)
 
-    df.sqlContext.executePlan(
+    val qe = df.sqlContext.executePlan(
       InsertIntoTable(
         UnresolvedRelation(tableIdent),
         partitions.getOrElse(Map.empty[String, Option[String]]),
         input,
         overwrite,
-        ifNotExists = false)).toRdd
+        ifNotExists = false))
+    executeAndCallQEListener("insertInto", qe)(qe.toRdd)
   }
 
   private def normalizedParCols: Option[Seq[String]] = partitioningColumns.map { parCols =>
@@ -248,7 +282,8 @@ final class DataFrameWriter private[sql](df: DataFrame) {
             mode,
             extraOptions.toMap,
             df.logicalPlan)
-        df.sqlContext.executePlan(cmd).toRdd
+        val qe = df.sqlContext.executePlan(cmd)
+        executeAndCallQEListener("saveAsTable", qe)(qe.toRdd)
     }
   }
 
@@ -265,7 +300,6 @@ final class DataFrameWriter private[sql](df: DataFrame) {
    * @param connectionProperties JDBC database connection arguments, a list of arbitrary string
    *                             tag/value. Normally at least a "user" and "password" property
    *                             should be included.
-   *
    * @since 1.4.0
    */
   def jdbc(url: String, table: String, connectionProperties: Properties): Unit = {
@@ -307,8 +341,9 @@ final class DataFrameWriter private[sql](df: DataFrame) {
     } finally {
       conn.close()
     }
-
-    JdbcUtils.saveTable(df, url, table, props)
+    val options = connectionProperties.asScala += ("url" -> url) += ("table" -> table)
+    executeAndCallQEListener("jdbc", df.queryExecution,
+      options.toMap)(JdbcUtils.saveTable(df, url, table, props))
   }
 
   /**

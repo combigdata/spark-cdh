@@ -17,10 +17,17 @@
 
 package org.apache.spark.sql.hive
 
-import org.apache.spark.sql.hive.test.TestHiveSingleton
-import org.apache.spark.sql.QueryTest
 
-class HiveDataFrameSuite extends QueryTest with TestHiveSingleton {
+import org.apache.spark.sql.hive.test.TestHiveSingleton
+import org.apache.spark.sql.{QueryTest}
+import org.apache.spark.sql.execution.QueryExecution
+import org.apache.spark.sql.test.SQLTestUtils
+import org.apache.spark.sql.util.QueryExecutionListener
+
+class HiveDataFrameSuite extends QueryTest with TestHiveSingleton with SQLTestUtils{
+
+  import testImplicits._
+
   test("table name with schema") {
     // regression test for SPARK-11778
     hiveContext.sql("create schema usrdb")
@@ -28,5 +35,31 @@ class HiveDataFrameSuite extends QueryTest with TestHiveSingleton {
     hiveContext.read.table("usrdb.test")
     hiveContext.sql("drop table usrdb.test")
     hiveContext.sql("drop schema usrdb")
+  }
+
+  test("QueryExecutionListener gets called on DataFrameWriter.saveAsTable method") {
+    var onWriteSuccessCalled = false
+
+    hiveContext.listenerManager.register(new QueryExecutionListener {
+      override def onFailure(
+                              funcName: String,
+                              qe: QueryExecution,
+                              exception: Exception,
+                              options: Map[String, String]): Unit = {}
+      override def onSuccess(
+                              funcName: String,
+                              qe: QueryExecution,
+                              durationNs: Long,
+                              options: Map[String, String]): Unit = {
+        assert(durationNs > 0)
+        assert(qe ne null)
+        onWriteSuccessCalled = true
+      }
+    })
+    withTable("bar") {
+      Seq(1 -> 100).toDF("x", "y").write.saveAsTable("bar")
+    }
+    assert(onWriteSuccessCalled)
+    sqlContext.listenerManager.clear()
   }
 }

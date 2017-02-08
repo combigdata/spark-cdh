@@ -44,10 +44,10 @@ import org.apache.spark.sql.execution.datasources._
 import org.apache.spark.sql.execution.ui.{SQLListener, SQLTab}
 import org.apache.spark.sql.sources.BaseRelation
 import org.apache.spark.sql.types._
-import org.apache.spark.sql.util.ExecutionListenerManager
+import org.apache.spark.sql.util.{ExecutionListenerManager, QueryExecutionListener}
 import org.apache.spark.sql.{execution => sparkexecution}
 import org.apache.spark.util.Utils
-import org.apache.spark.{SparkContext, SparkException}
+import org.apache.spark.{SparkConf, SparkContext, SparkException}
 
 /**
  * The entry point for working with structured data (rows and columns) in Spark.  Allows the
@@ -271,6 +271,18 @@ class SQLContext private[sql](
     properties.asScala.foreach {
       case (key, value) => setConf(key, value)
     }
+
+    for(qeExecutionListener <- getQueryExecutionListeners(sparkContext.getConf))
+      listenerManager.register(qeExecutionListener)
+  }
+
+  private def getQueryExecutionListeners(conf: SparkConf): Seq[QueryExecutionListener] = {
+    val qeListenerClassNames: Seq[String] =
+      conf.get("spark.sql.queryExecutionListeners", "").split(',').map(_.trim).filter(_ != "")
+    qeListenerClassNames
+      .map(Utils.classForName(_))
+      .filter(classOf[QueryExecutionListener].isAssignableFrom(_))
+      .map(_.newInstance().asInstanceOf[QueryExecutionListener])
   }
 
   /**
