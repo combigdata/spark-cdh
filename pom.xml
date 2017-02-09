@@ -114,6 +114,7 @@
     <module>repl</module>
     <module>launcher</module>
     <module>external/kafka</module>
+    <module>lineage</module>
     <!-- Disabled in CDH
     <module>external/kafka-assembly</module>
     -->

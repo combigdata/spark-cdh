@@ -34,13 +34,16 @@ object BuildCommons {
 
   private val buildLocation = file(".").getAbsoluteFile.getParentFile
 
-  val allProjects@Seq(bagel, catalyst, core, graphx, hive, hiveThriftServer, mllib, repl,
+  val sparkProjects@Seq(bagel, catalyst, core, graphx, hive, hiveThriftServer, mllib, repl,
     sql, networkCommon, networkShuffle, streaming, streamingFlumeSink, streamingFlume, streamingKafka,
     streamingMqtt, streamingTwitter, streamingZeromq, launcher, unsafe, testTags) =
     Seq("bagel", "catalyst", "core", "graphx", "hive", "hive-thriftserver", "mllib", "repl",
       "sql", "network-common", "network-shuffle", "streaming", "streaming-flume-sink",
       "streaming-flume", "streaming-kafka", "streaming-mqtt", "streaming-twitter",
       "streaming-zeromq", "launcher", "unsafe", "test-tags").map(ProjectRef(buildLocation, _))
+
+  val lineage = ProjectRef(buildLocation, "lineage")
+  val allProjects = sparkProjects :+ lineage
 
   val optionallyEnabledProjects@Seq(yarn, java8Tests, sparkGangliaLgpl,
     streamingKinesisAsl, dockerIntegrationTests) =
@@ -250,6 +253,9 @@ object SparkBuild extends PomBuild {
   /* Spark SQL Core console settings */
   enable(SQL.settings)(sql)
 
+  /* Lineage Test Dependencies */
+  enable(LineageTestDependencies.settings)(lineage)
+
   /* Hive console settings */
   enable(Hive.settings)(hive)
 
@@ -380,6 +386,18 @@ object SQL {
         |import sqlContext._
       """.stripMargin,
     cleanupCommands in console := "sc.stop()"
+  )
+}
+
+object LineageTestDependencies {
+  lazy val settings = Seq(
+    libraryDependencies ++= Seq("org.apache.hadoop" % "hadoop-hdfs" % "2.6.0-cdh5.11.0-SNAPSHOT" %
+      "test" classifier "tests" excludeAll(
+      ExclusionRule(organization = "javax.servlet", name = "servlet-api"),
+      ExclusionRule(organization = "javax.servlet.jsp", name = "jsp-api")
+      ), "org.apache.hadoop" % "hadoop-common" % "2.6.0-cdh5.11.0-SNAPSHOT" %
+      "test" classifier "tests"
+    )
   )
 }
 

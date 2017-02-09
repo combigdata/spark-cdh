@@ -99,6 +99,11 @@
       <artifactId>spark-avro_${scala.binary.version}</artifactId>
       <version>${spark-avro.version}</version>
     </dependency>
+    <dependency>
+      <groupId>com.cloudera.spark</groupId>
+      <artifactId>spark-lineage_${scala.binary.version}</artifactId>
+      <version>${project.version}</version>
+    </dependency>
   </dependencies>
 
   <build>

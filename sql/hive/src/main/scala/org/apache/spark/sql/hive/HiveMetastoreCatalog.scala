@@ -184,7 +184,8 @@ private[hive] class HiveMetastoreCatalog(val client: ClientInterface, hive: Hive
             table.properties("spark.sql.sources.provider"),
             options)
 
-        LogicalRelation(resolvedRelation.relation)
+        LogicalRelation(resolvedRelation.relation, None, Some(TableIdentifier(in.name,
+          Some(in.database))))
       }
     }
 
@@ -456,7 +457,7 @@ private[hive] class HiveMetastoreCatalog(val client: ClientInterface, hive: Hive
         partitionSpecInMetastore: Option[PartitionSpec]): Option[LogicalRelation] = {
       cachedDataSourceTables.getIfPresent(tableIdentifier) match {
         case null => None // Cache miss
-        case logical @ LogicalRelation(parquetRelation: ParquetRelation, _) =>
+        case logical @ LogicalRelation(parquetRelation: ParquetRelation, _, _) =>
           // If we have the same paths, same schema, and same partition spec,
           // we will use the cached Parquet Relation.
           val useCached =
@@ -738,7 +739,7 @@ private[hive] case class InsertIntoHiveTable(
   }
 }
 
-private[hive] case class MetastoreRelation
+private[sql] case class MetastoreRelation
     (databaseName: String, tableName: String, alias: Option[String])
     (val table: HiveTable)
     (@transient private val sqlContext: SQLContext)
