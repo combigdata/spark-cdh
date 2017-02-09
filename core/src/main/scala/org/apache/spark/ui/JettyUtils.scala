@@ -25,7 +25,7 @@ import scala.collection.mutable.{ArrayBuffer, StringBuilder}
 import scala.language.implicitConversions
 import scala.xml.Node
 
-import org.eclipse.jetty.server.{Connector, Request, Server}
+import org.eclipse.jetty.server._
 import org.eclipse.jetty.server.handler._
 import org.eclipse.jetty.server.nio.SelectChannelConnector
 import org.eclipse.jetty.server.ssl.SslSelectChannelConnector
@@ -238,78 +238,94 @@ private[spark] object JettyUtils extends Logging {
 
     addFilters(handlers, conf)
 
-    val gzipHandlers = handlers.map { h =>
-      h.setConnectorNames(Array(SPARK_CONNECTOR_NAME))
-
-      val gzipHandler = new GzipHandler
-      gzipHandler.setHandler(h)
-      gzipHandler
+    // Start the server first, with no connectors.
+    val pool = new QueuedThreadPool
+    if (serverName.nonEmpty) {
+      pool.setName(serverName)
     }
+    pool.setDaemon(true)
 
-    // Bind to the given port, or throw a java.net.BindException if the port is occupied
-    def connect(currentPort: Int): ((Server, Option[Int]), Int) = {
-      val server = new Server
-      val connectors = new ArrayBuffer[Connector]()
-      val collection = new ContextHandlerCollection
+    val server = new Server()
+    server.setThreadPool(pool)
 
-      // Create a connector on port currentPort to listen for HTTP requests
-      val httpConnector = new SelectChannelConnector()
-      httpConnector.setPort(currentPort)
-      connectors += httpConnector
+    val errorHandler = new ErrorHandler()
+    errorHandler.setShowStacks(true)
+    errorHandler.setServer(server)
+    server.addBean(errorHandler)
 
-      val httpsConnector = sslOptions.createJettySslContextFactory() match {
-        case Some(factory) =>
-          // If the new port wraps around, do not try a privileged port.
-          val securePort =
-            if (currentPort != 0) {
-              (currentPort + 400 - 1024) % (65536 - 1024) + 1024
-            } else {
-              0
-            }
-          val scheme = "https"
-          // Create a connector on port securePort to listen for HTTPS requests
+    val collection = new ContextHandlerCollection
+    server.setHandler(collection)
+
+    try {
+      server.start()
+
+      // If SSL is configured, create the secure connector first.
+      val securePort = sslOptions.createJettySslContextFactory().map { factory =>
+        val securePort = sslOptions.port.getOrElse(if (port > 0) Utils.userPort(port, 400) else 0)
+        val secureServerName = if (serverName.nonEmpty) s"$serverName (HTTPS)" else serverName
+
+        def sslConnect(currentPort: Int): (Connector, Int) = {
           val connector = new SslSelectChannelConnector(factory)
-          connector.setPort(securePort)
+          connector.setServer(server)
+          connector.setPort(currentPort)
           connector.setName(SPARK_CONNECTOR_NAME)
-          connectors += connector
+          connector.setAcceptQueueSize(math.min(connector.getAcceptors, 8))
+          connector.setHost(hostName)
+          connector.start()
+          (connector, connector.getLocalPort())
+        }
 
-          // redirect the HTTP requests to HTTPS port
+        val (connector, boundPort) = Utils.startServiceOnPort(securePort,
+          sslConnect, conf, secureServerName)
+        server.addConnector(connector)
+        boundPort
+      }
+
+      // Bind the HTTP port.
+      def httpConnect(currentPort: Int): (SelectChannelConnector, Int) = {
+        val connector = new SelectChannelConnector()
+        connector.setServer(server)
+        connector.setPort(currentPort)
+        connector.setAcceptQueueSize(math.min(connector.getAcceptors, 8))
+        connector.setHost(hostName)
+        connector.start()
+        (connector, connector.getLocalPort())
+      }
+
+      val (httpConnector, httpPort) = Utils.startServiceOnPort(port, httpConnect, conf, serverName)
+
+      // If SSL is configured, then configure redirection in the HTTP connector.
+      securePort match {
+        case Some(p) =>
           httpConnector.setName(REDIRECT_CONNECTOR_NAME)
-          collection.addHandler(createRedirectHttpsHandler(securePort, scheme))
-          Some(connector)
+          val redirector = createRedirectHttpsHandler(p, "https")
+          collection.addHandler(redirector)
+          redirector.start()
 
         case None =>
-          // No SSL, so the HTTP connector becomes the official one where all contexts bind.
           httpConnector.setName(SPARK_CONNECTOR_NAME)
-          None
       }
 
-      val pool = new QueuedThreadPool
-      pool.setDaemon(true)
-      server.setThreadPool(pool)
-      val errorHandler = new ErrorHandler()
-      errorHandler.setShowStacks(true)
-      server.addBean(errorHandler)
+      server.addConnector(httpConnector)
 
-      gzipHandlers.foreach(collection.addHandler)
-      server.setHandler(collection)
+      // Add all the known handlers now that connectors are configured.
+      handlers.foreach { h =>
+        h.setConnectorNames(Array(SPARK_CONNECTOR_NAME))
+        val gzipHandler = new GzipHandler()
+        gzipHandler.setHandler(h)
+        collection.addHandler(gzipHandler)
+        gzipHandler.start()
+      }
 
-      server.setConnectors(connectors.toArray)
-      try {
-        server.start()
-        ((server, httpsConnector.map(_.getLocalPort())), httpConnector.getLocalPort)
-      } catch {
-        case e: Exception =>
-          server.stop()
+      ServerInfo(server, httpPort, securePort, collection)
+    } catch {
+      case e: Exception =>
+        server.stop()
+        if (pool.isStarted()) {
           pool.stop()
-          throw e
-      }
+        }
+        throw e
     }
-
-    val ((server, securePort), boundPort) = Utils.startServiceOnPort(port, connect, conf,
-      serverName)
-    ServerInfo(server, boundPort, securePort,
-      server.getHandler().asInstanceOf[ContextHandlerCollection])
   }
 
   private def createRedirectHttpsHandler(securePort: Int, scheme: String): ContextHandler = {
@@ -328,8 +344,7 @@ private[spark] object JettyUtils extends Logging {
         val httpsURI = createRedirectURI(scheme, baseRequest.getServerName, securePort,
           baseRequest.getRequestURI, baseRequest.getQueryString)
         response.setContentLength(0)
-        response.encodeRedirectURL(httpsURI)
-        response.sendRedirect(httpsURI)
+        response.sendRedirect(response.encodeRedirectURL(httpsURI))
         baseRequest.setHandled(true)
       }
     })
