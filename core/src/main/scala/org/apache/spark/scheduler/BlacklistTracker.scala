@@ -21,7 +21,7 @@ import java.util.concurrent.atomic.AtomicReference
 
 import scala.collection.mutable.{ArrayBuffer, HashMap, HashSet}
 
-import org.apache.spark.{Logging, SparkConf, SparkContext}
+import org.apache.spark.{ExecutorAllocationClient, Logging, SparkConf, SparkContext}
 import org.apache.spark.util.{Clock, SystemClock, Utils}
 
 /**
@@ -48,15 +48,17 @@ import org.apache.spark.util.{Clock, SystemClock, Utils}
 private[scheduler] class BlacklistTracker (
     private val listenerBus: LiveListenerBus,
     conf: SparkConf,
+    allocationClient: Option[ExecutorAllocationClient],
     clock: Clock = new SystemClock()) extends Logging {
 
-  def this(sc: SparkContext) = {
-    this(sc.listenerBus, sc.conf)
+  def this(sc: SparkContext, allocationClient: Option[ExecutorAllocationClient]) = {
+    this(sc.listenerBus, sc.conf, allocationClient)
   }
 
   BlacklistTracker.validateBlacklistConfs(conf)
   private val MAX_FAILURES_PER_EXEC = conf.getInt(BlacklistConfs.MAX_FAILURES_PER_EXEC, 2)
   private val MAX_FAILED_EXEC_PER_NODE = conf.getInt(BlacklistConfs.MAX_FAILED_EXEC_PER_NODE, 2)
+  private val BLACKLIST_KILL_ENABLED = conf.getBoolean(BlacklistConfs.BLACKLIST_KILL_ENABLED, false)
   val BLACKLIST_TIMEOUT_MILLIS = BlacklistTracker.getBlacklistTimeout(conf)
 
   /**
@@ -171,6 +173,17 @@ private[scheduler] class BlacklistTracker (
         listenerBus.post(SparkListenerExecutorBlacklisted(now, exec, newTotal))
         executorIdToFailureList.remove(exec)
         updateNextExpiryTime()
+        if (BLACKLIST_KILL_ENABLED) {
+          allocationClient match {
+            case Some(allocationClient) =>
+              logInfo(s"Killing blacklisted executor id $exec " +
+                s"since spark.blacklist.killBlacklistedExecutors is set.")
+              allocationClient.killExecutors(Seq(exec), true, true)
+            case None =>
+              logWarning(s"Not attempting to kill blacklisted executor id $exec " +
+                s"since allocation client is not defined.")
+          }
+        }
 
         // In addition to blacklisting the executor, we also update the data for failures on the
         // node, and potentially put the entire node into a blacklist as well.
@@ -182,6 +195,19 @@ private[scheduler] class BlacklistTracker (
           nodeIdToBlacklistExpiryTime.put(node, expiryTimeForNewBlacklists)
           listenerBus.post(SparkListenerNodeBlacklisted(now, node, blacklistedExecsOnNode.size))
           _nodeBlacklist.set(nodeIdToBlacklistExpiryTime.keySet.toSet)
+          if (BLACKLIST_KILL_ENABLED) {
+            allocationClient match {
+              case Some(allocationClient) =>
+                logInfo(s"Killing all executors on blacklisted host $node " +
+                  s"since spark.blacklist.killBlacklistedExecutors is set.")
+                if (allocationClient.killExecutorsOnHost(node) == false) {
+                  logError(s"Killing executors on node $node failed.")
+                }
+              case None =>
+                logWarning(s"Not attempting to kill executors on blacklisted host $node " +
+                  s"since allocation client is not defined.")
+            }
+          }
         }
       }
     }
@@ -410,6 +436,8 @@ private[spark] object BlacklistConfs {
   val MAX_FAILED_EXEC_PER_NODE_STAGE = "spark.blacklist.stage.maxFailedExecutorsPerNode"
 
   val BLACKLIST_TIMEOUT_CONF = "spark.blacklist.timeout"
+
+  val BLACKLIST_KILL_ENABLED = "spark.blacklist.killBlacklistedExecutors"
 
   val BLACKLIST_LEGACY_TIMEOUT_CONF = "spark.scheduler.executorTaskBlacklistTime"
 }

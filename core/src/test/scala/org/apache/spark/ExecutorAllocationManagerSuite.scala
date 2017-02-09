@@ -1039,3 +1039,72 @@ private object ExecutorAllocationManagerSuite extends PrivateMethodTester {
     manager invokePrivate _hostToLocalTaskCount()
   }
 }
+//
+///**
+// * A cluster manager which wraps around the scheduler and backend for local mode. It is used for
+// * testing the dynamic allocation policy.
+// */
+//private class DummyLocalExternalClusterManager extends ExternalClusterManager {
+//
+//  def canCreate(masterURL: String): Boolean = masterURL == "myDummyLocalExternalClusterManager"
+//
+//  override def createTaskScheduler(
+//      sc: SparkContext,
+//      masterURL: String): TaskScheduler = new TaskSchedulerImpl(sc, 1, isLocal = true)
+//
+//  override def createSchedulerBackend(
+//      sc: SparkContext,
+//      masterURL: String,
+//      scheduler: TaskScheduler): SchedulerBackend = {
+//    val sb = new LocalSchedulerBackend(sc.getConf, scheduler.asInstanceOf[TaskSchedulerImpl], 1)
+//    new DummyLocalSchedulerBackend(sc, sb)
+//  }
+//
+//  override def initialize(scheduler: TaskScheduler, backend: SchedulerBackend): Unit = {
+//    val sc = scheduler.asInstanceOf[TaskSchedulerImpl]
+//    sc.initialize(backend)
+//  }
+//}
+//
+///**
+// * A scheduler backend which wraps around local scheduler backend and exposes the executor
+// * allocation client interface for testing dynamic allocation.
+// */
+//private class DummyLocalSchedulerBackend (sc: SparkContext, sb: SchedulerBackend)
+//  extends SchedulerBackend with ExecutorAllocationClient {
+//
+//  override private[spark] def getExecutorIds(): Seq[String] = sc.getExecutorIds()
+//
+//  override private[spark] def requestTotalExecutors(
+//      numExecutors: Int,
+//      localityAwareTasks: Int,
+//      hostToLocalTaskCount: Map[String, Int]): Boolean =
+//    sc.requestTotalExecutors(numExecutors, localityAwareTasks, hostToLocalTaskCount)
+//
+//  override def requestExecutors(numAdditionalExecutors: Int): Boolean =
+//    sc.requestExecutors(numAdditionalExecutors)
+//
+//  override def killExecutors(
+//      executorIds: Seq[String],
+//      replace: Boolean,
+//      force: Boolean): Seq[String] = {
+//    val response = sc.killExecutors(executorIds)
+//    if (response) {
+//      executorIds
+//    } else {
+//      Seq.empty[String]
+//    }
+//  }
+//
+//  override def start(): Unit = sb.start()
+//
+//  override def stop(): Unit = sb.stop()
+//
+//  override def reviveOffers(): Unit = sb.reviveOffers()
+//
+//  override def defaultParallelism(): Int = sb.defaultParallelism()
+//
+//  override def killExecutorsOnHost(host: String): Boolean = {
+//    false
+//  }
+//}
