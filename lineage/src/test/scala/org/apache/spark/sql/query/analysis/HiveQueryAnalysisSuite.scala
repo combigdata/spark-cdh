@@ -23,12 +23,17 @@ import com.cloudera.spark.lineage.{DataSourceFormat, DataSourceType, FieldDetail
 import org.apache.spark.sql.QueryTest
 import org.apache.spark.sql.hive.test.TestHive._
 import org.apache.spark.sql.hive.test.TestHiveSingleton
+import org.apache.spark.sql.test.SQLTestUtils
 import org.scalatest.BeforeAndAfterAll
 
 /**
  * Tests that check that reading and writing to Hive tables produce the desired lineage data
  */
-class HiveQueryAnalysisSuite extends QueryTest with TestHiveSingleton with BeforeAndAfterAll {
+class HiveQueryAnalysisSuite
+    extends QueryTest
+    with TestHiveSingleton
+    with SQLTestUtils
+    with BeforeAndAfterAll {
 
   protected override def beforeAll(): Unit = {
     super.beforeAll()

@@ -46,6 +46,8 @@ trait Catalog {
 
   def lookupRelation(tableIdent: TableIdentifier, alias: Option[String] = None): LogicalPlan
 
+  def getCurrentDatabase: String
+
   /**
    * Returns tuples of (tableName, isTemporary) for all tables in the given database.
    * isTemporary is a Boolean value indicates if a table is a temporary or not.
@@ -82,6 +84,10 @@ trait Catalog {
 class SimpleCatalog(val conf: CatalystConf) extends Catalog {
   private[this] val tables: ConcurrentMap[String, LogicalPlan] =
     new ConcurrentHashMap[String, LogicalPlan]
+
+  private[this] var currentDatabase = "default"
+
+  override def getCurrentDatabase: String = currentDatabase
 
   override def registerTable(tableIdent: TableIdentifier, plan: LogicalPlan): Unit = {
     tables.put(getTableName(tableIdent), plan)
@@ -197,6 +203,10 @@ object EmptyCatalog extends Catalog {
   override def lookupRelation(
       tableIdent: TableIdentifier,
       alias: Option[String] = None): LogicalPlan = {
+    throw new UnsupportedOperationException
+  }
+
+  override def getCurrentDatabase: String = {
     throw new UnsupportedOperationException
   }
 

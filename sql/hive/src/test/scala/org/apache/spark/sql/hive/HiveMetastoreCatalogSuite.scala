@@ -26,7 +26,8 @@ import org.apache.spark.sql.test.{ExamplePointUDT, SQLTestUtils}
 import org.apache.spark.sql.types.{DecimalType, StringType, StructType}
 import org.apache.spark.sql.{SQLConf, QueryTest, Row, SaveMode}
 
-class HiveMetastoreCatalogSuite extends SparkFunSuite with TestHiveSingleton {
+class HiveMetastoreCatalogSuite extends SparkFunSuite with TestHiveSingleton with SQLTestUtils {
+
   import hiveContext.implicits._
 
   test("struct field should accept underscore in sub-column name") {
@@ -67,6 +68,17 @@ class HiveMetastoreCatalogSuite extends SparkFunSuite with TestHiveSingleton {
 
     hiveContext.range(10).write.saveAsTable("spark13454")
     hiveContext.sql("drop table spark13454")
+  }
+
+  test("getCurrentDatabase") {
+    assert(hiveContext.catalog.getCurrentDatabase == "default")
+    withTempDatabase { db =>
+      assert(hiveContext.catalog.getCurrentDatabase == "default")
+      activateDatabase(db) {
+        assert(hiveContext.catalog.getCurrentDatabase == db)
+      }
+    }
+    assert(hiveContext.catalog.getCurrentDatabase == "default")
   }
 }
 
