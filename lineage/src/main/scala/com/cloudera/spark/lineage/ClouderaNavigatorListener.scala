@@ -107,7 +107,7 @@ private[lineage] class ClouderaNavigatorListener
       queryDetails: QueryDetails,
       qe: QueryExecution): QueryDetails = {
     if (queryDetails.dataSourceType == DataSourceType.HIVE) {
-      queryDetails.hiveMetastoreLocation = qe.sqlContext.getConf("hive.metastore.uris")
+      queryDetails.hiveMetastoreLocation = Some(qe.sqlContext.getConf("hive.metastore.uris"))
     }
     queryDetails
   }

@@ -19,21 +19,18 @@ package org.apache.spark.sql.query.analysis
 
 import java.io.File
 
-import com.cloudera.spark.lineage.{DataSourceFormat, DataSourceType, FieldDetails}
-import org.apache.spark.sql.QueryTest
-import org.apache.spark.sql.hive.test.TestHive._
+import org.apache.spark.SparkFunSuite
 import org.apache.spark.sql.hive.test.TestHiveSingleton
 import org.apache.spark.sql.test.SQLTestUtils
-import org.scalatest.BeforeAndAfterAll
+import org.apache.spark.sql.hive.test.TestHive._
+import org.apache.spark.sql.query.analysis.TestUtils._
+
 
 /**
  * Tests that check that reading and writing to Hive tables produce the desired lineage data
  */
-class HiveQueryAnalysisSuite
-    extends QueryTest
-    with TestHiveSingleton
-    with SQLTestUtils
-    with BeforeAndAfterAll {
+class HiveQueryAnalysisSuite extends SparkFunSuite with TestHiveSingleton with SQLTestUtils
+  with ParquetHDFSTest {
 
   protected override def beforeAll(): Unit = {
     super.beforeAll()
@@ -53,7 +50,7 @@ class HiveQueryAnalysisSuite
   }
 
   test("QueryAnalysis.getInputMetadata returns back InputMetadata for simple queries") {
-    val df = sqlContext.sql("select code, description, salary from test_table_1")
+    val df = hiveContext.sql("select code, description, salary from test_table_1")
     val inputMetadata = QueryAnalysis.getInputMetadata(df.queryExecution)
     assert(inputMetadata.length === 3)
     assertHiveFieldExists(inputMetadata, "test_table_1", "code")
@@ -62,7 +59,7 @@ class HiveQueryAnalysisSuite
   }
 
   test("QueryAnalysis.getInputMetadata return back InputMetadata for complex joins") {
-    var df2 = sqlContext.sql(
+    var df2 = hiveContext.sql(
         "select code, sal from (select o.code as code,c.description as desc," +
           "c.salary as sal from test_table_1 c join test_table_2 o on (c.code = o.code)"
           + " where c.salary > 170000 sort by sal)t1 limit 3")
@@ -81,7 +78,7 @@ class HiveQueryAnalysisSuite
   }
 
   test("QueryAnalysis.getInputMetadata returns back InputMetadata for * queries") {
-    val df = sqlContext.sql("select * from test_table_1")
+    val df = hiveContext.sql("select * from test_table_1")
     val inputMetadata = QueryAnalysis.getInputMetadata(df.queryExecution)
     assert(inputMetadata.length === 4)
     assertHiveFieldExists(inputMetadata, "test_table_1", "code")
@@ -112,7 +109,7 @@ class HiveQueryAnalysisSuite
     }
   }
 
-  test("CDH-50079 : a hive table registered as a temp table is listed correctly") {
+  test("CDH-50079 : a hive table joined with a parquet temp table is listed correctly") {
     withParquetHDFSFile((1 to 4).map(i => Customer(i, i.toString))) { prq =>
       sqlContext.read.parquet(prq).registerTempTable("customers")
       sqlContext

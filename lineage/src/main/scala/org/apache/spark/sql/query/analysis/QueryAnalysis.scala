@@ -16,20 +16,24 @@
  */
 package org.apache.spark.sql.query.analysis
 
-import com.cloudera.spark.lineage.DataSourceType.DataSourceType
-import com.cloudera.spark.lineage.{DataSourceType, FieldDetails, QueryDetails}
+import com.fasterxml.jackson.module.scala.JsonScalaEnumeration
+import com.fasterxml.jackson.core.`type`.TypeReference
+
 import org.apache.hadoop.fs.Path
 import org.apache.spark.SparkContext
 import org.apache.spark.sql.catalyst.TableIdentifier
 import org.apache.spark.sql.catalyst.expressions.{Alias, AttributeReference, NamedExpression}
 import org.apache.spark.sql.catalyst.plans.logical.{UnaryNode, _}
 import org.apache.spark.sql.execution.QueryExecution
+import org.apache.spark.sql.execution.datasources.parquet.ParquetRelation
 import org.apache.spark.sql.execution.datasources.{
   CreateTableUsing,
   CreateTableUsingAsSelect,
   LogicalRelation
 }
 import org.apache.spark.sql.hive.MetastoreRelation
+import org.apache.spark.sql.query.analysis.DataSourceFormat.DataSourceFormat
+import org.apache.spark.sql.query.analysis.DataSourceType.DataSourceType
 import org.apache.spark.sql.sources.HadoopFsRelation
 
 import scala.collection.mutable
@@ -61,10 +65,10 @@ object QueryAnalysis {
       case None => {
         qe.optimizedPlan match {
           case CreateTableUsing(t, _, _, _, _, _, _) =>
-            Some(new QueryDetails(getQualifiedDBName(qe, t), fields.to[ListBuffer],
+            Some(QueryDetails(getQualifiedDBName(qe, t), fields.to[ListBuffer],
                 DataSourceType.HIVE))
           case CreateTableUsingAsSelect(t, _, _, _, _, _, _) =>
-            Some(new QueryDetails(getQualifiedDBName(qe, t), fields.to[ListBuffer],
+            Some(QueryDetails(getQualifiedDBName(qe, t), fields.to[ListBuffer],
                 DataSourceType.HIVE))
           case _ => None
         }
@@ -94,6 +98,7 @@ object QueryAnalysis {
 
   /**
    * Extracts the input metadata from the @see [[QueryExecution]] object.
+   *
    * @param qe
    * @return
    */
@@ -123,6 +128,7 @@ object QueryAnalysis {
 
   /**
    * Converts the list of input metadata into a map of format [table -> fields read from table]
+   *
    * @param list
    * @return
    */
@@ -210,3 +216,33 @@ object QueryAnalysis {
     }
   }
 }
+
+case class QueryDetails(
+    source: String,
+    fields: ListBuffer[String],
+    @JsonScalaEnumeration(classOf[DataSourceTypeType]) dataSourceType: DataSourceType =
+      DataSourceType.UNKNOWN,
+    @JsonScalaEnumeration(classOf[DataSourceFormatType]) dataSourceFormat: DataSourceFormat =
+      DataSourceFormat.UNKNOWN) {
+  var dataQuery: String = _
+  var hiveMetastoreLocation: Option[String] = _
+}
+
+case class FieldDetails(
+    source: Seq[String],
+    field: String,
+    sourceType: DataSourceType = DataSourceType.UNKNOWN,
+    format: DataSourceFormat = DataSourceFormat.UNKNOWN)
+
+object DataSourceType extends Enumeration {
+  type DataSourceType = Value
+  val HIVE, HDFS, S3, LOCAL, UNKNOWN = Value
+}
+
+object DataSourceFormat extends Enumeration {
+  type DataSourceFormat = Value
+  val JSON, CSV, PARQUET, AVRO, UNKNOWN = Value
+}
+
+class DataSourceTypeType extends TypeReference[DataSourceType.type]
+class DataSourceFormatType extends TypeReference[DataSourceFormat.type]

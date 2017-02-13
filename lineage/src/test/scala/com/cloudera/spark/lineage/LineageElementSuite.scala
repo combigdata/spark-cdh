@@ -31,6 +31,8 @@ import org.scalatest.FunSuite
 class LineageElementSuite extends FunSuite {
   // scalastyle:on
 
+  val hiveMetaStoreLocation: String = "thrift://localhost:8090/hive_location"
+
   test("Test the LineageElement is serialzied and deserialized into json properly") {
     val mySparkApp = "MySparkApp"
     val myExecutionId: String = "MyExecutionID"
@@ -52,10 +54,14 @@ class LineageElementSuite extends FunSuite {
     lineageElement.timestamp = timestamp
     lineageElement.duration = duration
     lineageElement.user = user
-    lineageElement.addInput(new QueryDetails(inputTable, List(col1, col2).to[ListBuffer],
-        DataSourceType.HIVE, DataSourceFormat.PARQUET))
-    lineageElement.addInput(new QueryDetails(inputTable2, List(col3, col4).to[ListBuffer],
-        DataSourceType.HIVE, DataSourceFormat.AVRO))
+    val qd1 = new QueryDetails(inputTable, List(col1, col2).to[ListBuffer],
+      DataSourceType.HIVE, DataSourceFormat.PARQUET)
+    qd1.hiveMetastoreLocation = Some(hiveMetaStoreLocation)
+    lineageElement.addInput(qd1)
+    val qd2 = new QueryDetails(inputTable2, List(col3, col4).to[ListBuffer],
+      DataSourceType.HIVE, DataSourceFormat.AVRO)
+    qd2.hiveMetastoreLocation = Some(hiveMetaStoreLocation)
+    lineageElement.addInput(qd2)
     lineageElement
       .addOutput(new QueryDetails(outputFile, List(outputCol1, outputCol2).to[ListBuffer],
           DataSourceType.HDFS, DataSourceFormat.JSON))
@@ -92,5 +98,10 @@ class LineageElementSuite extends FunSuite {
     assert(fields.forall(cols.contains(_)))
     assert(elem.get("dataSourceType").get === dataSourceType)
     assert(elem.get("dataSourceFormat").get === dataSourceFormat)
+    if(dataSourceType == "HIVE") {
+      assert(elem.get("hiveMetastoreLocation").get === hiveMetaStoreLocation)
+    } else {
+      assert(!elem.get("hiveMetaStoreLocation").isDefined)
+    }
   }
 }

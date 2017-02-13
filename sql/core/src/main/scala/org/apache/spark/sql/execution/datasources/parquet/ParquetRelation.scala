@@ -107,7 +107,7 @@ private[sql] class ParquetRelation(
     // This is for metastore conversion.
     private val maybePartitionSpec: Option[PartitionSpec],
     override val userDefinedPartitionColumns: Option[StructType],
-    parameters: Map[String, String])(
+    val parameters: Map[String, String])(
     val sqlContext: SQLContext)
   extends HadoopFsRelation(maybePartitionSpec, parameters)
   with Logging {
