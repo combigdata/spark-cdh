@@ -445,3 +445,18 @@ The following extra configuration options are available when the shuffle service
   </td>
 </tr>
 </table>
+
+## Using the Spark History Server to replace the Spark Web UI
+
+It is possible to use the Spark History Server application page as the tracking URL for running
+applications when the application UI is disabled. This may be desirable on secure clusters, or to
+reduce the memory usage of the Spark driver. To set up tracking through the Spark History Server,
+do the following:
+
+- On the application side, set <code>spark.yarn.historyServer.allowTracking=true</code> in Spark's
+  configuration. This will tell Spark to use the history server's URL as the tracking URL if
+  the application's UI is disabled.
+- On the Spark History Server, add <code>org.apache.spark.deploy.yarn.YarnProxyRedirectFilter</code>
+  to the list of filters in the <code>spark.ui.filters</code> configuration.
+
+Be aware that the history server information may not be up-to-date with the application's state.

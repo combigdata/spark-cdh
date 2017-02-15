@@ -270,7 +270,7 @@ private[spark] class ApplicationMaster(
       _sparkConf: SparkConf,
       _rpcEnv: RpcEnv,
       driverRef: RpcEndpointRef,
-      uiAddress: String,
+      uiAddress: Option[String],
       securityMgr: SecurityManager) = {
     val appId = client.getAttemptId().getApplicationId().toString()
     val attemptId = client.getAttemptId().getAttemptId().toString()
@@ -347,8 +347,7 @@ private[spark] class ApplicationMaster(
           sc.getConf.get("spark.driver.host"),
           sc.getConf.get("spark.driver.port"),
           isClusterMode = true)
-        registerAM(sc.getConf, rpcEnv, driverRef, sc.ui.map(_.appUIAddress).getOrElse(""),
-          securityMgr)
+        registerAM(sc.getConf, rpcEnv, driverRef, sc.ui.map(_.appUIAddress), securityMgr)
       } else {
         // Sanity check; should never happen in normal operation, since sc should only be null
         // if the user app did not create a SparkContext.
@@ -374,7 +373,7 @@ private[spark] class ApplicationMaster(
       clientMode = true)
     val driverRef = waitForSparkDriver()
     addAmIpFilter()
-    registerAM(sparkConf, rpcEnv, driverRef, sparkConf.get("spark.driver.appUIAddress", ""),
+    registerAM(sparkConf, rpcEnv, driverRef, sparkConf.getOption("spark.driver.appUIAddress"),
       securityMgr)
 
     // In client mode the actor will stop the reporter thread.

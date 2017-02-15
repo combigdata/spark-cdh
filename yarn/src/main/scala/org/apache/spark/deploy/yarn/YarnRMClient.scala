@@ -57,7 +57,7 @@ private[spark] class YarnRMClient(args: ApplicationMasterArguments) extends Logg
       driverRef: RpcEndpointRef,
       conf: YarnConfiguration,
       sparkConf: SparkConf,
-      uiAddress: String,
+      uiAddress: Option[String],
       uiHistoryAddress: String,
       securityMgr: SecurityManager
     ): YarnAllocator = {
@@ -66,9 +66,17 @@ private[spark] class YarnRMClient(args: ApplicationMasterArguments) extends Logg
     amClient.start()
     this.uiHistoryAddress = uiHistoryAddress
 
+    val trackingUrl = uiAddress.getOrElse {
+      if (sparkConf.getBoolean("spark.yarn.historyServer.allowTracking", false)) {
+        uiHistoryAddress
+      } else {
+        ""
+      }
+    }
+
     logInfo("Registering the ApplicationMaster")
     synchronized {
-      amClient.registerApplicationMaster(Utils.localHostName(), 0, uiAddress)
+      amClient.registerApplicationMaster(Utils.localHostName(), 0, trackingUrl)
       registered = true
     }
     new YarnAllocator(driverUrl, driverRef, conf, sparkConf, amClient, getAttemptId(), args,
