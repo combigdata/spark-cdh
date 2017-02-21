@@ -25,12 +25,14 @@ import org.apache.spark.sql.test.SQLTestUtils
 import org.apache.spark.sql.hive.test.TestHive._
 import org.apache.spark.sql.query.analysis.TestUtils._
 
-
 /**
  * Tests that check that reading and writing to Hive tables produce the desired lineage data
  */
-class HiveQueryAnalysisSuite extends SparkFunSuite with TestHiveSingleton with SQLTestUtils
-  with ParquetHDFSTest {
+class HiveQueryAnalysisSuite
+    extends SparkFunSuite
+    with TestHiveSingleton
+    with SQLTestUtils
+    with ParquetHDFSTest {
 
   protected override def beforeAll(): Unit = {
     super.beforeAll()
@@ -51,11 +53,7 @@ class HiveQueryAnalysisSuite extends SparkFunSuite with TestHiveSingleton with S
 
   test("QueryAnalysis.getInputMetadata returns back InputMetadata for simple queries") {
     val df = hiveContext.sql("select code, description, salary from test_table_1")
-    val inputMetadata = QueryAnalysis.getInputMetadata(df.queryExecution)
-    assert(inputMetadata.length === 3)
-    assertHiveFieldExists(inputMetadata, "test_table_1", "code")
-    assertHiveFieldExists(inputMetadata, "test_table_1", "description")
-    assertHiveFieldExists(inputMetadata, "test_table_1", "salary")
+    assertHiveInputs(df.queryExecution, "test_table_1", Seq("code", "description", "salary"))
   }
 
   test("QueryAnalysis.getInputMetadata return back InputMetadata for complex joins") {
@@ -70,21 +68,13 @@ class HiveQueryAnalysisSuite extends SparkFunSuite with TestHiveSingleton with S
     assert(inputMetadata.length === 2)
     assertHiveFieldExists(inputMetadata, "test_table_1", "salary")
     assertHiveFieldExists(inputMetadata, "test_table_2", "code")
-    val outputMetadata = QueryAnalysis.getOutputMetaData(qe)
-    assert(outputMetadata.isDefined)
-    assert(outputMetadata.get.fields.forall(Seq("code", "sal").contains(_)))
-    assert(outputMetadata.get.dataSourceType === DataSourceType.HIVE)
-    assert(outputMetadata.get.source === "default.mytable")
+    assertHiveOutputs(qe, "mytable", Seq("code", "sal"))
   }
 
   test("QueryAnalysis.getInputMetadata returns back InputMetadata for * queries") {
     val df = hiveContext.sql("select * from test_table_1")
-    val inputMetadata = QueryAnalysis.getInputMetadata(df.queryExecution)
-    assert(inputMetadata.length === 4)
-    assertHiveFieldExists(inputMetadata, "test_table_1", "code")
-    assertHiveFieldExists(inputMetadata, "test_table_1", "description")
-    assertHiveFieldExists(inputMetadata, "test_table_1", "salary")
-    assertHiveFieldExists(inputMetadata, "test_table_1", "total_emp")
+    assertHiveInputs(df.queryExecution, "test_table_1", Seq("code", "description", "salary",
+      "total_emp"))
   }
 
   test("There is fully qualified table name in OutputMetadata") {
@@ -93,18 +83,8 @@ class HiveQueryAnalysisSuite extends SparkFunSuite with TestHiveSingleton with S
       activateDatabase(db) {
         df.write.saveAsTable("mytable")
         val qe = TestQeListener.getAndClear()
-        val inputMetadata = QueryAnalysis.getInputMetadata(df.queryExecution)
-        assert(inputMetadata.length === 4)
-        assertHiveFieldExists(inputMetadata, "test_table_1", "code")
-        assertHiveFieldExists(inputMetadata, "test_table_1", "description")
-        assertHiveFieldExists(inputMetadata, "test_table_1", "salary")
-        assertHiveFieldExists(inputMetadata, "test_table_1", "total_emp")
-        val outputMetadata = QueryAnalysis.getOutputMetaData(qe)
-        assert(outputMetadata.isDefined)
-        assert(outputMetadata.get.fields.forall(Seq("code", "description", "salary",
-              "total_emp").contains(_)))
-        assert(outputMetadata.get.dataSourceType === DataSourceType.HIVE)
-        assert(outputMetadata.get.source === db + ".mytable")
+        assertHiveInputs(qe, "test_table_1", Seq("total_emp", "salary", "description", "code"))
+        assertHiveOutputs(qe, "mytable", Seq("total_emp", "salary", "description", "code"), db)
       }
     }
   }
@@ -128,6 +108,87 @@ class HiveQueryAnalysisSuite extends SparkFunSuite with TestHiveSingleton with S
     }
   }
 
+  test("CDH-50366: Lineage should output data when there is no inputs") {
+    import hiveContext.implicits._
+    val nonInputTable: String = "MyNonInputTable"
+
+    val nonInputDF = (1 to 4).map { i =>
+      (i % 2 == 0, i, i.toLong, i.toFloat, i.toDouble)
+    }.toDF
+    nonInputDF.write.saveAsTable(nonInputTable)
+    var qe = TestQeListener.getAndClear()
+    assert(QueryAnalysis.getInputMetadata(qe).length === 0)
+    assertHiveOutputs(qe, nonInputTable, Seq( "_1", "_2", "_3", "_4", "_5"))
+    withTempPath { f =>
+      nonInputDF.write.json(f.getCanonicalPath)
+      val qe = TestQeListener.getAndClear()
+      assert(QueryAnalysis.getInputMetadata(qe).length === 0)
+      val outputMetadata = QueryAnalysis.getOutputMetaData(qe)
+      assert(outputMetadata.isDefined)
+      assert(outputMetadata.get.fields.size === 5)
+      assert(outputMetadata.get.source === "file:" + f.getCanonicalPath)
+      assert(outputMetadata.get.dataSourceType === DataSourceType.LOCAL)
+    }
+
+    var anotherDF = hiveContext.sql("select code, description, salary from test_table_1")
+    anotherDF = anotherDF.join(nonInputDF, nonInputDF.col("_3") === anotherDF.col("salary"))
+    anotherDF.write.saveAsTable(nonInputTable + 2)
+    qe = TestQeListener.getAndClear()
+    assertHiveInputs(qe, "test_table_1", Seq("salary", "code", "description"))
+    assertHiveOutputs(qe, nonInputTable + 2, Seq("code", "description", "salary", "_1", "_2", "_3",
+      "_4", "_5"))
+
+    anotherDF.select("_2", "_5", "salary", "code").write.saveAsTable(nonInputTable + 3)
+    qe = TestQeListener.getAndClear()
+    assertHiveInputs(qe, "test_table_1", Seq("salary", "code"))
+    assertHiveOutputs(qe, nonInputTable + 3, Seq("code", "salary", "_2", "_5"))
+
+    var personDF = (1 to 4).map(i => Person(i.toString, i)).toDF
+    personDF.write.saveAsTable(nonInputTable + 4)
+    qe = TestQeListener.getAndClear()
+    val inputMetadata = QueryAnalysis.getInputMetadata(qe)
+    assert(inputMetadata.length === 0)
+    assertHiveOutputs(qe, nonInputTable + 4, Seq("name", "age"))
+
+    personDF = personDF.join(nonInputDF, nonInputDF.col("_3") === personDF.col("age"))
+    personDF.write.saveAsTable(nonInputTable + 5)
+    qe = TestQeListener.getAndClear()
+    assert(QueryAnalysis.getInputMetadata(qe).length === 0)
+    assertHiveOutputs(qe, nonInputTable + 5, Seq("name", "age" , "_1", "_2", "_3",
+      "_4", "_5"))
+
+    val testTableDF = hiveContext.sql("select code, description, salary from test_table_1")
+    personDF = (1 to 4).map(i => Person(i.toString, i)).toDF
+    personDF = personDF.join(testTableDF, testTableDF.col("salary") === personDF.col("age"))
+    personDF.select("code", "description", "name", "age").write.saveAsTable(nonInputTable + 6)
+    qe = TestQeListener.getAndClear()
+    assertHiveInputs(qe, "test_table_1", Seq("description", "code"))
+    assertHiveOutputs(qe, nonInputTable + 6, Seq("code", "description", "name", "age"))
+  }
+
+  def assertHiveInputs(
+      qe: org.apache.spark.sql.execution.QueryExecution,
+      table: String,
+      columns: Seq[String],
+      db: String = "default") {
+    val inputMetadata = QueryAnalysis.getInputMetadata(qe)
+    assert(inputMetadata.length === columns.size)
+    columns.foreach(assertHiveFieldExists(inputMetadata, table, _, db))
+  }
+
+  def assertHiveOutputs(
+      qe: org.apache.spark.sql.execution.QueryExecution,
+      table: String,
+      columns: Seq[String],
+      db: String = "default") {
+    val outputMetadata = QueryAnalysis.getOutputMetaData(qe)
+    assert(outputMetadata.isDefined)
+    assert(outputMetadata.get.fields.size === columns.size)
+    assert(outputMetadata.get.source === db + "." + table)
+    assert(outputMetadata.get.dataSourceType === DataSourceType.HIVE)
+    assert(outputMetadata.get.fields.forall(columns.contains(_)))
+  }
+
   implicit class SqlCmd(sql: String) {
     def cmd: () => Unit = { () =>
       new QueryExecution(sql).stringResult(): Unit
@@ -139,3 +200,5 @@ class HiveQueryAnalysisSuite extends SparkFunSuite with TestHiveSingleton with S
     hiveContext.listenerManager.clear()
   }
 }
+
+case class Person(name: String, age: Long)

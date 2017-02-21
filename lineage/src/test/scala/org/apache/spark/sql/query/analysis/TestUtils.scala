@@ -41,8 +41,9 @@ object TestUtils {
   def assertHiveFieldExists(
       inputMetadata: List[FieldDetails],
       table: String,
-      column: String): Unit = {
-    assert(inputMetadata.contains(FieldDetails(Array("default." + table), column,
+      column: String,
+      db: String = "default"): Unit = {
+    assert(inputMetadata.contains(FieldDetails(Array(db + "." + table), column,
       DataSourceType.HIVE, DataSourceFormat.UNKNOWN)))
   }
 
