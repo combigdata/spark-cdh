@@ -46,7 +46,7 @@ import scala.collection.mutable.ListBuffer
 object QueryAnalysis {
 
   def getOutputMetaData(qe: QueryExecution): Option[QueryDetails] = {
-    getTopLevelNamedExpressions(qe.optimizedPlan) match {
+    getTopLevelNamedExpressions(qe.optimizedPlan, true) match {
       case Some(s) => getSource(qe, qe.outputParams, s.map(_.name))
       case None => None
     }
@@ -155,14 +155,17 @@ object QueryAnalysis {
     getTopLevelNamedExpressions(plan).map(getAttributesReferences)
   }
 
-  private def getTopLevelNamedExpressions(plan: LogicalPlan): Option[List[NamedExpression]] = {
+  private def getTopLevelNamedExpressions(
+      plan: LogicalPlan,
+      output: Boolean = false): Option[List[NamedExpression]] = {
     plan.collectFirst {
       case p @ Project(_, _) => p.projectList.toList
       case Join(left, right, _, _) => {
-        val leftTop = getTopLevelNamedExpressions(left).getOrElse(List.empty)
-        val rightTop = getTopLevelNamedExpressions(right).getOrElse(List.empty)
+        val leftTop = getTopLevelNamedExpressions(left, output).getOrElse(List.empty)
+        val rightTop = getTopLevelNamedExpressions(right, output).getOrElse(List.empty)
         leftTop ::: rightTop
       }
+      case l: LocalRelation if output => l.output.toList
       case l: LogicalRelation => l.output.toList
       case m: MetastoreRelation => m.attributes.toList
     }
