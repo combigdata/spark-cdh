@@ -21,16 +21,16 @@ import javax.ws.rs.core.Response
 
 import com.sun.jersey.spi.container.{ContainerRequest, ContainerRequestFilter}
 
-private[v1] class SecurityFilter extends ContainerRequestFilter with UIRootFromServletContext {
+private[v1] class SecurityFilter extends ContainerRequestFilter with ApiRequestContext {
   def filter(req: ContainerRequest): ContainerRequest = {
-    val user = Option(req.getUserPrincipal).map { _.getName }.orNull
+    val user = httpRequest.getRemoteUser()
     if (uiRoot.securityManager.checkUIViewPermissions(user)) {
       req
     } else {
       throw new WebApplicationException(
         Response
           .status(Response.Status.FORBIDDEN)
-          .entity(raw"""user "$user"is not authorized""")
+          .entity(raw"""user "$user" is not authorized""")
           .build()
       )
     }

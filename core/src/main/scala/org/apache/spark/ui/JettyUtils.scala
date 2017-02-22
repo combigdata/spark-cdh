@@ -90,9 +90,9 @@ private[spark] object JettyUtils extends Logging {
             response.getWriter.println(servletParams.extractFn(result))
             // scalastyle:on println
           } else {
-            response.setStatus(HttpServletResponse.SC_UNAUTHORIZED)
+            response.setStatus(HttpServletResponse.SC_FORBIDDEN)
             response.setHeader("Cache-Control", "no-cache, no-store, must-revalidate")
-            response.sendError(HttpServletResponse.SC_UNAUTHORIZED,
+            response.sendError(HttpServletResponse.SC_FORBIDDEN,
               "User is not authorized to access this page.")
           }
         } catch {

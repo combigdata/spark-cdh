@@ -173,11 +173,15 @@ object MimaExcludes {
       ) ++ Seq(
         // SPARK-12149 Added new fields to ExecutorSummary
         ProblemFilters.exclude[MissingMethodProblem]("org.apache.spark.status.api.v1.ExecutorSummary.this")
+      ) ++ Seq(
+        // [SPARK-19652][UI] Do auth checks for REST API access.
+        ProblemFilters.exclude[DirectMissingMethodProblem]("org.apache.spark.deploy.history.HistoryServer.withSparkUI"),
+        ProblemFilters.exclude[IncompatibleTemplateDefProblem]("org.apache.spark.status.api.v1.UIRootFromServletContext")
       ) ++
       // SPARK-11314: YARN backend moved to yarn sub-module and MiMA complains even though it's a
       // private class.
       MimaBuild.excludeSparkClass("scheduler.cluster.YarnSchedulerBackend$YarnSchedulerEndpoint")
-      
+
     case v if v.startsWith("1.5") =>
       Seq(
         MimaBuild.excludeSparkPackage("network"),
