@@ -592,6 +592,8 @@ class StandaloneDynamicAllocationSuite
       val port = System.currentTimeMillis % 65536
       val endpointRef = mock(classOf[RpcEndpointRef])
       val mockAddress = mock(classOf[RpcAddress])
+      when(mockAddress.host).thenReturn("localhost")
+      when(mockAddress.hostPort).thenReturn(s"localhost:$port")
       when(endpointRef.address).thenReturn(mockAddress)
       val message = RegisterExecutor(id, endpointRef, s"localhost:$port", 10, Map.empty)
       val backend = sc.schedulerBackend.asInstanceOf[CoarseGrainedSchedulerBackend]
