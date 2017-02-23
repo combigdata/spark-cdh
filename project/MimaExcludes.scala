@@ -175,7 +175,7 @@ object MimaExcludes {
         ProblemFilters.exclude[MissingMethodProblem]("org.apache.spark.status.api.v1.ExecutorSummary.this")
       ) ++ Seq(
         // [SPARK-19652][UI] Do auth checks for REST API access.
-        ProblemFilters.exclude[DirectMissingMethodProblem]("org.apache.spark.deploy.history.HistoryServer.withSparkUI"),
+        ProblemFilters.exclude[MissingMethodProblem]("org.apache.spark.deploy.history.HistoryServer.withSparkUI"),
         ProblemFilters.exclude[IncompatibleTemplateDefProblem]("org.apache.spark.status.api.v1.UIRootFromServletContext")
       ) ++
       // SPARK-11314: YARN backend moved to yarn sub-module and MiMA complains even though it's a
