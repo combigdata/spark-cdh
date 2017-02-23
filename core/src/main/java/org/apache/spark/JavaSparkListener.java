@@ -85,4 +85,16 @@ public class JavaSparkListener implements SparkListener {
   @Override
   public void onOtherEvent(SparkListenerEvent event) { }
 
+  @Override
+  public void onExecutorBlacklisted(SparkListenerExecutorBlacklisted executorBlacklisted) { }
+
+  @Override
+  public void onExecutorUnblacklisted(SparkListenerExecutorUnblacklisted executorUnblacklisted) { }
+
+  @Override
+  public void onNodeBlacklisted(SparkListenerNodeBlacklisted nodeBlacklisted) { }
+
+  @Override
+  public void onNodeUnblacklisted(SparkListenerNodeUnblacklisted nodeUnblacklisted) { }
+
 }
