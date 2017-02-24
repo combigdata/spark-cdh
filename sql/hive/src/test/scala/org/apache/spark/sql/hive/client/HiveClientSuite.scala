@@ -20,15 +20,14 @@ package org.apache.spark.sql.hive.client
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.hive.conf.HiveConf
 
-import org.apache.spark.SparkFunSuite
+import org.apache.spark.{SparkConf, SparkFunSuite}
 import org.apache.spark.sql.catalyst.catalog._
 import org.apache.spark.sql.catalyst.expressions.{AttributeReference, EqualTo, Literal}
 import org.apache.spark.sql.hive.HiveUtils
 import org.apache.spark.sql.types.IntegerType
+import org.apache.spark.util.Utils
 
 class HiveClientSuite extends SparkFunSuite {
-  private val clientBuilder = new HiveClientBuilder
-
   private val tryDirectSqlKey = HiveConf.ConfVars.METASTORE_TRY_DIRECT_SQL.varname
 
   test(s"getPartitionsByFilter returns all partitions when $tryDirectSqlKey=false") {
@@ -42,9 +41,14 @@ class HiveClientSuite extends SparkFunSuite {
       compressed = false,
       properties = Map.empty)
 
+    val tempDir = Utils.createTempDir()
+
     val hadoopConf = new Configuration()
     hadoopConf.setBoolean(tryDirectSqlKey, false)
-    val client = clientBuilder.buildClient(HiveUtils.hiveExecutionVersion, hadoopConf)
+    hadoopConf.set(HiveConf.ConfVars.METASTOREWAREHOUSE.varname, tempDir.toURI().toString())
+
+    val client = HiveUtils.newClientForMetadata(new SparkConf(), hadoopConf,
+      HiveUtils.newTemporaryConfiguration(true))
     client.runSqlHive("CREATE TABLE test (value INT) PARTITIONED BY (part INT)")
 
     val partitions = (1 to testPartitionCount).map { part =>
