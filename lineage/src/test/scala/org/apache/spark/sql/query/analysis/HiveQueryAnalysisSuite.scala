@@ -135,7 +135,7 @@ class HiveQueryAnalysisSuite extends SparkFunSuite with TestHiveSingleton with S
   }
 
   override def afterAll(): Unit = {
+    super.afterAll()
     hiveContext.listenerManager.clear()
-    hiveContext.sparkContext.stop()
   }
 }

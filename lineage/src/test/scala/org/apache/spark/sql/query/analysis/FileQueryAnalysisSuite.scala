@@ -26,11 +26,8 @@ import org.apache.spark.sql.test.SharedSQLContext
 /**
  * Tests that reading and writing to the local and HDFS file systems produces the desired lineage.
  */
-class FileQueryAnalysisSuite
-    extends SparkFunSuite
-    with ParquetHDFSTest
-    with ParquetTest
-    with SharedSQLContext {
+class FileQueryAnalysisSuite extends SharedSQLContext with ParquetHDFSTest with
+ParquetTest {
 
   test("Local file works") {
     testSimpleQuery(withParquetFile, DataSourceType.LOCAL)
@@ -91,10 +88,5 @@ class FileQueryAnalysisSuite
         }
       }
     }
-  }
-
-  override def afterAll(): Unit = {
-    sqlContext.listenerManager.clear()
-    sqlContext.sparkContext.stop()
   }
 }

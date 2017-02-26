@@ -135,7 +135,7 @@ private[lineage] class ClouderaNavigatorListener
       try {
         fileWriter = new OutputStreamWriter(
             new FileOutputStream(dir + File.separator + "spark_lineage_log_" + sc.applicationId
-                  + "-" + sc.startTime + ".log"), StandardCharsets.UTF_8);
+                  + "-" + sc.startTime + ".log", true), StandardCharsets.UTF_8);
         fileWriter.append(mapper.writeValueAsString(lineageElement) + System.lineSeparator())
       } finally {
         if (fileWriter != null) {
