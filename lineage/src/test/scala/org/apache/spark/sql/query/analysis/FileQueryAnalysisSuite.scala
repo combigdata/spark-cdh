@@ -19,6 +19,7 @@ package org.apache.spark.sql.query.analysis
 
 import org.apache.spark.SparkFunSuite
 import org.apache.spark.sql.execution.datasources.parquet.ParquetTest
+import org.apache.spark.sql.hive.test.TestHiveSingleton
 import org.apache.spark.sql.query.analysis.DataSourceType.DataSourceType
 import org.apache.spark.sql.query.analysis.TestUtils._
 import org.apache.spark.sql.test.SharedSQLContext
@@ -26,8 +27,8 @@ import org.apache.spark.sql.test.SharedSQLContext
 /**
  * Tests that reading and writing to the local and HDFS file systems produces the desired lineage.
  */
-class FileQueryAnalysisSuite extends SharedSQLContext with ParquetHDFSTest with
-ParquetTest {
+class FileQueryAnalysisSuite extends ParquetTest with ParquetHDFSTest with TestHiveSingleton
+ {
 
   test("Local file works") {
     testSimpleQuery(withParquetFile, DataSourceType.LOCAL)
