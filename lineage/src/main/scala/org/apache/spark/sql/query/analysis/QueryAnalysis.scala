@@ -45,11 +45,9 @@ import scala.collection.mutable.ListBuffer
  */
 object QueryAnalysis {
 
-  def getOutputMetaData(
-      qe: QueryExecution,
-      extraParams: Map[String, String]): Option[QueryDetails] = {
+  def getOutputMetaData(qe: QueryExecution): Option[QueryDetails] = {
     getTopLevelNamedExpressions(qe.optimizedPlan) match {
-      case Some(s) => getSource(qe, extraParams, s.map(_.name))
+      case Some(s) => getSource(qe, qe.outputParams, s.map(_.name))
       case None => None
     }
   }

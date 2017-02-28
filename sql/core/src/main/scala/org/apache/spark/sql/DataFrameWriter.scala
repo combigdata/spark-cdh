@@ -153,10 +153,11 @@ final class DataFrameWriter private[sql](df: DataFrame) {
         val start = System.nanoTime()
         action
         val end = System.nanoTime()
-        df.sqlContext.listenerManager.onSuccess(funcName, qe, end - start, options.toMap)
+        qe.outputParams = options.toMap
+        df.sqlContext.listenerManager.onSuccess(funcName, qe, end - start)
       } catch {
         case e: Exception =>
-            df.sqlContext.listenerManager.onFailure(funcName, qe, e, options.toMap)
+            df.sqlContext.listenerManager.onFailure(funcName, qe, e)
             throw e
       }
   }

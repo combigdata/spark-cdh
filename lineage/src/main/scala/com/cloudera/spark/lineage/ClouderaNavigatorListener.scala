@@ -46,17 +46,11 @@ private[lineage] class ClouderaNavigatorListener
   private val SPARK_LINEAGE_DIR_PROPERTY: String = "spark.lineage.log.dir"
   private val DEFAULT_SPARK_LINEAGE_DIR: String = "/var/log/spark/lineage"
 
-  override def onFailure(
-      funcName: String,
-      qe: QueryExecution,
-      exception: Exception,
-      extraParams: Map[String, String]): Unit = {}
+  override def onFailure( funcName: String, qe: QueryExecution, exception: Exception): Unit = {}
 
-  override def onSuccess(
-      funcName: String,
-      qe: QueryExecution,
-      durationNs: Long,
-      extraParams: Map[String, String]): Unit = writeQueryMetadata(qe, durationNs, extraParams)
+  override def onSuccess( funcName: String, qe: QueryExecution, durationNs: Long): Unit = {
+    writeQueryMetadata(qe, durationNs)
+  }
 
   override def onApplicationEnd(applicationEnd: SparkListenerApplicationEnd): Unit = {
     val sc = SparkContext.getOrCreate()
@@ -67,10 +61,7 @@ private[lineage] class ClouderaNavigatorListener
     }
   }
 
-  private def writeQueryMetadata(
-      qe: QueryExecution,
-      durationNs: Long,
-      extraParams: Map[String, String]): Unit = {
+  private def writeQueryMetadata( qe: QueryExecution, durationNs: Long): Unit = {
     val sc = SparkContext.getOrCreate()
     if (checkLineageEnabled(sc)) {
       val lineageElement = getNewLineageElement(sc)
@@ -85,7 +76,7 @@ private[lineage] class ClouderaNavigatorListener
         .foreach(lineageElement.addInput(_))
 
       QueryAnalysis
-        .getOutputMetaData(qe, extraParams)
+        .getOutputMetaData(qe)
         .map(addHiveMetastoreLocation(_, qe))
         .foreach(lineageElement.addOutput(_))
 
@@ -125,6 +116,7 @@ private[lineage] class ClouderaNavigatorListener
   /**
    * Write the lineage element to the file, flush and close it so that navigator can see the data
    * immediately
+   *
    * @param lineageElement
    * @param sc
    */
