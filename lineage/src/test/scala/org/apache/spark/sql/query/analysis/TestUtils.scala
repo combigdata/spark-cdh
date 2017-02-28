@@ -23,28 +23,17 @@ import org.apache.spark.sql.util.QueryExecutionListener
 
 object TestQeListener extends QueryExecutionListener {
   private var qe: QueryExecution = _
-  private var extraParams: Map[String, String] = _
 
-  override def onSuccess(
-      funcName: String,
-      qe: QueryExecution,
-      durationNs: Long,
-      extraParams: Map[String, String]): Unit = {
+  override def onSuccess( funcName: String, qe: QueryExecution, durationNs: Long): Unit = {
     this.qe = qe
-    this.extraParams = extraParams
   }
 
-  override def onFailure(
-      funcName: String,
-      qe: QueryExecution,
-      exception: Exception,
-      extraParams: Map[String, String]): Unit = {}
+  override def onFailure( funcName: String, qe: QueryExecution, exception: Exception): Unit = {}
 
-  def getAndClear(): (QueryExecution, Map[String, String]) = {
-    val rValues = (qe, extraParams)
+  def getAndClear(): QueryExecution = {
+    val rQe = qe
     qe = null
-    extraParams = null
-    rValues
+    rQe
   }
 }
 

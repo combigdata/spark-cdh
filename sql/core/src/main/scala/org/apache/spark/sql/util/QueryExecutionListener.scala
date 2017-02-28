@@ -46,11 +46,7 @@ trait QueryExecutionListener {
    * @param durationNs the execution time for this query in nanoseconds.
    */
   @DeveloperApi
-  def onSuccess(
-      funcName: String,
-      qe: QueryExecution,
-      durationNs: Long,
-      extraParams: Map[String, String] = Map.empty): Unit
+  def onSuccess(funcName: String, qe: QueryExecution, durationNs: Long): Unit
 
   /**
    * A callback function that will be called when a query execution failed.
@@ -62,11 +58,7 @@ trait QueryExecutionListener {
    * @param exception the exception that failed this query.
    */
   @DeveloperApi
-  def onFailure(
-      funcName: String,
-      qe: QueryExecution,
-      exception: Exception,
-      extraParams: Map[String, String] = Map.empty): Unit
+  def onFailure(funcName: String, qe: QueryExecution, exception: Exception): Unit
 }
 
 
@@ -102,26 +94,18 @@ class ExecutionListenerManager private[sql] () extends Logging {
     listeners.clear()
   }
 
-  private[sql] def onSuccess(
-      funcName: String,
-      qe: QueryExecution,
-      duration: Long,
-      extraParams: Map[String, String] = Map()): Unit = {
+  private[sql] def onSuccess(funcName: String, qe: QueryExecution, duration: Long): Unit = {
     readLock {
       withErrorHandling { listener =>
-          listener.onSuccess(funcName, qe, duration, extraParams)
+        listener.onSuccess(funcName, qe, duration)
       }
     }
   }
 
-  private[sql] def onFailure(
-      funcName: String,
-      qe: QueryExecution,
-      exception: Exception,
-      extraParams: Map[String, String] = Map()): Unit = {
+  private[sql] def onFailure(funcName: String, qe: QueryExecution, exception: Exception): Unit = {
     readLock {
       withErrorHandling { listener =>
-          listener.onFailure(funcName, qe, exception, extraParams)
+        listener.onFailure(funcName, qe, exception)
       }
     }
   }
