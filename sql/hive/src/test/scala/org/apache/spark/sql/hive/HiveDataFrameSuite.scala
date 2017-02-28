@@ -41,16 +41,9 @@ class HiveDataFrameSuite extends QueryTest with TestHiveSingleton with SQLTestUt
     var onWriteSuccessCalled = false
 
     hiveContext.listenerManager.register(new QueryExecutionListener {
-      override def onFailure(
-                              funcName: String,
-                              qe: QueryExecution,
-                              exception: Exception,
-                              options: Map[String, String]): Unit = {}
-      override def onSuccess(
-                              funcName: String,
-                              qe: QueryExecution,
-                              durationNs: Long,
-                              options: Map[String, String]): Unit = {
+      override def onFailure( funcName: String, qe: QueryExecution, exception: Exception): Unit = {}
+
+      override def onSuccess( funcName: String, qe: QueryExecution, durationNs: Long): Unit = {
         assert(durationNs > 0)
         assert(qe ne null)
         onWriteSuccessCalled = true

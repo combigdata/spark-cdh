@@ -17,6 +17,7 @@
 
 package org.apache.spark.sql.execution
 
+import org.apache.spark.annotation.DeveloperApi
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.SQLContext
 import org.apache.spark.sql.catalyst.InternalRow
@@ -53,6 +54,8 @@ class QueryExecution(val sqlContext: SQLContext, val logical: LogicalPlan) {
 
   /** Internal version of the RDD. Avoids copies and has no schema */
   lazy val toRdd: RDD[InternalRow] = executedPlan.execute()
+
+  private[sql] var outputParams: Map[String, String] = Map.empty
 
   protected def stringOrError[A](f: => A): String =
     try f.toString catch { case e: Throwable => e.toString }

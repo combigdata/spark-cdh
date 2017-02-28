@@ -17,12 +17,10 @@
 
 package org.apache.spark.sql.query.analysis
 
-import org.apache.spark.SparkFunSuite
 import org.apache.spark.sql.execution.datasources.parquet.ParquetTest
 import org.apache.spark.sql.hive.test.TestHiveSingleton
 import org.apache.spark.sql.query.analysis.DataSourceType.DataSourceType
 import org.apache.spark.sql.query.analysis.TestUtils._
-import org.apache.spark.sql.test.SharedSQLContext
 
 /**
  * Tests that reading and writing to the local and HDFS file systems produces the desired lineage.
@@ -53,12 +51,12 @@ class FileQueryAnalysisSuite extends ParquetTest with ParquetHDFSTest with TestH
     fileFunc((1 to 4).map(i => Customer(i, i.toString))) { parquetFile =>
       val df = sqlContext.read.load(parquetFile).select("id", "name")
       df.write.save(parquetFile + "_output")
-      val (qe, extraParams) = TestQeListener.getAndClear()
+      val qe = TestQeListener.getAndClear()
       val inputMetadata = QueryAnalysis.getInputMetadata(qe)
       assert(inputMetadata.length === 2)
       assertHDFSFieldExists(inputMetadata, Array(parquetFile), "id", dataSourceType)
       assertHDFSFieldExists(inputMetadata, Array(parquetFile), "name", dataSourceType)
-      val outputMetadata = QueryAnalysis.getOutputMetaData(df.queryExecution, extraParams)
+      val outputMetadata = QueryAnalysis.getOutputMetaData(df.queryExecution)
       assert(outputMetadata.isDefined)
       assert(outputMetadata.get.fields.forall(Seq("id", "name").contains(_)))
       assert(outputMetadata.get.dataSourceType === dataSourceType)
@@ -76,12 +74,12 @@ class FileQueryAnalysisSuite extends ParquetTest with ParquetHDFSTest with TestH
           val parquetFiles = Array(parquetFile, parquetFile2, parquetFile3)
           val df = sqlContext.read.load(parquetFiles: _*).select("id", "name")
           df.write.save(parquetFile + "_output")
-          val (qe, extraParams) = TestQeListener.getAndClear()
+          val qe = TestQeListener.getAndClear()
           val inputMetadata = QueryAnalysis.getInputMetadata(qe)
           assert(inputMetadata.length === 2)
           assertHDFSFieldExists(inputMetadata, parquetFiles, "id", dataSourceType)
           assertHDFSFieldExists(inputMetadata, parquetFiles, "name", dataSourceType)
-          val outputMetadata = QueryAnalysis.getOutputMetaData(df.queryExecution, extraParams)
+          val outputMetadata = QueryAnalysis.getOutputMetaData(df.queryExecution)
           assert(outputMetadata.isDefined)
           assert(outputMetadata.get.fields.forall(Seq("id", "name").contains(_)))
           assert(outputMetadata.get.dataSourceType === dataSourceType)
