@@ -30,6 +30,10 @@ if [[ "$VERSION" != 2* ]]; then
   exit 1
 fi
 
+# Generate a short version from the POM version, so that we can tag the build so cdep can always
+# pick up the latest build from a branch without needing code changes.
+SHORT_VERSION=$(echo "$VERSION" | cut -d . -f 1-3)
+
 # Commitish from github.mtv.cloudera.com/CDH/cdh.git repo
 # Taken from a point in time from cdh6.x branch of cdh.git, so someone doesn't pull the rug from underneath us
 # If specifying a branch here for testing, specify origin/<branch name>
@@ -56,7 +60,7 @@ MAKE_MANIFEST_LOCATION=http://github.mtv.cloudera.com/raw/Starship/cmf/${CMF_GIT
 # We are building a non-patch build by default
 PATCH_NUMBER=0
 
-BUILDDB_HOST=${BUILDDB_HOST:-"mostrows-builddb.vpc.cloudera.com:8080"}
+BUILDDB_HOST=${BUILDDB_HOST:-"builddb.infra.cloudera.com:8080"}
 STORAGE_HOST=${STORAGE_HOST:-"console.aws.amazon.com/s3/home?region=us-west-1#&bucket=cloudera-build&prefix=build"}
 
 CSD_WILDCARD="$SPARK_HOME/csd/target/SPARK2_ON_YARN*.jar"
@@ -68,17 +72,23 @@ GBN=
 EXPIRE_DAYS=${EXPIRE_DAYS:-10}
 
 function usage {
-  echo "build.sh for building a parcel from source code. Can be called from any working directory."
-  echo "Requirements: JAVA_HOME needs to be set, Python 2.7 or higher"
-  echo "Call simply as build.sh"
-  echo "Options:"
-  echo "-h or --help for printing usage"
-  echo "-s or --skip-build for skipping the spark2 build. The bits built from last time used to build parcel"
-  echo "-p <patch number> or --patch-num <patch number> when building a patch"
-  echo "--publish for publishing to S3"
-  echo "--build-only for only doing the build (i.e. only building distribution tar.gz, no parcel etc.)"
-  echo "-t or --with-tests to run unit tests after the build (and optional publishing) is complete."
-  echo "--os for choosing the os that the parcel should be built for. The OS name should be the long name (like Redhat6). For each os a seperate --os should be used. If the --os is not provided, the parcel will be built for all the supported distributions."
+  set +x
+  cat <<EOF
+build.sh for building a parcel from source code. Can be called from any working directory.
+Requirements: JAVA_HOME needs to be set, Python 2.7 or higher
+Call simply as build.sh
+
+Options:
+ -h or --help:  print usage
+ -s or --skip-build:  skip the build. The bits built from last time used to build the parcel.
+ -p <patch number> or --patch-num <patch number>:  when building a patch
+ --publish: for publishing to S3
+ --build-only: for only doing the build (i.e. only building distribution tar.gz, no parcel etc.)
+ -t or --with-tests: run unit tests after the build (and optional publishing) is complete.
+ --os <osname>: choose the os that the parcel should be built for. The OS name should be the long
+                name (like Redhat6). For each os a seperate --os should be used. If the --os is
+                not provided, the parcel will be built for all the supported distributions.
+EOF
 }
 
 function my_echo {
@@ -327,6 +337,7 @@ function publish {
   echo ${GBN} > ${REPO_OUTPUT_DIR}/gbn.txt
   $PYTHON_VE/bin/python ${CDH_CLONE_DIR}/lib/python/cauldron/src/cauldron/tools/upload.py s3 ${REPO_OUTPUT_DIR}:${GBN}
   curl http://${BUILDDB_HOST}/save?gbn=${GBN}
+  curl "http://${BUILDDB_HOST}/addtag?gbn=${GBN}&value=${SHORT_VERSION}-latest"
   if [[ $PATCH_NUMBER -ne 0 ]]; then
        curl "http://${BUILDDB_HOST}/addtag?gbn=${GBN}&value=released"
   fi
@@ -439,5 +450,3 @@ if [[ "$RUN_TESTS" = true ]]; then
       my_echo "https://${STORAGE_HOST}/${GBN}"
   fi
 fi
-
-
