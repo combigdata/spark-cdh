@@ -91,3 +91,8 @@ spark-warehouse/
 *.Rproj.*
 
 .Rproj.user
+
+# Cloudera-specific build files.
+build/cdh*
+cloudera/util.py
+
