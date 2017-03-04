@@ -69,7 +69,6 @@ private[lineage] class ClouderaNavigatorListener
     val sc = SparkContext.getOrCreate()
     if (checkLineageEnabled(sc)) {
       val lineageElement = getNewLineageElement(sc)
-      lineageElement.yarnApplicationId = sc.applicationId
       lineageElement.duration = durationNs / 1000000
       lineageElement.user = sc.sparkUser
 
@@ -95,6 +94,7 @@ private[lineage] class ClouderaNavigatorListener
     lineageElement.applicationID =
       sc.getConf.getOption("spark.lineage.app.name").getOrElse(sc.applicationId)
     lineageElement.timestamp = System.currentTimeMillis()
+    lineageElement.yarnApplicationId = sc.applicationId
     lineageElement
   }
 
