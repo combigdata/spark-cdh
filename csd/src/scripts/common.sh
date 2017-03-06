@@ -64,6 +64,10 @@ export SPARK_DAEMON_JAVA_OPTS="$SPARK_DAEMON_JAVA_OPTS -Djava.net.preferIPv4Stac
 # Make sure PARCELS_ROOT is in the format we expect, canonicalized and without a trailing slash.
 export PARCELS_ROOT=$(readlink -m "$PARCELS_ROOT")
 
+# Make sure DEFAULT_SPARK_KAFKA_VERSION is set (since the config is only available for the gateway
+# role).
+DEFAULT_SPARK_KAFKA_VERSION=${DEFAULT_SPARK_KAFKA_VERSION:-None}
+
 # Reads a line in the format "$host:$key=$value", setting those variables.
 function readconf {
   local conf
@@ -147,6 +151,7 @@ function prepare_spark_env {
   replace "{{SPARK_EXTRA_LIB_PATH}}" "$SPARK_LIBRARY_PATH" "$SPARK_ENV"
   replace "{{PYTHON_PATH}}" "$PYTHON_PATH" "$SPARK_ENV"
   replace "{{CDH_PYTHON}}" "$CDH_PYTHON" "$SPARK_ENV"
+  replace "{{DEFAULT_SPARK_KAFKA_VERSION}}" "$DEFAULT_SPARK_KAFKA_VERSION" "$SPARK_ENV"
 
   local CLASSPATH_FILE="$(dirname $SPARK_ENV)/classpath.txt"
   local CLASSPATH_FILE_TMP="${CLASSPATH_FILE}.tmp"

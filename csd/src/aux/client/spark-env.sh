@@ -58,4 +58,22 @@ if [ -n "$TMP_PYSPARK_PYTHON" ] && [ -n "$TMP_PYSPARK_DRIVER_PYTHON" ]; then
   export PYSPARK_DRIVER_PYTHON="$TMP_PYSPARK_DRIVER_PYTHON"
 fi
 
-export SPARK_DIST_CLASSPATH=$(paste -sd: "$SELF/classpath.txt")
+# Add the Kafka jars configured by the user to the classpath.
+SPARK_DIST_CLASSPATH=
+SPARK_KAFKA_VERSION=${SPARK_KAFKA_VERSION:-'{{DEFAULT_SPARK_KAFKA_VERSION}}'}
+case "$SPARK_KAFKA_VERSION" in
+  0.9)
+    SPARK_DIST_CLASSPATH="$SPARK_HOME/kafka-0.9/*"
+    ;;
+  0.10)
+    SPARK_DIST_CLASSPATH="$SPARK_HOME/kafka-0.10/*"
+    ;;
+  None)
+    ;;
+  *)
+    echo "Invalid Kafka version: $SPARK_KAFKA_VERSION"
+    exit 1
+    ;;
+esac
+
+export SPARK_DIST_CLASSPATH="$SPARK_DIST_CLASSPATH:$(paste -sd: "$SELF/classpath.txt")"

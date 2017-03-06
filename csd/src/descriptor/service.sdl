@@ -405,6 +405,15 @@
         "required" : "true",
         "type" : "boolean",
         "default" : true
+      },
+      {
+        "name" : "spark_kafka_version",
+        "label" : "Default Kafka Version",
+        "description" : "Default Kafka library version to add to Spark applications. This can be overridden by setting the SPARK_KAFKA_VERSION environment variable when launching Spark applications.",
+        "required" : "true",
+        "type" : "string_enum",
+        "validValues" : [ "0.9", "0.10", "None" ],
+        "default" : "0.9"
       }
     ],
     "scriptRunner" : {
@@ -412,7 +421,8 @@
       "args" : [ "client" ],
       "environmentVariables" : {
         "DEPLOY_MODE" : "${spark_deploy_mode}",
-        "PYTHON_PATH" : "${spark_python_path}"
+        "PYTHON_PATH" : "${spark_python_path}",
+        "DEFAULT_SPARK_KAFKA_VERSION" : "${spark_kafka_version}"
       }
     },
     "logging" : {
