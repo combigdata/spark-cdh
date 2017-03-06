@@ -167,11 +167,15 @@ echo -e "\$ ${BUILD_COMMAND[@]}\n"
 # Make directories
 rm -rf "$DISTDIR"
 mkdir -p "$DISTDIR/jars"
+mkdir -p "$DISTDIR/kafka-0.9"
+mkdir -p "$DISTDIR/kafka-0.10"
 echo "Spark $VERSION$GITREVSTRING built for Hadoop $SPARK_HADOOP_VERSION" > "$DISTDIR/RELEASE"
 echo "Build flags: $@" >> "$DISTDIR/RELEASE"
 
 # Copy jars
 cp "$SPARK_HOME"/assembly/target/scala*/jars/* "$DISTDIR/jars/"
+cp "$SPARK_HOME"/external/kafka-0-10-assembly/target/scala*/jars/* "$DISTDIR/kafka-0.10/"
+cp "$SPARK_HOME"/external/kafka-0-8-assembly/target/scala*/jars/* "$DISTDIR/kafka-0.9/"
 
 # Only create the yarn directory if the yarn artifacts were built.
 if [ -f "$SPARK_HOME"/common/network-yarn/target/scala*/spark-*-yarn-shuffle.jar ]; then

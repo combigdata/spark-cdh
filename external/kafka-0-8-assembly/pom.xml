@@ -32,6 +32,7 @@
 
   <properties>
     <sbt.project.name>streaming-kafka-0-8-assembly</sbt.project.name>
+    <build.copyDependenciesPhase>package</build.copyDependenciesPhase>
   </properties>
 
   <dependencies>
@@ -44,6 +45,18 @@
       <groupId>org.apache.spark</groupId>
       <artifactId>spark-streaming_${scala.binary.version}</artifactId>
       <version>${project.version}</version>
+      <scope>provided</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.spark</groupId>
+      <artifactId>spark-tags_${scala.binary.version}</artifactId>
+      <version>${project.version}</version>
+      <scope>provided</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.spark-project.spark</groupId>
+      <artifactId>unused</artifactId>
+      <version>1.0.0</version>
       <scope>provided</scope>
     </dependency>
     <!--
@@ -103,6 +116,11 @@
     <dependency>
       <groupId>org.scala-lang</groupId>
       <artifactId>scala-library</artifactId>
+      <scope>provided</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.scala-lang.modules</groupId>
+      <artifactId>scala-parser-combinators_${scala.binary.version}</artifactId>
       <scope>provided</scope>
     </dependency>
     <dependency>
@@ -171,5 +189,21 @@
     </plugin>
   </plugins>
 </build>
+
+  <profiles>
+    <!-- Profiles that disable inclusion of certain dependencies. -->
+    <profile>
+      <id>hadoop-provided</id>
+      <properties>
+        <hadoop.deps.scope>provided</hadoop.deps.scope>
+      </properties>
+      <activation>
+        <property>
+          <name>cdh.build</name>
+        </property>
+      </activation>
+    </profile>
+  </profiles>
+
 </project>
 
