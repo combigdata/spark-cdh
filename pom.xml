@@ -111,6 +111,7 @@
     <module>external/kafka-0-10</module>
     <module>external/kafka-0-10-assembly</module>
     <module>external/kafka-0-10-sql</module>
+    <module>csd</module>
   </modules>
 
   <properties>
@@ -739,6 +740,11 @@
         <groupId>org.scala-lang</groupId>
         <artifactId>scalap</artifactId>
         <version>${scala.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.scala-lang.modules</groupId>
+        <artifactId>scala-parser-combinators_${scala.binary.version}</artifactId>
+        <version>1.0.4</version>
       </dependency>
       <dependency>
         <groupId>org.scalatest</groupId>
