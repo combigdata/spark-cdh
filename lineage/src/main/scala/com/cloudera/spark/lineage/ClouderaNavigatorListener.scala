@@ -24,6 +24,10 @@ import java.nio.file.{Files, Paths}
 import com.fasterxml.jackson.annotation.JsonInclude.Include
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.module.scala.DefaultScalaModule
+
+import org.apache.hadoop.hive.conf.HiveConf
+import org.apache.hadoop.hive.conf.HiveConf.ConfVars._
+
 import org.apache.spark.{Logging, SparkContext}
 import org.apache.spark.scheduler.{SparkListener, SparkListenerApplicationEnd}
 import org.apache.spark.sql.execution.QueryExecution
@@ -98,7 +102,7 @@ private[lineage] class ClouderaNavigatorListener
       queryDetails: QueryDetails,
       qe: QueryExecution): QueryDetails = {
     if (queryDetails.dataSourceType == DataSourceType.HIVE) {
-      queryDetails.hiveMetastoreLocation = Some(qe.sqlContext.getConf("hive.metastore.uris"))
+      queryDetails.hiveMetastoreLocation = Option(new HiveConf().getVar(METASTOREURIS))
     }
     queryDetails
   }
