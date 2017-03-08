@@ -27,6 +27,7 @@ import scala.util.control.NonFatal
 
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.{FileSystem, Path}
+import org.apache.hadoop.hive.conf.HiveConf
 import org.apache.hadoop.hive.ql.metadata.HiveException
 import org.apache.thrift.TException
 
@@ -226,18 +227,35 @@ private[spark] class HiveExternalCatalog(conf: SparkConf, hadoopConf: Configurat
       throw new TableAlreadyExistsException(db = db, table = table)
     }
 
-    // Ideally we should not create a managed table with location, but Hive serde table can
-    // specify location for managed table. And in [[CreateDataSourceTableAsSelectCommand]] we have
-    // to create the table directory and write out data before we create this table, to avoid
-    // exposing a partial written table.
-    val needDefaultTableLocation = tableDefinition.tableType == MANAGED &&
-      tableDefinition.storage.locationUri.isEmpty
-
-    val tableLocation = if (needDefaultTableLocation) {
-      Some(CatalogUtils.stringToURI(defaultTablePath(tableDefinition.identifier)))
-    } else {
-      tableDefinition.storage.locationUri
-    }
+      // Ideally we should not create a managed table with location, but Hive serde table can
+      // specify location for managed table. And in [[CreateDataSourceTableAsSelectCommand]] we have
+      // to create the table directory and write out data before we create this table, to avoid
+      // exposing a partial written table.
+      //
+      // CDH-51334: when using a remote metastore, and if a managed table is being created with its
+      // location explicitly set to the location where it would be created anyway, then do
+      // not set its location explicitly. This avoids an issue with Sentry in secure clusters.
+      // Otherwise, the above comment applies.
+      //
+      // This workaround is not done for embedded metastores because (i) there's no Sentry in that
+      // case, and (ii) HiveSparkSubmitSuite has a unit test that relies on the behavior without
+      // the CDH change.
+      val tableLocation: Option[String] = if (tableDefinition.tableType == MANAGED) {
+        val metastoreURIs = client.getConf(HiveConf.ConfVars.METASTOREURIS.varname, "")
+        if (metastoreURIs.nonEmpty) {
+          val fs = FileSystem.get(hadoopConf)
+          val metastoreTableLocation = fs.makeQualified(
+            new Path(defaultTablePath(tableDefinition.identifier)))
+          tableDefinition.storage.locationUri
+            .map { path => fs.makeQualified(new Path(path)).toString }
+            .filter(_ != metastoreTableLocation)
+        } else {
+          tableDefinition.storage.locationUri
+            .orElse(Some(defaultTablePath(tableDefinition.identifier)))
+        }
+      } else {
+        tableDefinition.storage.locationUri
+      }
 
     if (DDLUtils.isDatasourceTable(tableDefinition)) {
       createDataSourceTable(
