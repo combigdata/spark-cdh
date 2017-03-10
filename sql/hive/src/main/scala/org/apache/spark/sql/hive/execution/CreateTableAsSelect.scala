@@ -31,7 +31,7 @@ import org.apache.spark.sql.{AnalysisException, Row, SQLContext}
  * @param allowExisting allow continue working if it's already exists, otherwise
  *                      raise exception
  */
-private[hive]
+private[sql]
 case class CreateTableAsSelect(
     tableDesc: HiveTable,
     query: LogicalPlan,
