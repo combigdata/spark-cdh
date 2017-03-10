@@ -32,6 +32,7 @@ import org.apache.spark.sql.execution.datasources.{
   LogicalRelation
 }
 import org.apache.spark.sql.hive.MetastoreRelation
+import org.apache.spark.sql.hive.execution.CreateTableAsSelect
 import org.apache.spark.sql.query.analysis.DataSourceFormat.DataSourceFormat
 import org.apache.spark.sql.query.analysis.DataSourceType.DataSourceType
 import org.apache.spark.sql.sources.HadoopFsRelation
@@ -67,6 +68,9 @@ object QueryAnalysis {
                 DataSourceType.HIVE))
           case CreateTableUsingAsSelect(t, _, _, _, _, _, _) =>
             Some(QueryDetails(getQualifiedDBName(qe, t), fields.to[ListBuffer],
+                DataSourceType.HIVE))
+          case CreateTableAsSelect(ht, _, _) =>
+            Some(QueryDetails(ht.database + "." + ht.name, fields.to[ListBuffer],
                 DataSourceType.HIVE))
           case _ => None
         }
@@ -204,6 +208,7 @@ object QueryAnalysis {
           None
         }
       case m: MetastoreRelation => Some(m)
+      case CreateTableAsSelect(_, query, _) => getRelation(query, attr)
       case p @ Project(_, _) =>
         if (getAttributesReferences(p.projectList).exists(a => a.sameRef(attr))) {
           getRelation(p.child, attr)

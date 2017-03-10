@@ -43,8 +43,9 @@ object TestUtils {
       table: String,
       column: String,
       db: String = "default"): Unit = {
-    assert(inputMetadata.contains(FieldDetails(Array(db + "." + table), column,
-      DataSourceType.HIVE, DataSourceFormat.UNKNOWN)))
+    val fd = FieldDetails(Array(db + "." + table), column,
+      DataSourceType.HIVE, DataSourceFormat.UNKNOWN)
+    assert(inputMetadata.contains(fd), s"$inputMetadata doesn't contain: $fd")
   }
 
   def assertHDFSFieldExists(
@@ -52,8 +53,9 @@ object TestUtils {
       parquetFiles: Array[String],
       column: String,
       dataSourceType: DataSourceType): Unit = {
-    assert(inputMetadata.contains(FieldDetails(parquetFiles.map(getScheme(dataSourceType) + _),
-      column, dataSourceType, DataSourceFormat.UNKNOWN)))
+    val fd = FieldDetails(parquetFiles.map(getScheme(dataSourceType) + _), column,
+      dataSourceType, DataSourceFormat.UNKNOWN)
+    assert(inputMetadata.contains(fd), s"$inputMetadata doesn't contain: $fd")
   }
 
   def getScheme(dataSourceType: DataSourceType): String = {

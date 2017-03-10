@@ -142,9 +142,23 @@ class DataFrame private[sql](
     case _: Command |
          _: InsertIntoTable |
          _: CreateTableUsingAsSelect =>
-      LogicalRDD(queryExecution.analyzed.output, queryExecution.toRdd)(sqlContext)
+      LogicalRDD(queryExecution.analyzed.output, withCallback("CTAS", queryExecution))(sqlContext)
     case _ =>
       queryExecution.analyzed
+  }
+
+  private def withCallback(funcName: String, qe: QueryExecution): RDD[InternalRow] = {
+    try {
+      val start = System.nanoTime()
+      val rdd = qe.toRdd
+      val end = System.nanoTime()
+      qe.sqlContext.listenerManager.onSuccess(funcName, qe, end - start)
+      rdd
+    } catch {
+      case e: Exception =>
+        qe.sqlContext.listenerManager.onFailure(funcName, qe, e)
+        throw e
+    }
   }
 
   protected[sql] def resolve(colName: String): NamedExpression = {
