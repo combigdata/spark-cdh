@@ -166,6 +166,49 @@ class HiveQueryAnalysisSuite
     assertHiveOutputs(qe, nonInputTable + 6, Seq("code", "description", "name", "age"))
   }
 
+  test("CDH-51351: CTAS Queries should report lineage") {
+    val inputDF = hiveContext.sql("select * from test_table_1")
+    inputDF.write.saveAsTable("test_table_3")
+    var qe = TestQeListener.getAndClear()
+    assertHiveInputs(qe, "test_table_1", Seq("description", "code", "salary", "total_emp"))
+    assertHiveOutputs(qe, "test_table_3", Seq("description", "code", "salary", "total_emp"))
+    hiveContext.sql("create table test_table_4 as select * from test_table_1")
+    qe = TestQeListener.getAndClear()
+    assertHiveInputs(qe, "test_table_1", Seq("description", "code", "salary", "total_emp"))
+    assertHiveOutputs(qe, "test_table_4", Seq("description", "code", "salary", "total_emp"))
+
+    hiveContext.sql("create table test_table_7 as select code, salary from test_table_1")
+    qe = TestQeListener.getAndClear()
+    assertHiveInputs(qe, "test_table_1", Seq("code", "salary"))
+    assertHiveOutputs(qe, "test_table_7", Seq("code", "salary"))
+
+    hiveContext.sql(
+      s"""create table test_table_5 as
+        | select
+        |   code, sal
+        |   from (
+        |     select
+        |       t2.code as code,
+        |       t1.description as desc,
+        |       t1.salary as sal
+        |   from
+        |     test_table_1 t1
+        |   join
+        |     test_table_2 t2
+        |   on
+        |     (t1.code = t2.code)
+        |   where t1.salary > 170000
+        |   sort by sal
+        |   ) t
+        |limit 3""".stripMargin)
+    qe = TestQeListener.getAndClear()
+    val inputMetadata = QueryAnalysis.getInputMetadata(qe)
+    assert(inputMetadata.length === 2)
+    assertHiveFieldExists(inputMetadata, "test_table_1", "salary")
+    assertHiveFieldExists(inputMetadata, "test_table_2", "code")
+    assertHiveOutputs(qe, "test_table_5", Seq("code", "sal"))
+  }
+
   def assertHiveInputs(
       qe: org.apache.spark.sql.execution.QueryExecution,
       table: String,
