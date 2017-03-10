@@ -721,7 +721,7 @@ private[hive] class HiveMetastoreCatalog(val client: ClientInterface, hive: Hive
  * This plan ignores nullability of ArrayType, MapType, StructType unlike InsertIntoTable
  * because Hive table doesn't have nullability for ARRAY, MAP, STRUCT types.
  */
-private[hive] case class InsertIntoHiveTable(
+private[sql] case class InsertIntoHiveTable(
     table: MetastoreRelation,
     partition: Map[String, Option[String]],
     child: LogicalPlan,

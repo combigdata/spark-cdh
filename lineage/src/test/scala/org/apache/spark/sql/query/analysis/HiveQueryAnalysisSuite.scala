@@ -209,6 +209,102 @@ class HiveQueryAnalysisSuite
     assertHiveOutputs(qe, "test_table_5", Seq("code", "sal"))
   }
 
+  test("CDH-51296: Insert Queries should report lineage") {
+    // Create test table of different column names
+    hiveContext.sql(
+      s"""create table test_table_6 (code_new STRING, salary_new INT)
+        | ROW FORMAT DELIMITED FIELDS TERMINATED BY '\t'""".stripMargin)
+
+    // Assert select * of tables of similar schema works for DataFrameWriter.insert method
+    hiveContext.sql("select * from test_table_1").write.insertInto("test_table_2")
+    var qe = TestQeListener.getAndClear()
+    assertHiveInputs(qe, "test_table_1", Seq("description", "code", "salary", "total_emp"))
+    assertHiveOutputs(qe, "test_table_2", Seq("description", "code", "salary", "total_emp"))
+
+    // Assert select where column name of input table is different from column names of output
+    // table for DataFrameWriter.insert method
+    hiveContext.sql("select code, salary from test_table_1").write.insertInto("test_table_6")
+    qe = TestQeListener.getAndClear()
+    assertHiveInputs(qe, "test_table_1", Seq("code", "salary"))
+    assertHiveOutputs(qe, "test_table_6", Seq("code_new", "salary_new"))
+
+    // Assert select * works where output table column names vary from input table column names
+    hiveContext.sql("select * from test_table_1").write.insertInto("test_table_6")
+    qe = TestQeListener.getAndClear()
+    // This issue fails because of this bug CDH-51466.
+    // assertHiveInputs(qe, "test_table_1", Seq("code", "salary"))
+    assertHiveOutputs(qe, "test_table_6", Seq("code_new", "salary_new"))
+
+    // Assert insert with complex join query
+    hiveContext.sql(
+      s"""select
+        |   code, sal
+        | from
+        |   (
+        |     select
+        |       tt_2.code as code,
+        |       tt_1.description as desc,
+        |       tt_1.salary as sal
+        |     from
+        |       test_table_1 tt_1
+        |     join
+        |       test_table_2 tt_2 on (tt_1.code = tt_2.code)
+        |     where tt_1.salary > 170000
+        |       sort by sal
+        |     )t1
+        |       limit 3""".stripMargin).write.insertInto("test_table_6")
+    assertComplexInsert()
+
+    // Repeat the above same tests for insert into query
+    // Assert select * of tables of similar schema works insert into query
+    hiveContext.sql("insert into test_table_2 select * from test_table_1")
+    qe = TestQeListener.getAndClear()
+    assertHiveInputs(qe, "test_table_1", Seq("description", "code", "salary", "total_emp"))
+    assertHiveOutputs(qe, "test_table_2", Seq("description", "code", "salary", "total_emp"))
+
+    // Assert select query where column name of input table is different from column names of output
+    // table works for insert into query
+    hiveContext.sql("insert into test_table_6 select code, salary from test_table_1")
+    qe = TestQeListener.getAndClear()
+    assertHiveInputs(qe, "test_table_1", Seq("code", "salary"))
+    assertHiveOutputs(qe, "test_table_6", Seq("code_new", "salary_new"))
+
+    // Assert select * works where output table column names vary from input table column names
+    hiveContext.sql("insert into test_table_6 select * from test_table_1")
+    qe = TestQeListener.getAndClear()
+    // This issue fails because of this bug CDH-51466.
+    // assertHiveInputs(qe, "test_table_1", Seq("code", "salary"))
+    assertHiveOutputs(qe, "test_table_6", Seq("code_new", "salary_new"))
+
+    // Assert select query with complex join works for insert into query
+    hiveContext.sql(
+      s"""insert into test_table_6
+        |   select code, sal
+        | from (
+        |   select
+        |     tt_2.code as code,
+        |     tt_1.description as desc,
+        |     tt_1 .salary as sal
+        |   from
+        |     test_table_1 tt_1
+        |   join
+        |     test_table_2 tt_2 on (tt_1.code = tt_2.code)
+        |   where tt_1.salary > 170000
+        |     sort by sal
+        |   )t1
+        |     limit 3""".stripMargin)
+    assertComplexInsert()
+  }
+
+  private def assertComplexInsert() = {
+    val qe = TestQeListener.getAndClear()
+    val inputMetadata = QueryAnalysis.getInputMetadata(qe)
+    assert(inputMetadata.length === 2)
+    assertHiveFieldExists(inputMetadata, "test_table_1", "salary")
+    assertHiveFieldExists(inputMetadata, "test_table_2", "code")
+    assertHiveOutputs(qe, "test_table_6", Seq("code_new", "salary_new"))
+  }
+
   def assertHiveInputs(
       qe: org.apache.spark.sql.execution.QueryExecution,
       table: String,
