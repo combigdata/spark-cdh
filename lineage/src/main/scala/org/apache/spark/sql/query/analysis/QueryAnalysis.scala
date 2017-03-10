@@ -26,12 +26,8 @@ import org.apache.spark.sql.catalyst.expressions.{Alias, AttributeReference, Nam
 import org.apache.spark.sql.catalyst.plans.logical.{UnaryNode, _}
 import org.apache.spark.sql.execution.QueryExecution
 import org.apache.spark.sql.execution.datasources.parquet.ParquetRelation
-import org.apache.spark.sql.execution.datasources.{
-  CreateTableUsing,
-  CreateTableUsingAsSelect,
-  LogicalRelation
-}
-import org.apache.spark.sql.hive.MetastoreRelation
+import org.apache.spark.sql.execution.datasources.{CreateTableUsing, CreateTableUsingAsSelect, LogicalRelation}
+import org.apache.spark.sql.hive.{InsertIntoHiveTable, MetastoreRelation}
 import org.apache.spark.sql.hive.execution.CreateTableAsSelect
 import org.apache.spark.sql.query.analysis.DataSourceFormat.DataSourceFormat
 import org.apache.spark.sql.query.analysis.DataSourceType.DataSourceType
@@ -72,6 +68,9 @@ object QueryAnalysis {
           case CreateTableAsSelect(ht, _, _) =>
             Some(QueryDetails(ht.database + "." + ht.name, fields.to[ListBuffer],
                 DataSourceType.HIVE))
+          case InsertIntoHiveTable(m, _, _, _, _) =>
+            Some(QueryDetails(m.databaseName + "." + m.tableName,
+                m.output.map(_.name).to[ListBuffer], DataSourceType.HIVE))
           case _ => None
         }
       }
@@ -209,6 +208,7 @@ object QueryAnalysis {
         }
       case m: MetastoreRelation => Some(m)
       case CreateTableAsSelect(_, query, _) => getRelation(query, attr)
+      case InsertIntoHiveTable(_, _, child, _, _) => getRelation(child, attr)
       case p @ Project(_, _) =>
         if (getAttributesReferences(p.projectList).exists(a => a.sameRef(attr))) {
           getRelation(p.child, attr)
