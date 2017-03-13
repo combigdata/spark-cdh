@@ -83,7 +83,15 @@ private[lineage] class ClouderaNavigatorListener
         .map(addHiveMetastoreLocation(_, qe))
         .foreach(lineageElement.addOutput(_))
 
-      if (lineageElement.inputs.size > 0 || lineageElement.outputs.size > 0) {
+      if (QueryAnalysis.hasAggregateFunction(qe.optimizedPlan)) {
+        lineageElement.errorCode = "01"
+        logInfo(s"Lineage Error code: ${lineageElement.errorCode}. Query Plan has group " +
+          s"by/aggregate clause and lineage for such queries isn 't supported :\n" +
+          s"${qe.optimizedPlan.toString}")
+      }
+
+      if (lineageElement.inputs.size > 0 || lineageElement.outputs.size > 0 ||
+          !lineageElement.errorCode.equals("00")) {
         writeToLineageFile(lineageElement, sc)
       }
     }

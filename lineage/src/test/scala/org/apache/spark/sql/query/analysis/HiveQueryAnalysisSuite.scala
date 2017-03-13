@@ -49,6 +49,26 @@ class HiveQueryAnalysisSuite
          |  STORED AS TEXTFILE LOCATION "${new File(testDataDirectory, s).getCanonicalPath}"
       """.stripMargin.cmd))
     testTables.foreach(registerTestTable)
+
+    TestUtils.createTable(hiveContext, "employee",
+      Map(
+        "id" -> "int",
+        "first_name" -> "varchar(64)",
+        "last_name" -> "varchar(64)",
+        "salary" -> "int",
+        "address" -> "string",
+        "city" -> "varchar(64)"
+      )
+    )
+
+    TestUtils.createTable(hiveContext, "department",
+      Map(
+        "dept_id" -> "int",
+        "name" -> "varchar(64)",
+        "location" -> "varchar(64)",
+        "budget" -> "int"
+      )
+    )
   }
 
   test("QueryAnalysis.getInputMetadata returns back InputMetadata for simple queries") {
@@ -211,9 +231,8 @@ class HiveQueryAnalysisSuite
 
   test("CDH-51296: Insert Queries should report lineage") {
     // Create test table of different column names
-    hiveContext.sql(
-      s"""create table test_table_6 (code_new STRING, salary_new INT)
-        | ROW FORMAT DELIMITED FIELDS TERMINATED BY '\t'""".stripMargin)
+    TestUtils.createTable(
+      hiveContext, "test_table_6", Map("code_new" -> "STRING", "salary_new" -> "INT"))
 
     // Assert select * of tables of similar schema works for DataFrameWriter.insert method
     hiveContext.sql("select * from test_table_1").write.insertInto("test_table_2")
@@ -294,6 +313,157 @@ class HiveQueryAnalysisSuite
         |   )t1
         |     limit 3""".stripMargin)
     assertComplexInsert()
+  }
+
+  test("CDH-51486 : Add an error code to lineage data to indicate an aggregated function is used") {
+    // Assert DESCRIBE, CREATE, DROP queries
+    val descDf = hiveContext.sql("DESCRIBE employee")
+    assert(!QueryAnalysis.hasAggregateFunction(descDf.queryExecution.optimizedPlan))
+    val createDf = hiveContext.sql("create table test1(code int, desc string)")
+    assert(!QueryAnalysis.hasAggregateFunction(createDf.queryExecution.optimizedPlan))
+    val dropDf = hiveContext.sql("drop table test1")
+    assert(!QueryAnalysis.hasAggregateFunction(dropDf.queryExecution.optimizedPlan))
+
+    // Assert a simple query isn't flagged as aggregate
+    val simpleDf = hiveContext.sql("select * from employee")
+    assert(!QueryAnalysis.hasAggregateFunction(simpleDf.queryExecution.optimizedPlan))
+
+    // Assert a joined query isn't flagged as aggregate
+    val joinedDf = hiveContext.sql(
+      "select * from employee join department on employee.city = department.location")
+    assert(!QueryAnalysis.hasAggregateFunction(joinedDf.queryExecution.optimizedPlan))
+
+    // Test aggregate clauses are flagged as aggregate
+    getAggregateClauses("salary", "id").foreach { agg =>
+      val df = hiveContext.sql(
+        s"select aggClause from (select $agg as aggClause from employee group by city, address)t1")
+      assert(QueryAnalysis.hasAggregateFunction(df.queryExecution.optimizedPlan))
+      // The below line fails because of CDH-51222
+      // assertHiveInputs(df.queryExecution, "employee", "salary")
+    }
+
+    // Test complex joins are flagged as aggregate
+    getAggregateClauses("budget", "dept_id").foreach { agg =>
+      val df = hiveContext.sql(
+        s"""select emp.first_name, emp.last_name, aggClause,location
+              from employee emp
+            join
+              (
+                select
+                  $agg as aggClause,
+                  location
+                from department
+                group by location, dept_id
+                sort by location
+                limit 15
+              ) dept
+                on emp.city = dept.location"""
+      )
+      // Assert aggregate function is detected
+      assert(QueryAnalysis.hasAggregateFunction(df.queryExecution.optimizedPlan))
+
+      // Assert that the input metadata has all columns other than the aggregated column
+      // After fixing CDH-51222 assert on that column too.
+      val inputMetadata = QueryAnalysis.getInputMetadata(df.queryExecution)
+      // When CDH-51222 is fixed change 3 to 4
+      assert(inputMetadata.length === 3)
+      assertHiveFieldExists(inputMetadata, "employee", "first_name")
+      assertHiveFieldExists(inputMetadata, "employee", "last_name")
+      assertHiveFieldExists(inputMetadata, "department", "location")
+      // The below line fails because of CDH-51222
+      // assertHiveFieldExists(inputMetadata, "department", "budget")
+    }
+
+    // Test ctas with complex joins are flagged as aggregate
+    getAggregateClauses("budget", "dept_id").foreach { agg =>
+      hiveContext.sql("drop table if exists new_employee")
+      val df = hiveContext.sql(
+        s"""create table new_employee as
+            select emp.first_name, emp.last_name, aggClause,location
+              from employee emp
+            join
+              (
+                select
+                  $agg as aggClause,
+                  location
+                from department
+                group by location, dept_id
+                sort by location
+                limit 15
+              ) dept
+                on emp.city = dept.location"""
+      )
+      // Assert aggregate function is detected
+      assert(QueryAnalysis.hasAggregateFunction(df.queryExecution.optimizedPlan))
+
+      // Assert that the input metadata has all columns other than the aggregated column
+      // After fixing CDH-51222 assert on that column too.
+      val inputMetadata = QueryAnalysis.getInputMetadata(df.queryExecution)
+      // When CDH-51222 is fixed change 3 to 4
+      assert(inputMetadata.length === 3)
+      assertHiveFieldExists(inputMetadata, "employee", "first_name")
+      assertHiveFieldExists(inputMetadata, "employee", "last_name")
+      assertHiveFieldExists(inputMetadata, "department", "location")
+      // The below line fails because of CDH-51222
+      // assertHiveFieldExists(inputMetadata, "department", "budget")
+      assertHiveOutputs(df.queryExecution, "new_employee",
+        Seq("first_name", "last_name", "aggClause", "location"))
+    }
+
+    // Test inserts with complex joins are flagged as aggregate
+    TestUtils.createTable(hiveContext, "emp_insert", Map("first_name" -> "String", "last_name" ->
+      "String", "agg_clause" -> "Float", "location" -> "String"))
+    Seq("sum(budget)", "max(budget)", "min(budget)", "avg(budget)", "count(*)")
+      .foreach { agg =>
+      val df = hiveContext.sql(
+        s"""insert into emp_insert
+            select emp.first_name as fname, emp.last_name as lname, aggClauseInsert,location
+              from employee emp
+            join
+              (
+                select
+                  $agg as aggClauseInsert,
+                  location
+                from department
+                group by location, dept_id
+                sort by location
+                limit 15
+              ) dept
+                on emp.city = dept.location"""
+      )
+      // Assert aggregate function is detected
+      assert(QueryAnalysis.hasAggregateFunction(df.queryExecution.optimizedPlan))
+
+      // Assert that the input metadata has all columns other than the aggregated column
+      // After fixing CDH-51222 assert on that column too.
+      val inputMetadata = QueryAnalysis.getInputMetadata(df.queryExecution)
+      // When CDH-51222 is fixed change 3 to 4
+      assert(inputMetadata.length === 3)
+      assertHiveFieldExists(inputMetadata, "employee", "first_name")
+      assertHiveFieldExists(inputMetadata, "employee", "last_name")
+      assertHiveFieldExists(inputMetadata, "department", "location")
+      // The below line fails because of CDH-51222
+      // assertHiveFieldExists(inputMetadata, "department", "budget")
+      assertHiveOutputs(df.queryExecution, "emp_insert",
+        Seq("first_name", "last_name", "agg_clause", "location"))
+    }
+  }
+  
+  private def getAggregateClauses(col1: String, col2: String): Seq[String] = {
+    Seq(
+      s"sum($col1)",
+      s"avg($col1)",
+      s"count(*)",
+      s"max($col1)",
+      s"min($col1)",
+      s"variance($col1)",
+      s"stddev_pop($col1)",
+      s"covar_pop($col1, $col2)",
+      s"corr($col1, $col2)",
+      s"percentile($col1,0)",
+      s"histogram_numeric($col1,5)",
+      s"collect_set($col1)"
+    )
   }
 
   private def assertComplexInsert() = {
