@@ -18,6 +18,7 @@
 package org.apache.spark.sql.query.analysis
 
 import org.apache.spark.sql.execution.QueryExecution
+import org.apache.spark.sql.hive.HiveContext
 import org.apache.spark.sql.query.analysis.DataSourceType.DataSourceType
 import org.apache.spark.sql.util.QueryExecutionListener
 
@@ -60,5 +61,11 @@ object TestUtils {
 
   def getScheme(dataSourceType: DataSourceType): String = {
     if (dataSourceType == DataSourceType.LOCAL) "file:" else ""
+  }
+
+  def createTable(hiveContext: HiveContext, table: String, cols: Map[String, String]): Unit = {
+    val colString = cols.map(kv => s"${kv._1} ${kv._2}").mkString(",")
+    hiveContext.sql(s"""create table $table ($colString)
+      | ROW FORMAT DELIMITED FIELDS TERMINATED BY '\t'""".stripMargin)
   }
 }
