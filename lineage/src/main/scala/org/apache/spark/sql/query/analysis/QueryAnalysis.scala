@@ -18,7 +18,6 @@ package org.apache.spark.sql.query.analysis
 
 import com.fasterxml.jackson.module.scala.JsonScalaEnumeration
 import com.fasterxml.jackson.core.`type`.TypeReference
-
 import org.apache.hadoop.fs.Path
 import org.apache.spark.SparkContext
 import org.apache.spark.sql.catalyst.TableIdentifier
@@ -143,6 +142,17 @@ object QueryAnalysis {
       map
     }
     map.values
+  }
+
+  /**
+   * Returns back if the plan has an aggregate function
+   * @param plan - the plan to be analyzed
+   */
+  def hasAggregateFunction(plan: LogicalPlan): Boolean = {
+    plan match {
+      case agg: Aggregate => true
+      case lp: LogicalPlan => lp.children.exists(hasAggregateFunction)
+    }
   }
 
   private def getTopLevelAttributes(qe: QueryExecution): List[AttributeReference] = {

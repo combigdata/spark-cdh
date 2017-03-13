@@ -33,6 +33,9 @@ private[lineage] class LineageElement {
   var duration: Long = _
   var user: String = _
   var message: String = _
+  // Though it looks like an integer, navigator wants a 2 character string, including the
+  // leading '0'.
+  var errorCode: String = "00"
   var inputs: ListBuffer[QueryDetails] = ListBuffer[QueryDetails]()
   var outputs: ListBuffer[QueryDetails] = ListBuffer[QueryDetails]()
   var ended: Boolean = _

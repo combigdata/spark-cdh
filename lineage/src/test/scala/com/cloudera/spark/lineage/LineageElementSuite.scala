@@ -39,6 +39,7 @@ class LineageElementSuite extends FunSuite {
     val timestamp: Long = 1234567890
     val duration: Long = 1000
     val user: String = "Myself"
+    val errorCode: String = "01"
     val inputTable: String = "MyTable"
     val col1: String = "MyCol1"
     val col2: String = "MyCol2"
@@ -54,6 +55,7 @@ class LineageElementSuite extends FunSuite {
     lineageElement.timestamp = timestamp
     lineageElement.duration = duration
     lineageElement.user = user
+    lineageElement.errorCode = errorCode
     val qd1 = new QueryDetails(inputTable, List(col1, col2).to[ListBuffer],
       DataSourceType.HIVE, DataSourceFormat.PARQUET)
     qd1.hiveMetastoreLocation = Some(hiveMetaStoreLocation)
@@ -77,6 +79,7 @@ class LineageElementSuite extends FunSuite {
     assert(map.get("user") === user)
     assert(map.get("duration") === duration)
     assert(map.get("ended") === false)
+    assert(map.get("errorCode") ===  errorCode)
 
     val inputList: List[Map[String, Any]] = map.get("inputs").asInstanceOf[List[Map[String, Any]]]
     assert(inputList.size === 2)
