@@ -12,7 +12,6 @@
 
   <groupId>com.cloudera.csd</groupId>
   <artifactId>SPARK2_ON_YARN</artifactId>
-  <version>2.1.0.cloudera1-SNAPSHOT</version>
   <name>The Spark2 on YARN CSD</name>
   <packaging>pom</packaging>
 

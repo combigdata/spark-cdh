@@ -338,8 +338,9 @@ function publish {
   $PYTHON_VE/bin/python ${CDH_CLONE_DIR}/lib/python/cauldron/src/cauldron/tools/upload.py s3 ${REPO_OUTPUT_DIR}:${GBN}
   curl http://${BUILDDB_HOST}/save?gbn=${GBN}
   curl "http://${BUILDDB_HOST}/addtag?gbn=${GBN}&value=${SHORT_VERSION}-latest"
+  curl "http://${BUILDDB_HOST}/addtag?gbn=${GBN}&value=${BUILD_TYPE_TAG}"
   if [[ $PATCH_NUMBER -ne 0 ]]; then
-       curl "http://${BUILDDB_HOST}/addtag?gbn=${GBN}&value=released"
+    curl "http://${BUILDDB_HOST}/addtag?gbn=${GBN}&value=released"
   fi
 }
 
@@ -389,6 +390,14 @@ done
 
 if [[ $PATCH_NUMBER -ne 0 ]]; then
    VERSION_FOR_BUILD=${VERSION/-SNAPSHOT/}_p${PATCH_NUMBER}
+fi
+
+# Tag the build with either "snapshot" or "rc", based on the pom version. This allows us to better
+# control which tests get automatically executed for each kind of build.
+BUILD_TYPE_TAG=snapshot
+if ! [[ $VERSION =~ .+-SNAPSHOT ]]; then
+  echo "Detected non-snapshot build $VERSION, tagging build as rc."
+  BUILD_TYPE_TAG=rc
 fi
 
 # Override with a custom version if specified
