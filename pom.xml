@@ -100,9 +100,6 @@
     <module>assembly</module>
     <module>external/flume</module>
     <module>external/flume-sink</module>
-    <!-- Disabled in CDH.
-    <module>external/flume-assembly</module>
-    -->
     <module>examples</module>
     <module>repl</module>
     <module>launcher</module>
@@ -672,7 +669,7 @@
       <dependency>
         <groupId>org.glassfish.jersey.core</groupId>
         <artifactId>jersey-client</artifactId>
-        <version>${jersey.version}</version>		
+        <version>${jersey.version}</version>
       </dependency>
       <dependency>
         <groupId>org.glassfish.jersey.containers</groupId>
@@ -2829,6 +2826,18 @@
           </plugins>
         </pluginManagement>
       </build>
+    </profile>
+
+    <profile>
+      <id>flume-assembly</id>
+      <activation>
+        <property>
+          <name>!cdh.build</name>
+        </property>
+      </activation>
+      <modules>
+        <module>external/flume-assembly</module>
+      </modules>
     </profile>
   </profiles>
 </project>
