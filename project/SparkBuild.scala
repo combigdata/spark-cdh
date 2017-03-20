@@ -129,6 +129,7 @@ object SparkBuild extends PomBuild {
   override val userPropertiesMap = System.getProperties.asScala.toMap
 
   lazy val MavenCompile = config("m2r") extend(Compile)
+  lazy val TestDebug = config("testDebug") extend(Test)
   lazy val publishLocalBoth = TaskKey[Unit]("publish-local", "publish local for m2 and ivy")
 
   lazy val sparkGenjavadocSettings: Seq[sbt.Def.Setting[_]] = Seq(
@@ -297,8 +298,23 @@ object SparkBuild extends PomBuild {
   // TODO: move this to its upstream project.
   override def projectDefinitions(baseDirectory: File): Seq[Project] = {
     super.projectDefinitions(baseDirectory).map { x =>
-      if (projectsMap.exists(_._1 == x.id)) x.settings(projectsMap(x.id): _*)
-      else x.settings(Seq[Setting[_]](): _*)
+      val baseProject =
+        if (projectsMap.exists(_._1 == x.id)) {
+          x.settings(projectsMap(x.id): _*)
+        } else {
+          x.settings(Seq[Setting[_]](): _*)
+        }
+      // enable running tests with a debugger like "testDebug:testOnly ..."
+      // (somewhat explained http://www.scala-sbt.org/0.13/docs/Testing.html)
+      // The test will pause until you attach a debugger to it (b/c of suspend=y).
+      // This is a standard remote debugging configuration, eg. in IntelliJ
+      // setup a debug configuration for "Remote".
+      baseProject
+       .configs(TestDebug)
+       .settings(inConfig(TestDebug)(Defaults.testTasks): _*)
+       .settings(Seq(
+         javaOptions in TestDebug ++= "-agentlib:jdwp=transport=dt_socket,server=y,suspend=y,address=5005"
+           .split(" ").toSeq))
     } ++ Seq[Project](OldDeps.project)
   }
 

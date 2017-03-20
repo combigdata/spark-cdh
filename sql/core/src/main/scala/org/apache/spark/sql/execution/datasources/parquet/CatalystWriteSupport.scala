@@ -19,6 +19,7 @@ package org.apache.spark.sql.execution.datasources.parquet
 
 import java.nio.{ByteBuffer, ByteOrder}
 import java.util
+import java.util.TimeZone
 
 import scala.collection.JavaConverters.mapAsJavaMapConverter
 
@@ -66,6 +67,9 @@ private[parquet] class CatalystWriteSupport extends WriteSupport[InternalRow] wi
   // Whether to write data in legacy Parquet format compatible with Spark 1.4 and prior versions
   private var writeLegacyParquetFormat: Boolean = _
 
+  private var storageTz: TimeZone = _
+  private var localTz: TimeZone = _
+
   // Reusable byte array used to write timestamps as Parquet INT96 values
   private val timestampBuffer = new Array[Byte](12)
 
@@ -81,6 +85,14 @@ private[parquet] class CatalystWriteSupport extends WriteSupport[InternalRow] wi
       configuration.get(SQLConf.PARQUET_WRITE_LEGACY_FORMAT.key).toBoolean
     }
     this.rootFieldWriters = schema.map(_.dataType).map(makeWriter)
+    localTz = TimeZone.getDefault()
+    // If the table has a timezone property, apply the correct conversions.  See SPARK-12297.
+    val tzString = configuration.get(ParquetFileFormat.PARQUET_TIMEZONE_TABLE_PROPERTY)
+    storageTz = if (tzString == null) {
+      localTz
+    } else {
+      TimeZone.getTimeZone(tzString)
+    }
 
     val messageType = new CatalystSchemaConverter(configuration).convert(schema)
     val metadata = Map(CatalystReadSupport.SPARK_METADATA_KEY -> schemaString).asJava
@@ -162,7 +174,13 @@ private[parquet] class CatalystWriteSupport extends WriteSupport[InternalRow] wi
 
           // NOTE: Starting from Spark 1.5, Spark SQL `TimestampType` only has microsecond
           // precision.  Nanosecond parts of timestamp values read from INT96 are simply stripped.
-          val (julianDay, timeOfDayNanos) = DateTimeUtils.toJulianDay(row.getLong(ordinal))
+          val rawMicros = row.getLong(ordinal)
+          val adjustedMicros = if (localTz.getID() == storageTz.getID()) {
+            rawMicros
+          } else {
+            DateTimeUtils.convertTz(rawMicros, storageTz, localTz)
+          }
+          val (julianDay, timeOfDayNanos) = DateTimeUtils.toJulianDay(adjustedMicros)
           val buf = ByteBuffer.wrap(timestampBuffer)
           buf.order(ByteOrder.LITTLE_ENDIAN).putLong(timeOfDayNanos).putInt(julianDay)
           recordConsumer.addBinary(Binary.fromByteArray(timestampBuffer))

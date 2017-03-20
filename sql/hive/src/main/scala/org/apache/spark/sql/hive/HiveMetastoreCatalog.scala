@@ -38,7 +38,7 @@ import org.apache.spark.sql.catalyst.plans.logical
 import org.apache.spark.sql.catalyst.plans.logical._
 import org.apache.spark.sql.catalyst.rules._
 import org.apache.spark.sql.catalyst.util.DataTypeParser
-import org.apache.spark.sql.execution.datasources.parquet.ParquetRelation
+import org.apache.spark.sql.execution.datasources.parquet.{ParquetFileFormat, ParquetRelation}
 import org.apache.spark.sql.execution.datasources.{CreateTableUsingAsSelect, LogicalRelation, Partition => ParquetPartition, PartitionSpec, ResolvedDataSource}
 import org.apache.spark.sql.execution.{FileRelation, datasources}
 import org.apache.spark.sql.hive.client._
@@ -439,6 +439,9 @@ private[hive] class HiveMetastoreCatalog(val client: ClientInterface, hive: Hive
     // NOTE: Instead of passing Metastore schema directly to `ParquetRelation`, we have to
     // serialize the Metastore schema to JSON and pass it as a data source option because of the
     // evil case insensitivity issue, which is reconciled within `ParquetRelation`.
+    val tzKey = ParquetFileFormat.PARQUET_TIMEZONE_TABLE_PROPERTY
+    val tzProps = metastoreRelation.table.properties.get(tzKey)
+      .map { tz => Map(tzKey -> tz) }.getOrElse(Map())
     val parquetOptions = Map(
       ParquetRelation.METASTORE_SCHEMA -> metastoreSchema.json,
       ParquetRelation.MERGE_SCHEMA -> mergeSchema.toString,
@@ -446,7 +449,7 @@ private[hive] class HiveMetastoreCatalog(val client: ClientInterface, hive: Hive
         metastoreRelation.tableName,
         Some(metastoreRelation.databaseName)
       ).unquotedString
-    )
+    ) ++ tzProps
     val tableIdentifier =
       QualifiedTableName(metastoreRelation.databaseName, metastoreRelation.tableName)
 

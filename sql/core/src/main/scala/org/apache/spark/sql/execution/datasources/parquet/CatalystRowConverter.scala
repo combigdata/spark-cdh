@@ -19,10 +19,12 @@ package org.apache.spark.sql.execution.datasources.parquet
 
 import java.math.{BigDecimal, BigInteger}
 import java.nio.ByteOrder
+import java.util.TimeZone
 
 import scala.collection.JavaConverters._
 import scala.collection.mutable.ArrayBuffer
 
+import org.apache.hadoop.conf.Configuration
 import parquet.column.Dictionary
 import parquet.io.api.{Binary, Converter, GroupConverter, PrimitiveConverter}
 import parquet.schema.OriginalType.{INT_32, LIST, UTF8}
@@ -32,7 +34,8 @@ import parquet.schema.{GroupType, MessageType, PrimitiveType, Type}
 import org.apache.spark.Logging
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.expressions._
-import org.apache.spark.sql.catalyst.util.{GenericArrayData, ArrayBasedMapData, DateTimeUtils}
+import org.apache.spark.sql.catalyst.util.{DateTimeUtils, GenericArrayData, ArrayBasedMapData}
+import org.apache.spark.sql.catalyst.util.DateTimeUtils._
 import org.apache.spark.sql.types._
 import org.apache.spark.unsafe.types.UTF8String
 
@@ -120,7 +123,8 @@ private[parquet] class CatalystPrimitiveConverter(val updater: ParentContainerUp
 private[parquet] class CatalystRowConverter(
     parquetType: GroupType,
     catalystType: StructType,
-    updater: ParentContainerUpdater)
+    updater: ParentContainerUpdater,
+    hadoopConf: Configuration)
   extends CatalystGroupConverter(updater) with Logging {
 
   assert(
@@ -251,18 +255,21 @@ private[parquet] class CatalystRowConverter(
 
       case TimestampType =>
         // TODO Implements `TIMESTAMP_MICROS` once parquet-mr has that.
+        val localTz = TimeZone.getDefault()
+        val tzString = hadoopConf.get(ParquetFileFormat.PARQUET_TIMEZONE_TABLE_PROPERTY)
+        val storageTz = if (tzString == null) {
+          localTz
+        } else {
+          TimeZone.getTimeZone(tzString)
+        }
+        logInfo(s"Building timestamp reader with localTz = ${localTz.getID()}; " +
+          s"storageTz = ${storageTz.getID()}; tzString = $tzString")
         new CatalystPrimitiveConverter(updater) {
           // Converts nanosecond timestamps stored as INT96
           override def addBinary(value: Binary): Unit = {
-            assert(
-              value.length() == 12,
-              "Timestamps (with nanoseconds) are expected to be stored in 12-byte long binaries, " +
-              s"but got a ${value.length()}-byte binary.")
-
-            val buf = value.toByteBuffer.order(ByteOrder.LITTLE_ENDIAN)
-            val timeOfDayNanos = buf.getLong
-            val julianDay = buf.getInt
-            updater.setLong(DateTimeUtils.fromJulianDay(julianDay, timeOfDayNanos))
+            val timestamp = CatalystRowConverter.binaryToSQLTimestamp(
+              value, fromTz = localTz, toTz = storageTz)
+            updater.setLong(timestamp)
           }
         }
 
@@ -293,7 +300,7 @@ private[parquet] class CatalystRowConverter(
       case t: StructType =>
         new CatalystRowConverter(parquetType.asGroupType(), t, new ParentContainerUpdater {
           override def set(value: Any): Unit = updater.set(value.asInstanceOf[InternalRow].copy())
-        })
+        }, hadoopConf)
 
       case t =>
         throw new RuntimeException(
@@ -637,7 +644,7 @@ private[parquet] class CatalystRowConverter(
   }
 }
 
-private[parquet] object CatalystRowConverter {
+private[parquet] object CatalystRowConverter extends Logging {
   def binaryToUnscaledLong(binary: Binary): Long = {
     // The underlying `ByteBuffer` implementation is guaranteed to be `HeapByteBuffer`, so here
     // we are using `Binary.toByteBuffer.array()` to steal the underlying byte array without
@@ -658,5 +665,30 @@ private[parquet] object CatalystRowConverter {
     val bits = 8 * (end - start)
     unscaled = (unscaled << (64 - bits)) >> (64 - bits)
     unscaled
+  }
+
+  /**
+   * Converts an int96 to a SQLTimestamp, given both the storage timezone and the local timezone.
+   * The timestamp is really meant to be interpreted as a "floating time", but since we
+   * actually store it as micros since epoch, why we have to apply a conversion when timezones
+   * change.
+   * @param binary
+   * @return
+   */
+  def binaryToSQLTimestamp(binary: Binary, fromTz: TimeZone, toTz: TimeZone): SQLTimestamp = {
+    // Note that this method is copied from ParquetRowConverter present in Spark 2.2, and has been
+    // placed here as part of the backport of SPARK-12297 / CDH-35305
+    assert(binary.length() == 12, s"Timestamps (with nanoseconds) are expected to be stored in" +
+      s" 12-byte long binaries. Found a ${binary.length()}-byte binary instead.")
+    val buffer = binary.toByteBuffer.order(ByteOrder.LITTLE_ENDIAN)
+    val timeOfDayNanos = buffer.getLong
+    val julianDay = buffer.getInt
+    val storageTzMicros = DateTimeUtils.fromJulianDay(julianDay, timeOfDayNanos)
+    // avoid expensive time logic if possible.
+    if (fromTz.getID() != toTz.getID()) {
+      DateTimeUtils.convertTz(storageTzMicros, fromTz, toTz)
+    } else {
+      storageTzMicros
+    }
   }
 }
