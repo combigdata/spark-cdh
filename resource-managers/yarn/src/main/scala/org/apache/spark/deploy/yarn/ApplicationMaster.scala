@@ -390,7 +390,7 @@ private[spark] class ApplicationMaster(
   }
 
   private def runDriver(securityMgr: SecurityManager): Unit = {
-    addAmIpFilter()
+    setupRmProxy()
     userClassThread = startUserApplication()
 
     // This a bit hacky, but we need to wait until the spark.driver.port property has
@@ -431,7 +431,7 @@ private[spark] class ApplicationMaster(
     rpcEnv = RpcEnv.create("sparkYarnAM", Utils.localHostName, port, sparkConf, securityMgr,
       clientMode = true)
     val driverRef = waitForSparkDriver()
-    addAmIpFilter()
+    setupRmProxy()
     registerAM(sparkConf, rpcEnv, driverRef, sparkConf.getOption("spark.driver.appUIAddress"),
       securityMgr)
 
@@ -583,11 +583,21 @@ private[spark] class ApplicationMaster(
     runAMEndpoint(driverHost, driverPort.toString, isClusterMode = false)
   }
 
-  /** Add the Yarn IP filter that is required for properly securing the UI. */
-  private def addAmIpFilter() = {
-    val proxyBase = System.getenv(ApplicationConstants.APPLICATION_WEB_PROXY_BASE_ENV)
-    val amFilter = "org.apache.hadoop.yarn.server.webproxy.amfilter.AmIpFilter"
-    val params = client.getAmIpFilterParams(yarnConf, proxyBase)
+  /**
+   * Configure the YARN RM proxy. If it's enabled, use AmIpFilter to redirect requests to the
+   * proxy; otherwise, install the redirect filter to make requests coming from YARN go to the
+   * driver.
+   */
+  private def setupRmProxy(): Unit = {
+    val (amFilter, params, proxyBase) = if (sparkConf.get(RM_PROXY_ENABLED)) {
+      val proxyBase = System.getenv(ApplicationConstants.APPLICATION_WEB_PROXY_BASE_ENV)
+      val filterClass = "org.apache.hadoop.yarn.server.webproxy.amfilter.AmIpFilter"
+      val params = client.getAmIpFilterParams(yarnConf, proxyBase)
+      (filterClass, params, proxyBase)
+    } else {
+      (classOf[YarnProxyRedirectFilter].getName(), Map(), "")
+    }
+
     if (isClusterMode) {
       System.setProperty("spark.ui.filters", amFilter)
       params.foreach { case (k, v) => System.setProperty(s"spark.$amFilter.param.$k", v) }

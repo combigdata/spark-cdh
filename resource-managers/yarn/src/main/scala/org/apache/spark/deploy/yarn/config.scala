@@ -89,6 +89,15 @@ package object config {
       .booleanConf
       .createWithDefault(false)
 
+  private[spark] val RM_PROXY_ENABLED =
+    ConfigBuilder("spark.yarn.rmProxy.enabled")
+      .doc("Whether to enable support for the YARN RM proxy. When enabled, makes all requests to " +
+        "the UI go through the YARN RM. If disabled, clients can connect directly to the driver " +
+        "if they know the address, and the YARN RM link will be redirected to the driver's " +
+        "address.")
+      .booleanConf
+      .createWithDefault(true)
+
   /* File distribution. */
 
   private[spark] val SPARK_ARCHIVE = ConfigBuilder("spark.yarn.archive")
