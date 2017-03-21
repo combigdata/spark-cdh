@@ -163,10 +163,7 @@ private[spark] abstract class YarnSchedulerBackend(
       System.setProperty("spark.ui.proxyBase", proxyBase)
     }
 
-    val hasFilter =
-      filterName != null && filterName.nonEmpty &&
-      filterParams != null && filterParams.nonEmpty
-    if (hasFilter) {
+    if (filterName != null && filterName.nonEmpty) {
       logInfo(s"Add WebUI Filter. $filterName, $filterParams, $proxyBase")
       conf.set("spark.ui.filters", filterName)
       filterParams.foreach { case (k, v) => conf.set(s"spark.$filterName.param.$k", v) }

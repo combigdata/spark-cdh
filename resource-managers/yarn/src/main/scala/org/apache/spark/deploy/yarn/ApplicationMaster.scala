@@ -475,7 +475,7 @@ private[spark] class ApplicationMaster(args: ApplicationMasterArguments) extends
   }
 
   private def runDriver(): Unit = {
-    addAmIpFilter(None)
+    setupRmProxy(None)
     userClassThread = startUserApplication()
 
     // This a bit hacky, but we need to wait until the spark.driver.port property has
@@ -515,7 +515,7 @@ private[spark] class ApplicationMaster(args: ApplicationMasterArguments) extends
     rpcEnv = RpcEnv.create("sparkYarnAM", hostname, hostname, -1, sparkConf, securityMgr,
       amCores, true)
     val driverRef = waitForSparkDriver()
-    addAmIpFilter(Some(driverRef))
+    setupRmProxy(Some(driverRef))
     registerAM(sparkConf, rpcEnv, driverRef, sparkConf.getOption("spark.driver.appUIAddress"))
     registered = true
 
@@ -662,11 +662,21 @@ private[spark] class ApplicationMaster(args: ApplicationMasterArguments) extends
     createSchedulerRef(driverHost, driverPort.toString)
   }
 
-  /** Add the Yarn IP filter that is required for properly securing the UI. */
-  private def addAmIpFilter(driver: Option[RpcEndpointRef]) = {
-    val proxyBase = System.getenv(ApplicationConstants.APPLICATION_WEB_PROXY_BASE_ENV)
-    val amFilter = "org.apache.hadoop.yarn.server.webproxy.amfilter.AmIpFilter"
-    val params = client.getAmIpFilterParams(yarnConf, proxyBase)
+  /**
+   * Configure the YARN RM proxy. If it's enabled, use AmIpFilter to redirect requests to the
+   * proxy; otherwise, install the redirect filter to make requests coming from YARN go to the
+   * driver.
+   */
+  private def setupRmProxy(driver: Option[RpcEndpointRef]): Unit = {
+    val (amFilter, params, proxyBase) = if (sparkConf.get(RM_PROXY_ENABLED)) {
+      val proxyBase = System.getenv(ApplicationConstants.APPLICATION_WEB_PROXY_BASE_ENV)
+      val filterClass = "org.apache.hadoop.yarn.server.webproxy.amfilter.AmIpFilter"
+      val params = client.getAmIpFilterParams(yarnConf, proxyBase)
+      (filterClass, params, proxyBase)
+    } else {
+      (classOf[YarnProxyRedirectFilter].getName(), Map(), "")
+    }
+
     driver match {
       case Some(d) =>
         d.send(AddWebUIFilter(amFilter, params.toMap, proxyBase))
