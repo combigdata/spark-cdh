@@ -121,20 +121,16 @@ private[spark] abstract class YarnSchedulerBackend(
     }
   }
 
-  private[cluster] def prepareRequestExecutors(requestedTotal: Int): RequestExecutors = {
-    val nodeBlacklist: Set[String] = scheduler.nodeBlacklist()
-    val filteredHostToLocalTaskCount =
-      hostToLocalTaskCount.filter { case (k, v) => !nodeBlacklist.contains(k) }
-    RequestExecutors(requestedTotal, localityAwareTasks, filteredHostToLocalTaskCount,
-      nodeBlacklist)
-  }
-
   /**
    * Request executors from the ApplicationMaster by specifying the total number desired.
    * This includes executors already pending or running.
    */
   override def doRequestTotalExecutors(requestedTotal: Int): Future[Boolean] = {
-    yarnSchedulerEndpointRef.ask[Boolean](prepareRequestExecutors(requestedTotal))
+    val nodeBlacklist: Set[String] = scheduler.nodeBlacklist()
+    val filteredHostToLocalTaskCount = hostToLocalTaskCount.filterKeys(!nodeBlacklist.contains(_))
+    yarnSchedulerEndpointRef.ask[Boolean](
+      RequestExecutors(requestedTotal, localityAwareTasks, filteredHostToLocalTaskCount,
+        nodeBlacklist))
   }
 
   /**
