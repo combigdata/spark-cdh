@@ -25,30 +25,26 @@ import scala.collection.mutable.HashMap
 private[scheduler] class ExecutorFailuresInTaskSet(val node: String) {
   /**
    * Mapping from index of the tasks in the taskset, to the number of times it has failed on this
-   * executor and the expiry time.
+   * executor.
    */
-  val taskToFailureCountAndExpiryTime = HashMap[Int, (Int, Long)]()
+  val taskToFailureCount = HashMap[Int, Int]()
 
-  def updateWithFailure(taskIndex: Int, failureExpiryTime: Long): Unit = {
-    val (prevFailureCount, prevFailureExpiryTime) =
-      taskToFailureCountAndExpiryTime.getOrElse(taskIndex, (0, -1L))
-    // these times always come from the driver, so we don't need to worry about skew, but might
-    // as well still be defensive in case there is non-monotonicity in the clock
-    val newExpiryTime = math.max(prevFailureExpiryTime, failureExpiryTime)
-    taskToFailureCountAndExpiryTime(taskIndex) = (prevFailureCount + 1, newExpiryTime)
+  def updateWithFailure(taskIndex: Int): Unit = {
+    val prevFailureCount = taskToFailureCount.getOrElse(taskIndex, 0)
+    taskToFailureCount(taskIndex) = prevFailureCount + 1
   }
 
-  def numUniqueTasksWithFailures: Int = taskToFailureCountAndExpiryTime.size
+  def numUniqueTasksWithFailures: Int = taskToFailureCount.size
 
   /**
    * Return the number of times this executor has failed on the given task index.
    */
   def getNumTaskFailures(index: Int): Int = {
-    taskToFailureCountAndExpiryTime.getOrElse(index, (0, 0))._1
+    taskToFailureCount.getOrElse(index, 0)
   }
 
   override def toString(): String = {
     s"numUniqueTasksWithFailures = $numUniqueTasksWithFailures; " +
-      s"tasksToFailureCount = $taskToFailureCountAndExpiryTime"
+      s"tasksToFailureCount = $taskToFailureCount"
   }
 }
