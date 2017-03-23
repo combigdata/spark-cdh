@@ -39,7 +39,7 @@ object BuildCommons {
 
   private val buildLocation = file(".").getAbsoluteFile.getParentFile
 
-  val sqlProjects@Seq(catalyst, sql, hive, hiveThriftServer, sqlKafka010) = Seq(
+  val sqlProjects@Seq(catalyst, sql, hive, hiveThriftServer, sqlKafka010, hiveExec) = Seq(
     "catalyst", "sql", "hive", "hive-thriftserver", "sql-kafka-0-10", "hive-exec"
   ).map(ProjectRef(buildLocation, _))
 
