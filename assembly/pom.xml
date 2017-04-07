@@ -103,6 +103,12 @@
       <groupId>com.cloudera.spark</groupId>
       <artifactId>spark-lineage_${scala.binary.version}</artifactId>
       <version>${project.version}</version>
+      <exclusions>
+        <exclusion>
+          <groupId>org.apache.hadoop</groupId>
+          <artifactId>*</artifactId>
+        </exclusion>
+      </exclusions>
     </dependency>
   </dependencies>
 
@@ -361,6 +367,53 @@
       <properties>
         <flume.deps.scope>provided</flume.deps.scope>
       </properties>
+    </profile>
+
+    <!-- Profiled to ensure that unwanted classes do not show up in the assembly. -->
+    <profile>
+      <id>provided-deps-check</id>
+      <activation>
+        <property>
+          <name>cdh.build</name>
+        </property>
+      </activation>
+      <build>
+        <plugins>
+          <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-antrun-plugin</artifactId>
+            <executions>
+              <execution>
+                <phase>verify</phase>
+                <goals>
+                  <goal>run</goal>
+                </goals>
+                <configuration>
+                  <target>
+                    <macrodef name="not_exists">
+                      <attribute name="resource"/>
+                      <sequential>
+                        <fail message="Found @{resource}">
+                          <condition>
+                            <resourceexists>
+                              <zipentry zipfile="${spark.jar}" name="@{resource}"/>
+                            </resourceexists>
+                          </condition>
+                        </fail>
+                      </sequential>
+                    </macrodef>
+                    <echo>Verifying provided dependencies</echo>
+                    <not_exists resource="org/apache/hadoop/ipc/Client.class" />
+                    <not_exists resource="org/apache/hadoop/fs/FileSystem.class" />
+                    <not_exists resource="org/apache/hadoop/yarn/client/api/YarnClient.class" />
+                    <not_exists resource="org/apache/hadoop/hive/conf/HiveConf.class" />
+                  </target>
+                </configuration>
+              </execution>
+            </executions>
+          </plugin>
+        </plugins>
+      </build>
     </profile>
   </profiles>
 </project>
