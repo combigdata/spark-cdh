@@ -27,7 +27,7 @@
   "inExpressWizard" : true,
   "icon" : "images/icon.png",
   "parcel" : {
-    "repoUrl" : "http://archive.cloudera.com/spark2/parcels/latest/",
+    "repoUrl" : "http://archive.cloudera.com/spark2/parcels/2.1.0.cloudera2/",
     "requiredTags" : ["spark2", "cdh"],
     "optionalTags" : ["spark-plugin", "spark2-plugin"]
   },
