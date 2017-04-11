@@ -429,33 +429,25 @@ if [[ "$SKIP_BUILD" = false ]]; then
   do_build
 fi
 
+if [[ "$RUN_TESTS" = true ]]; then
+  my_echo "Now trying to run unit tests"
+  run_tests
+  my_echo "Unit tests succeeded."
+fi
+
 if [[ "$BUILD_ONLY" != true ]]; then
   post_build_steps
   build_parcel
   populate_manifest
   populate_build_json
-  if [[ "$PUBLISH" = true ]]; then
-    publish
-  fi
+  my_echo "Build output: $REPO_OUTPUT_DIR"
 fi
 
-my_echo "GBN=$GBN"
-my_echo "Build output:$REPO_OUTPUT_DIR"
-my_echo "Build completed. Success!"
-
-# We print the urls for bits once before the unit test just in case there is a need to refer to them
-# even if the unit tests were failed
 if [[ "$PUBLISH" = true ]]; then
-    my_echo "Parcels are stored at the following location:"
-    my_echo "https://${STORAGE_HOST}/${GBN}"
+  publish
+  my_echo "Build published, GBN=$GBN."
+  my_echo "Parcels available at the following location:"
+  my_echo "https://${STORAGE_HOST}/${GBN}"
 fi
 
-if [[ "$RUN_TESTS" = true ]]; then
-  my_echo "Now trying to run unit tests"
-  run_tests
-  my_echo "Unit tests succeeded."
-  if [[ "$PUBLISH" = true ]]; then
-      my_echo "Parcels are stored at the following location:"
-      my_echo "https://${STORAGE_HOST}/${GBN}"
-  fi
-fi
+my_echo "Build completed. Success!"
