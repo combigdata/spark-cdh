@@ -22,6 +22,7 @@ import java.io.{ByteArrayInputStream, DataInputStream, File, FileOutputStream, I
 import java.net.{InetAddress, UnknownHostException, URI}
 import java.nio.ByteBuffer
 import java.util.{Properties, UUID}
+import java.util.regex.Pattern
 import java.util.zip.{ZipEntry, ZipOutputStream}
 
 import scala.collection.JavaConverters._
@@ -226,30 +227,18 @@ private[spark] class Client(
     capability.setMemory(args.amMemory + amMemoryOverhead)
     capability.setVirtualCores(args.amCores)
 
-    if (sparkConf.contains("spark.yarn.am.nodeLabelExpression")) {
-      try {
-        val amRequest = Records.newRecord(classOf[ResourceRequest])
-        amRequest.setResourceName(ResourceRequest.ANY)
-        amRequest.setPriority(Priority.newInstance(0))
-        amRequest.setCapability(capability)
-        amRequest.setNumContainers(1)
-        val amLabelExpression = sparkConf.get("spark.yarn.am.nodeLabelExpression")
-        val method = amRequest.getClass.getMethod("setNodeLabelExpression", classOf[String])
-        method.invoke(amRequest, amLabelExpression)
+    val anyRequest = createAMResourceRequest(ResourceRequest.ANY, capability)
+    val localizedRequests = getAMLocalityRequests(sparkConf, capability, isClusterMode)
+    if (localizedRequests.nonEmpty) {
+      anyRequest.setRelaxLocality(false)
+    }
+    val amRequests = Seq(anyRequest) ++ localizedRequests
 
-        val setResourceRequestMethod =
-          appContext.getClass.getMethod("setAMContainerResourceRequest", classOf[ResourceRequest])
-        setResourceRequestMethod.invoke(appContext, amRequest)
-      } catch {
-        case e: NoSuchMethodException =>
-          logWarning("Ignoring spark.yarn.am.nodeLabelExpression because the version " +
-            "of YARN does not support it")
-          appContext.setResource(capability)
-      }
-    } else {
-      appContext.setResource(capability)
+    sparkConf.getOption("spark.yarn.am.nodeLabelExpression").foreach { nodeLabel =>
+      amRequests.foreach { req => req.setNodeLabelExpression(nodeLabel) }
     }
 
+    appContext.setAMContainerResourceRequests(amRequests.asJava)
     appContext
   }
 
@@ -1108,6 +1097,13 @@ object Client extends Logging {
   // in YARN ApplicationReports, which can be used for filtering when querying YARN.
   val CONF_SPARK_YARN_APPLICATION_TAGS = "spark.yarn.tags"
 
+  // Comma-separated list of strings defining the locality for the Spark client-mode AM.
+  val CONF_SPARK_YARN_AM_LOCALITY = "spark.yarn.am.locality"
+
+  // Comma-separated list of strings defining the locality for the Spark cluster-mode AM
+  // (a.k.a. the driver).
+  val CONF_SPARK_YARN_DRIVER_LOCALITY = "spark.yarn.driver.locality"
+
   // Staging directory is private! -> rwx--------
   val STAGING_DIR_PERMISSION: FsPermission =
     FsPermission.createImmutable(Integer.parseInt("700", 8).toShort)
@@ -1419,6 +1415,68 @@ object Client extends Logging {
    */
   def buildPath(components: String*): String = {
     components.mkString(Path.SEPARATOR)
+  }
+
+  private[yarn] def getAMLocalityRequests(
+      conf: SparkConf,
+      capability: Resource,
+      isDriver: Boolean): Seq[ResourceRequest] = {
+    val RACK_GROUP = "rack"
+    val NODE_IF_RACK_GROUP = "node1"
+    val NODE_IF_NO_RACK_GROUP = "node2"
+
+    // Matches any of the following patterns with capturing groups:
+    //   /rack
+    //   /rack/node
+    //   node (assumes /default-rack)
+    //
+    // The groups can be retrieved using the RACK_GROUP, NODE_IF_RACK_GROUP,
+    // and/or NODE_IF_NO_RACK_GROUP group keys.
+    val RACK_NODE_PATTERN =
+      Pattern.compile(
+        String.format("(?<%s>[^/]+?)|(?<%s>/[^/]+?)(?:/(?<%s>[^/]+?))?",
+        NODE_IF_NO_RACK_GROUP, RACK_GROUP, NODE_IF_RACK_GROUP))
+
+    val rackRequests = new HashMap[String, ResourceRequest]()
+
+    val confKey = if (isDriver) CONF_SPARK_YARN_DRIVER_LOCALITY else CONF_SPARK_YARN_AM_LOCALITY
+    val nodeRequests = conf.getOption(confKey).toSeq
+      .flatMap { s => s.split(",").map(_.trim()).filter(_.nonEmpty) }
+      .flatMap { locality =>
+        val matcher = RACK_NODE_PATTERN.matcher(locality)
+        if (!matcher.matches()) {
+          throw new IllegalArgumentException(s"Invalid locality pattern: $locality")
+        }
+
+        val (rackName, nodeName) = Option(matcher.group(RACK_GROUP)) match {
+          case Some(rack) =>
+            (rack, matcher.group(NODE_IF_RACK_GROUP))
+
+          case _ =>
+            ("/default-rack", matcher.group(NODE_IF_NO_RACK_GROUP))
+        }
+
+        val rackRequest = rackRequests.getOrElseUpdate(rackName,
+          createAMResourceRequest(rackName, capability))
+
+        Option(nodeName).map { name =>
+          rackRequest.setRelaxLocality(false)
+          createAMResourceRequest(name, capability)
+        }
+      }
+
+    rackRequests.values.toSeq ++ nodeRequests
+  }
+
+  /** Create an AM resource request for the given locality. */
+  private def createAMResourceRequest(resource: String, capability: Resource): ResourceRequest = {
+    val request = Records.newRecord(classOf[ResourceRequest])
+    request.setPriority(Priority.newInstance(0))
+    request.setResourceName(resource)
+    request.setCapability(capability)
+    request.setNumContainers(1)
+    request.setRelaxLocality(true)
+    request
   }
 
 }

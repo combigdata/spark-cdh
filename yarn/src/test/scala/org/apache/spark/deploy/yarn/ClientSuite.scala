@@ -249,6 +249,55 @@ class ClientSuite extends SparkFunSuite with Matchers with BeforeAndAfterAll {
 
   }
 
+  test("am locality config parsing") {
+    import Client._
+    val capability = mock(classOf[Resource])
+    val rackOnly = getAMLocalityRequests(
+      new SparkConf(false).set(CONF_SPARK_YARN_AM_LOCALITY, "/rack"),
+      capability,
+      false)
+    assert(rackOnly.size === 1)
+    assert(rackOnly.head.getResourceName() === "/rack")
+
+    val nodeOnly = getAMLocalityRequests(
+      new SparkConf(false).set(CONF_SPARK_YARN_AM_LOCALITY, "node"),
+      capability,
+      false)
+    assert(nodeOnly.size === 2)
+    assert(nodeOnly.head.getResourceName() === "/default-rack")
+    assert(!nodeOnly.head.getRelaxLocality())
+    assert(nodeOnly.last.getResourceName() === "node")
+
+    val nodeAndRack = getAMLocalityRequests(
+      new SparkConf(false).set(CONF_SPARK_YARN_DRIVER_LOCALITY, "/rack/node"),
+      capability,
+      true)
+    assert(nodeAndRack.size === 2)
+    assert(nodeAndRack.head.getResourceName() === "/rack")
+    assert(!nodeAndRack.head.getRelaxLocality())
+    assert(nodeAndRack.last.getResourceName() === "node")
+
+    val mismatchedConfig = getAMLocalityRequests(
+      new SparkConf(false).set(CONF_SPARK_YARN_DRIVER_LOCALITY, "/rack/node"),
+      capability,
+      false)
+    assert(mismatchedConfig.isEmpty)
+
+    val multiConfigs = getAMLocalityRequests(
+      new SparkConf(false).set(CONF_SPARK_YARN_DRIVER_LOCALITY, "/rack/node,/rack2,node2"),
+      capability,
+      true)
+    val resources = multiConfigs.map(_.getResourceName()).toSet
+    assert(resources === Set("/default-rack", "/rack", "/rack2", "node", "node2"))
+
+    intercept[IllegalArgumentException] {
+      getAMLocalityRequests(
+        new SparkConf(false).set(CONF_SPARK_YARN_DRIVER_LOCALITY, "/rack/node/this_is_not_allowed"),
+        capability,
+        true)
+    }
+  }
+
   object Fixtures {
 
     val knownDefYarnAppCP: Seq[String] =
