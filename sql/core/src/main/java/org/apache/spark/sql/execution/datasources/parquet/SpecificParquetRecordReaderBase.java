@@ -53,6 +53,7 @@ import parquet.hadoop.ParquetInputSplit;
 import parquet.hadoop.api.InitContext;
 import parquet.hadoop.api.ReadSupport;
 import parquet.hadoop.metadata.BlockMetaData;
+import parquet.hadoop.metadata.FileMetaData;
 import parquet.hadoop.metadata.ParquetMetadata;
 import parquet.hadoop.util.ConfigurationUtil;
 import parquet.schema.MessageType;
@@ -128,8 +129,14 @@ public abstract class SpecificParquetRecordReaderBase<T> extends RecordReader<Vo
                 + " in range " + split.getStart() + ", " + split.getEnd());
       }
     }
-    MessageType fileSchema = footer.getFileMetaData().getSchema();
-    Map<String, String> fileMetadata = footer.getFileMetaData().getKeyValueMetaData();
+    FileMetaData fileMeta = footer.getFileMetaData();
+    // We need to grab the creator for this specific file, because the timestamp conversion varies
+    // based on the creator, and each file in the table may have a different creator.
+    taskAttemptContext.getConfiguration().set(
+        ParquetFileFormat.FILE_CREATOR(),
+        fileMeta.getCreatedBy());
+    MessageType fileSchema = fileMeta.getSchema();
+    Map<String, String> fileMetadata = fileMeta.getKeyValueMetaData();
     this.readSupport = getReadSupportInstance(
         (Class<? extends ReadSupport<T>>) getReadSupportClass(configuration));
     ReadSupport.ReadContext readContext = readSupport.init(new InitContext(

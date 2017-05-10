@@ -17,16 +17,16 @@
 
 package org.apache.spark.sql.hive
 
+import java.io.File
+import java.nio.file.Files
 import java.sql.Timestamp
-import java.text.SimpleDateFormat
-import java.util.{Calendar, TimeZone}
+import java.util.TimeZone
 
 import org.apache.hadoop.hive.conf.HiveConf
 
 import org.apache.spark.SparkFunSuite
 import org.apache.spark.sql._
 import org.apache.spark.sql.catalyst.TableIdentifier
-import org.apache.spark.sql.catalyst.util.DateTimeUtils
 import org.apache.spark.sql.execution.datasources.parquet.{ParquetCompatibilityTest, ParquetFileFormat}
 import org.apache.spark.sql.hive.client.HiveTable
 import org.apache.spark.sql.hive.test.TestHiveSingleton
@@ -433,5 +433,79 @@ class ParquetHiveCompatibilitySuite extends ParquetCompatibilityTest with TestHi
         raw"""ALTER TABLE flippidee_floop SET TBLPROPERTIES ("$key"="Blart Versenwald III")""")
     }
     assert(badTzAlterException.getMessage.contains("Blart Versenwald III"))
+  }
+
+  test("SPARK-12297: No conversion on Impala parquet files") {
+    // Different conversions apply to impala data and spark / hive generated data.  This tests
+    // uses a pre-existing impala generated file, and a spark generated file, stuffs them both into
+    // the same table, and makes sure they are read back correctly.
+    Seq(false, true).foreach { withTableTimezone =>
+      val tblName = s"mixed_timestamp_data_$withTableTimezone"
+      withTable(tblName) {
+        withTempDir { tableLocation =>
+          // take our pre-existing impala file and copy it into the location for the table.
+          val resourcePath =
+            "/data/files/parquet_timestamp_mixed_source_table/impala_timestamp_data.0.parq"
+          val inputDataFile = new File(getClass().getResource(resourcePath).getFile())
+          Files.copy(inputDataFile.toPath, new File(tableLocation, inputDataFile.getName()).toPath)
+          sqlContext.setConf(SQLConf.PARQUET_BINARY_AS_STRING, true)
+          val key = ParquetFileFormat.PARQUET_TIMEZONE_TABLE_PROPERTY
+          val tblProperties = if (withTableTimezone) {
+            s"""TBLPROPERTIES ("$key"="Europe/Berlin")"""
+          } else {
+            ""
+          }
+
+          sqlContext.sql(
+            s"""CREATE EXTERNAL TABLE $tblName (
+                |  str string,
+                |  ts timestamp
+                |)
+                |STORED AS PARQUET
+                |LOCATION '${tableLocation}'
+                |$tblProperties""".stripMargin
+          )
+          // insert some data from spark as well -- this will go into a different parquet file, with
+          // different "CreatedBy" metadata, so we can distinguish when we read back.
+          val dataFromSpark = createRawData().withColumnRenamed("display", "str")
+          dataFromSpark.write.insertInto(tblName)
+
+          // verify test setup is correct -- read the data bypassing the hive table, so no
+          // conversions apply, and make sure we've got two different offsets.
+          val deltas = sqlContext.read.parquet(tableLocation
+            .getAbsolutePath).map { row =>
+            val displayAsTs = Timestamp.valueOf(row.getAs[String]("str"))
+            row.getAs[Timestamp]("ts").getTime() - displayAsTs.getTime()
+          }.collect().toSet
+          // The impala file is written as UTC.  This test is run in America/Los_Angeles, and the
+          // table prop (if applicable) is Europe/Berlin.
+          val sparkGeneratedDataTz =
+            if (withTableTimezone) "Europe/Berlin" else "America/Los_Angeles"
+          val expectedDeltas = Set("UTC", sparkGeneratedDataTz).map { tz =>
+            // we have chosen times so that the offsets don't change w/ DST etc.
+            TimeZone.getDefault().getOffset(0L) - TimeZone.getTimeZone(tz).getOffset(0L)
+          }
+          assert(deltas === expectedDeltas)
+
+          if (withTableTimezone) {
+            // now check that we read it in correctly when going through the hive table, and apply
+            // the correct conversion.
+            sqlContext.sql(s"select * from $tblName").collect().foreach { row =>
+              // the impala data file doesn't show the trailing ".0" in the "str" column
+              val tsAsString = row.getAs[Timestamp]("ts").toString.stripSuffix(".0")
+              assert(row.getAs[String]("str") === tsAsString)
+            }
+          }
+          else {
+            // if we don't set any table property, then reading it from the table should be the same
+            // as reading it directly from the files (no conversion applied, which means a
+            // discrepancy between impala and spark; that is to retain backwards compatibility).
+            val readFromTable = sqlContext.sql(s"select * from $tblName").collect()
+            val readFromFiles = sqlContext.read.parquet(tableLocation.getAbsolutePath).collect()
+            assert(readFromTable.map(_.toString).sorted === readFromFiles.map(_.toString).sorted)
+          }
+        }
+      }
+    }
   }
 }
