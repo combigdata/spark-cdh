@@ -53,6 +53,7 @@ class ParquetTimestampSuite extends SparkFunSuite with MockitoSugar with SharedS
       val catalystSchema = StructType(Array(StructField("ts", TimestampType, true)))
       CatalystWriteSupport.setSchema(catalystSchema, conf)
       conf.set(ParquetFileFormat.PARQUET_TIMEZONE_TABLE_PROPERTY, "America/Chicago")
+      conf.set(ParquetFileFormat.FILE_CREATOR, "parquet-mr")
       conf.set(SQLConf.PARQUET_WRITE_LEGACY_FORMAT.key, "true")
       conf.set(SQLConf.PARQUET_BINARY_AS_STRING.key, "false")
       conf.set(SQLConf.PARQUET_INT96_AS_TIMESTAMP.key, "true")
