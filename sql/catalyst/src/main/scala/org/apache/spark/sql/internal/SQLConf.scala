@@ -23,7 +23,7 @@ import java.util.concurrent.TimeUnit
 import scala.collection.JavaConverters._
 import scala.collection.immutable
 
-import _root_.parquet.hadoop.ParquetOutputCommitter
+// import _root_.parquet.hadoop.ParquetOutputCommitter
 import org.apache.hadoop.fs.Path
 
 import org.apache.spark.internal.Logging

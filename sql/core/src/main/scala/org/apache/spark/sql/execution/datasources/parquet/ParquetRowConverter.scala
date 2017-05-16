@@ -25,9 +25,10 @@ import scala.collection.mutable.ArrayBuffer
 
 import parquet.column.Dictionary
 import parquet.io.api.{Binary, Converter, GroupConverter, PrimitiveConverter}
-import parquet.schema.{GroupType, MessageType, PrimitiveType, Type}
+import parquet.schema.{GroupType, MessageType, OriginalType, PrimitiveType, Type}
 import parquet.schema.OriginalType.{INT_32, LIST, UTF8}
 import parquet.schema.PrimitiveType.PrimitiveTypeName.{BINARY, DOUBLE, FIXED_LEN_BYTE_ARRAY, INT32, INT64}
+
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.expressions._

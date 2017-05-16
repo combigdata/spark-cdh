@@ -31,15 +31,16 @@ import org.apache.hadoop.fs.{FileStatus, Path}
 import org.apache.hadoop.mapreduce._
 import org.apache.hadoop.mapreduce.lib.input.FileSplit
 import org.apache.hadoop.mapreduce.task.TaskAttemptContextImpl
-import parquet.format.converter.ParquetMetadataConverter.SKIP_ROW_GROUPS
 import org.slf4j.bridge.SLF4JBridgeHandler
 import parquet.{Log => ApacheParquetLog}
 import parquet.filter2.compat.FilterCompat
 import parquet.filter2.predicate.FilterApi
+import parquet.format.converter.ParquetMetadataConverter.SKIP_ROW_GROUPS
 import parquet.hadoop._
 import parquet.hadoop.codec.CodecConfig
 import parquet.hadoop.util.ContextUtil
 import parquet.schema.MessageType
+
 import org.apache.spark.{SparkException, TaskContext}
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql._
