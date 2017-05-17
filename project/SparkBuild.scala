@@ -391,11 +391,11 @@ object SQL {
 
 object LineageTestDependencies {
   lazy val settings = Seq(
-    libraryDependencies ++= Seq("org.apache.hadoop" % "hadoop-hdfs" % "2.6.0-cdh5.11.1-SNAPSHOT" %
+    libraryDependencies ++= Seq("org.apache.hadoop" % "hadoop-hdfs" % "2.6.0-cdh5.11.2-SNAPSHOT" %
       "test" classifier "tests" excludeAll(
       ExclusionRule(organization = "javax.servlet", name = "servlet-api"),
       ExclusionRule(organization = "javax.servlet.jsp", name = "jsp-api")
-      ), "org.apache.hadoop" % "hadoop-common" % "2.6.0-cdh5.11.1-SNAPSHOT" %
+      ), "org.apache.hadoop" % "hadoop-common" % "2.6.0-cdh5.11.2-SNAPSHOT" %
       "test" classifier "tests"
     )
   )
