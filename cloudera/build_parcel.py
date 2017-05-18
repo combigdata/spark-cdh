@@ -277,7 +277,6 @@ class Metadata(object):
             },
             "provides": [
                 "spark2",
-                "cdh-plugin",
             ],
             "users": {
                 "spark": {
