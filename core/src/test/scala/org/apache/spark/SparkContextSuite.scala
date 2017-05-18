@@ -23,7 +23,7 @@ import java.nio.charset.StandardCharsets
 import java.util.concurrent.TimeUnit
 
 import scala.concurrent.Await
-import scala.concurrent.duration.Duration
+import scala.concurrent.duration._
 
 import com.google.common.io.Files
 import org.apache.hadoop.io.{BytesWritable, LongWritable, Text}
@@ -31,7 +31,8 @@ import org.apache.hadoop.mapred.TextInputFormat
 import org.apache.hadoop.mapreduce.lib.input.{TextInputFormat => NewTextInputFormat}
 import org.scalatest.Matchers._
 
-import org.apache.spark.util.Utils
+import org.apache.spark.scheduler.{SparkListener, SparkListenerJobStart, SparkListenerTaskEnd, SparkListenerTaskStart}
+import org.apache.spark.util.{ThreadUtils, Utils}
 
 class SparkContextSuite extends SparkFunSuite with LocalSparkContext {
 
@@ -294,7 +295,7 @@ class SparkContextSuite extends SparkFunSuite with LocalSparkContext {
       sc = new SparkContext(new SparkConf().setAppName("test").setMaster("local"))
       val future = sc.parallelize(Seq(0)).foreachAsync(_ => {Thread.sleep(1000L)})
       sc.cancelJobGroup("nonExistGroupId")
-      Await.ready(future, Duration(2, TimeUnit.SECONDS))
+      ThreadUtils.awaitReady(future, Duration(2, TimeUnit.SECONDS))
 
       // In SPARK-6414, sc.cancelJobGroup will cause NullPointerException and cause
       // SparkContext to shutdown, so the following assertion will fail.

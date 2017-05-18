@@ -141,7 +141,9 @@ class KinesisCheckpointerSuite extends TestSuiteBase
       ExecutionContext.global)
 
     intercept[TimeoutException] {
+      // scalastyle:off awaitready
       Await.ready(f, 50 millis)
+      // scalastyle:on awaitready
     }
 
     clock.advance(checkpointInterval.milliseconds / 2)
