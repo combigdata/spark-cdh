@@ -16,7 +16,6 @@
  */
 package org.apache.spark.sql.execution.datasources.parquet
 
-private[sql] object ParquetFileFormat {
+object ParquetFileFormat {
   val PARQUET_TIMEZONE_TABLE_PROPERTY = "parquet.mr.int96.write.zone"
-  val FILE_CREATOR = "spark.sql.parquet.creator"
 }

@@ -257,17 +257,12 @@ private[parquet] class CatalystRowConverter(
         // TODO Implements `TIMESTAMP_MICROS` once parquet-mr has that.
         val localTz = TimeZone.getDefault()
         val tzString = hadoopConf.get(ParquetFileFormat.PARQUET_TIMEZONE_TABLE_PROPERTY)
-        val fileCreator = hadoopConf.get(ParquetFileFormat.FILE_CREATOR)
         val storageTz = if (tzString == null) {
-            localTz
-          } else if (!fileCreator.startsWith("parquet-mr")) {
-            // Impala always writes the data as UTC, regardless of the table property. The
-            // conversion is only done as part of spark & hive, which identify as parquet-mr.
-            TimeZone.getTimeZone("UTC")
-          } else {
-            TimeZone.getTimeZone(tzString)
-          }
-        logDebug(s"Building timestamp reader with localTz = ${localTz.getID()}; " +
+          localTz
+        } else {
+          TimeZone.getTimeZone(tzString)
+        }
+        logInfo(s"Building timestamp reader with localTz = ${localTz.getID()}; " +
           s"storageTz = ${storageTz.getID()}; tzString = $tzString")
         new CatalystPrimitiveConverter(updater) {
           // Converts nanosecond timestamps stored as INT96
