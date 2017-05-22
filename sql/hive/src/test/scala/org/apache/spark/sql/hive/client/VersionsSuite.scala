@@ -100,7 +100,7 @@ class VersionsSuite extends SparkFunSuite with Logging {
       hadoopConf = new Configuration(),
       config = buildConf(),
       ivyPath = ivyPath).createClient()
-    val db = new CatalogDatabase("default", "desc", "loc", Map())
+    val db = new CatalogDatabase("default", "desc", new URI("loc"), Map())
     badClient.createDatabase(db, ignoreIfExists = true)
   }
 

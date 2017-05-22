@@ -63,7 +63,7 @@ class HiveFileFormat(fileSinkConf: FileSinkDesc)
       job: Job,
       options: Map[String, String],
       dataSchema: StructType): OutputWriterFactory = {
-    val conf = job.getConfiguration
+    val conf = job.getConfiguration.asInstanceOf[JobConf]
     val tableDesc = fileSinkConf.getTableInfo
     conf.set("mapred.output.format.class", tableDesc.getOutputFileFormatClassName)
 
