@@ -17,7 +17,6 @@
 
 package org.apache.spark.sql.execution.datasources.parquet
 
-import org.apache.hadoop.conf.Configuration
 import parquet.io.api.{GroupConverter, RecordMaterializer}
 import parquet.schema.MessageType
 
@@ -31,13 +30,10 @@ import org.apache.spark.sql.types.StructType
  * @param catalystSchema Catalyst schema of the rows to be constructed
  */
 private[parquet] class CatalystRecordMaterializer(
-    parquetSchema: MessageType,
-    catalystSchema: StructType,
-    conf: Configuration)
+    parquetSchema: MessageType, catalystSchema: StructType)
   extends RecordMaterializer[InternalRow] {
 
-  private val rootConverter = new CatalystRowConverter(
-    parquetSchema, catalystSchema, NoopUpdater, conf)
+  private val rootConverter = new CatalystRowConverter(parquetSchema, catalystSchema, NoopUpdater)
 
   override def getCurrentRecord: InternalRow = rootConverter.currentRecord
 

@@ -279,9 +279,6 @@ private[sql] class ParquetRelation(
         .getOrElse(
           sqlContext.conf.parquetCompressionCodec.toUpperCase,
           CompressionCodecName.UNCOMPRESSED).name())
-    parameters.get(ParquetFileFormat.PARQUET_TIMEZONE_TABLE_PROPERTY).foreach (
-      conf.set(ParquetFileFormat.PARQUET_TIMEZONE_TABLE_PROPERTY, _)
-    )
 
     new OutputWriterFactory {
       override def newInstance(
@@ -311,7 +308,6 @@ private[sql] class ParquetRelation(
     val parquetBlockSize = ParquetOutputFormat.getLongBlockSize(broadcastedConf.value.value)
 
     // Create the function to set variable Parquet confs at both driver and executor side.
-    val tz = parameters.get(ParquetFileFormat.PARQUET_TIMEZONE_TABLE_PROPERTY)
     val initLocalJobFuncOpt =
       ParquetRelation.initializeLocalJobFunc(
         requiredColumns,
@@ -321,8 +317,7 @@ private[sql] class ParquetRelation(
         useMetadataCache,
         safeParquetFilterPushDown,
         assumeBinaryIsString,
-        assumeInt96IsTimestamp,
-        tz) _
+        assumeInt96IsTimestamp) _
 
     // Create the function to set input paths at the driver side.
     val setInputPaths =
@@ -568,8 +563,7 @@ private[sql] object ParquetRelation extends Logging {
       useMetadataCache: Boolean,
       parquetFilterPushDown: Boolean,
       assumeBinaryIsString: Boolean,
-      assumeInt96IsTimestamp: Boolean,
-      timestampTimezone: Option[String])(job: Job): Unit = {
+      assumeInt96IsTimestamp: Boolean)(job: Job): Unit = {
     val conf = SparkHadoopUtil.get.getConfigurationFromJobContext(job)
     conf.set(ParquetInputFormat.READ_SUPPORT_CLASS, classOf[CatalystReadSupport].getName)
 
@@ -599,7 +593,6 @@ private[sql] object ParquetRelation extends Logging {
     // Sets flags for `CatalystSchemaConverter`
     conf.setBoolean(SQLConf.PARQUET_BINARY_AS_STRING.key, assumeBinaryIsString)
     conf.setBoolean(SQLConf.PARQUET_INT96_AS_TIMESTAMP.key, assumeInt96IsTimestamp)
-    timestampTimezone.foreach(conf.set(ParquetFileFormat.PARQUET_TIMEZONE_TABLE_PROPERTY, _))
 
     overrideMinSplitSize(parquetBlockSize, conf)
   }

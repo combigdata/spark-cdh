@@ -97,8 +97,7 @@ private[parquet] class CatalystReadSupport extends ReadSupport[InternalRow] with
 
     new CatalystRecordMaterializer(
       parquetRequestedSchema,
-      CatalystReadSupport.expandUDT(catalystRequestedSchema),
-      conf)
+      CatalystReadSupport.expandUDT(catalystRequestedSchema))
   }
 }
 
