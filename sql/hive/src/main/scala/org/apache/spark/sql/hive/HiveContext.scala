@@ -214,7 +214,7 @@ class HiveContext private[hive](
     val loader = new IsolatedClientLoader(
       version = IsolatedClientLoader.hiveVersion(hiveExecutionVersion),
       execJars = Seq(),
-      config = newTemporaryConfiguration(),
+      config = newTemporaryConfiguration() ++ userConfigOverrides,
       isolationOn = false,
       baseClassLoader = Utils.getContextOrSparkClassLoader)
     loader.createClient().asInstanceOf[ClientWrapper]
@@ -249,7 +249,8 @@ class HiveContext private[hive](
     logInfo("default warehouse location is " + defaultWarehouseLocation)
 
     // `configure` goes second to override other settings.
-    val allConfig = metadataConf.asScala.map(e => e.getKey -> e.getValue).toMap ++ configure
+    val allConfig = metadataConf.asScala.map(e => e.getKey -> e.getValue).toMap ++ configure ++
+      userConfigOverrides
 
     val isolatedLoader = if (hiveMetastoreJars == "builtin") {
       if (hiveExecutionVersion != hiveMetastoreVersion) {
@@ -538,6 +539,14 @@ class HiveContext private[hive](
       ConfVars.SPARK_RPC_CLIENT_HANDSHAKE_TIMEOUT -> TimeUnit.MILLISECONDS
     ).map { case (confVar, unit) =>
       confVar.varname -> hiveconf.getTimeVar(confVar, unit).toString
+    }.toMap
+  }
+
+  /** The user-defined Hadoop configuration entries stored in SparkConf. */
+  private def userConfigOverrides: Map[String, String] = {
+    val hadoopPrefix = "spark.hadoop."
+    sc.conf.getAll.collect { case (k, v) if k.startsWith(hadoopPrefix) =>
+      k.substring(hadoopPrefix.length()) -> v
     }.toMap
   }
 
