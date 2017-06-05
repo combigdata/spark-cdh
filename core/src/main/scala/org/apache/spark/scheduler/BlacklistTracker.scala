@@ -300,7 +300,7 @@ private[scheduler] final class ExecutorFailureList extends Logging {
     }
   }
 
-  def minExpiryTime: Long = failures.head._2
+  def minExpiryTime: Long = failures.headOption.map(_._2).getOrElse(Long.MaxValue)
 
   /**
    * The number of unique tasks that failed on this executor.  Only counts failures within the

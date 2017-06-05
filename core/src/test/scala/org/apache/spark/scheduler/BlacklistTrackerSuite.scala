@@ -418,4 +418,9 @@ class BlacklistTrackerSuite extends SparkFunSuite with BeforeAndAfterEach with M
       assert(10 * 60 * 60 * 1000L == BlacklistTracker.getBlacklistTimeout(distConf))
     }
   }
+
+  test("timeouts can be safely applied to empty blacklist") {
+    val efl = new ExecutorFailureList
+    efl.dropFailuresWithTimeoutBefore(0)
+  }
 }
