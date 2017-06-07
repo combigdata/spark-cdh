@@ -676,7 +676,7 @@ class ParquetFilterSuite extends QueryTest with ParquetTest with SharedSQLContex
   }
 
 
-  test("Filter applied on merged Parquet schema with new column should work") {
+  ignore("Filter applied on merged Parquet schema with new column should work") {
     import testImplicits._
     Seq("true", "false").foreach { vectorized =>
       withSQLConf(SQLConf.PARQUET_FILTER_PUSHDOWN_ENABLED.key -> "true",
@@ -831,7 +831,7 @@ class ParquetFilterSuite extends QueryTest with ParquetTest with SharedSQLContex
     }
   }
 
-  test("SPARK-17213: Broken Parquet filter push-down for string columns") {
+  ignore("SPARK-17213: Broken Parquet filter push-down for string columns") {
     Seq(true, false).foreach { vectorizedEnabled =>
       withSQLConf(SQLConf.PARQUET_VECTORIZED_READER_ENABLED.key -> vectorizedEnabled.toString) {
         withTempPath { dir =>
