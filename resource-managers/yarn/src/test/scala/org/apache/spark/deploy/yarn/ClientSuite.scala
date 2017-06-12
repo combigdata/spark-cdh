@@ -23,6 +23,7 @@ import java.util.Properties
 
 import scala.collection.JavaConverters._
 import scala.collection.mutable.{HashMap => MutableHashMap}
+import scala.util.Try
 import scala.util.control.NonFatal
 
 import org.apache.hadoop.conf.Configuration
@@ -382,7 +383,11 @@ class ClientSuite extends SparkFunSuite with Matchers {
         containerLaunchContext)
 
       resources.foreach { case (name, value) =>
-        ResourceRequestTestHelper.getRequestedValue(appContext.getResource, name) should be (value)
+        val requestedValue = appContext.getAMContainerResourceRequests().asScala
+          .flatMap { req => Try(req.getCapability().getResourceValue(name)).toOption }
+          .headOption
+        assert(requestedValue.isDefined, s"Could not find request for $name")
+        assert(requestedValue.get === value)
       }
     }
   }
@@ -418,6 +423,55 @@ class ClientSuite extends SparkFunSuite with Matchers {
         assert(!Client.compareUri(new URI(t._2), new URI(t._3)),
           s"match between ${t._2} and ${t._3}")
       }
+  }
+
+  test("am locality config parsing") {
+    import Client._
+    val capability = mock(classOf[Resource])
+    val rackOnly = getAMLocalityRequests(
+      new SparkConf(false).set(AM_LOCALITY, Seq("/rack")),
+      capability,
+      false)
+    assert(rackOnly.size === 1)
+    assert(rackOnly.head.getResourceName() === "/rack")
+
+    val nodeOnly = getAMLocalityRequests(
+      new SparkConf(false).set(AM_LOCALITY, Seq("node")),
+      capability,
+      false)
+    assert(nodeOnly.size === 2)
+    assert(nodeOnly.head.getResourceName() === "/default-rack")
+    assert(!nodeOnly.head.getRelaxLocality())
+    assert(nodeOnly.last.getResourceName() === "node")
+
+    val nodeAndRack = getAMLocalityRequests(
+      new SparkConf(false).set(DRIVER_LOCALITY, Seq("/rack/node")),
+      capability,
+      true)
+    assert(nodeAndRack.size === 2)
+    assert(nodeAndRack.head.getResourceName() === "/rack")
+    assert(!nodeAndRack.head.getRelaxLocality())
+    assert(nodeAndRack.last.getResourceName() === "node")
+
+    val mismatchedConfig = getAMLocalityRequests(
+      new SparkConf(false).set(DRIVER_LOCALITY, Seq("/rack/node")),
+      capability,
+      false)
+    assert(mismatchedConfig.isEmpty)
+
+    val multiConfigs = getAMLocalityRequests(
+      new SparkConf(false).set(DRIVER_LOCALITY, Seq("/rack/node", "/rack2", "node2")),
+      capability,
+      true)
+    val resources = multiConfigs.map(_.getResourceName()).toSet
+    assert(resources === Set("/default-rack", "/rack", "/rack2", "node", "node2"))
+
+    intercept[IllegalArgumentException] {
+      getAMLocalityRequests(
+        new SparkConf(false).set(DRIVER_LOCALITY, Seq("/rack/node/this_is_not_allowed")),
+        capability,
+        true)
+    }
   }
 
   object Fixtures {

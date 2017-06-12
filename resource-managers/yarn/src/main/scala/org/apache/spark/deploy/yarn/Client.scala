@@ -22,11 +22,13 @@ import java.net.{InetAddress, UnknownHostException, URI}
 import java.nio.ByteBuffer
 import java.nio.charset.StandardCharsets
 import java.security.PrivilegedExceptionAction
-import java.util.{Locale, Properties, UUID}
+import java.util.{List => JList, Locale, Properties, UUID}
+import java.util.regex.Pattern
 import java.util.zip.{ZipEntry, ZipOutputStream}
 
 import scala.collection.JavaConverters._
 import scala.collection.mutable.{ArrayBuffer, HashMap, HashSet, ListBuffer, Map}
+import scala.util.{Failure, Success, Try}
 import scala.util.control.NonFatal
 
 import com.google.common.base.Objects
@@ -270,18 +272,17 @@ private[spark] class Client(
     }
     logDebug(s"Created resource capability for AM request: $capability")
 
-    sparkConf.get(AM_NODE_LABEL_EXPRESSION) match {
-      case Some(expr) =>
-        val amRequest = Records.newRecord(classOf[ResourceRequest])
-        amRequest.setResourceName(ResourceRequest.ANY)
-        amRequest.setPriority(Priority.newInstance(0))
-        amRequest.setCapability(capability)
-        amRequest.setNumContainers(1)
-        amRequest.setNodeLabelExpression(expr)
-        appContext.setAMContainerResourceRequest(amRequest)
-      case None =>
-        appContext.setResource(capability)
+    // CDH-76006. Add AM locality requests if configured.
+    val anyRequest = createAMResourceRequest(ResourceRequest.ANY, capability)
+    val localizedRequests = getAMLocalityRequests(sparkConf, capability, isClusterMode)
+    if (localizedRequests.nonEmpty) {
+      anyRequest.setRelaxLocality(false)
     }
+    val amRequests = Seq(anyRequest) ++ localizedRequests
+    sparkConf.get(AM_NODE_LABEL_EXPRESSION).foreach { nodeLabel =>
+      amRequests.foreach { req => req.setNodeLabelExpression(nodeLabel) }
+    }
+    appContext.setAMContainerResourceRequests(amRequests.asJava)
 
     sparkConf.get(ROLLED_LOG_INCLUDE_PATTERN).foreach { includePattern =>
       try {
@@ -1200,7 +1201,6 @@ private object Client extends Logging {
   // Staging directory for any temporary jars or files
   val SPARK_STAGING: String = ".sparkStaging"
 
-
   // Staging directory is private! -> rwx--------
   val STAGING_DIR_PERMISSION: FsPermission =
     FsPermission.createImmutable(Integer.parseInt("700", 8).toShort)
@@ -1527,6 +1527,67 @@ private object Client extends Logging {
       envName + "=\\\"" + quoted + File.pathSeparator + "$" + envName + "\\\""
     }
     getClusterPath(conf, cmdPrefix)
+  }
+
+  private[yarn] def getAMLocalityRequests(
+      conf: SparkConf,
+      capability: Resource,
+      isDriver: Boolean): Seq[ResourceRequest] = {
+    val RACK_GROUP = "rack"
+    val NODE_IF_RACK_GROUP = "node1"
+    val NODE_IF_NO_RACK_GROUP = "node2"
+
+    // Matches any of the following patterns with capturing groups:
+    //   /rack
+    //   /rack/node
+    //   node (assumes /default-rack)
+    //
+    // The groups can be retrieved using the RACK_GROUP, NODE_IF_RACK_GROUP,
+    // and/or NODE_IF_NO_RACK_GROUP group keys.
+    val RACK_NODE_PATTERN =
+      Pattern.compile(
+        String.format("(?<%s>[^/]+?)|(?<%s>/[^/]+?)(?:/(?<%s>[^/]+?))?",
+        NODE_IF_NO_RACK_GROUP, RACK_GROUP, NODE_IF_RACK_GROUP))
+
+    val rackRequests = new HashMap[String, ResourceRequest]()
+
+    val confKey = if (isDriver) DRIVER_LOCALITY else AM_LOCALITY
+    val nodeRequests = conf.get(confKey).getOrElse(Nil)
+      .flatMap { locality =>
+        val matcher = RACK_NODE_PATTERN.matcher(locality)
+        if (!matcher.matches()) {
+          throw new IllegalArgumentException(s"Invalid locality pattern: $locality")
+        }
+
+        val (rackName, nodeName) = Option(matcher.group(RACK_GROUP)) match {
+          case Some(rack) =>
+            (rack, matcher.group(NODE_IF_RACK_GROUP))
+
+          case _ =>
+            ("/default-rack", matcher.group(NODE_IF_NO_RACK_GROUP))
+        }
+
+        val rackRequest = rackRequests.getOrElseUpdate(rackName,
+          createAMResourceRequest(rackName, capability))
+
+        Option(nodeName).map { name =>
+          rackRequest.setRelaxLocality(false)
+          createAMResourceRequest(name, capability)
+        }
+      }
+
+    rackRequests.values.toSeq ++ nodeRequests
+  }
+
+  /** Create an AM resource request for the given locality. */
+  private def createAMResourceRequest(resource: String, capability: Resource): ResourceRequest = {
+    val request = Records.newRecord(classOf[ResourceRequest])
+    request.setPriority(Priority.newInstance(0))
+    request.setResourceName(resource)
+    request.setCapability(capability)
+    request.setNumContainers(1)
+    request.setRelaxLocality(true)
+    request
   }
 }
 
