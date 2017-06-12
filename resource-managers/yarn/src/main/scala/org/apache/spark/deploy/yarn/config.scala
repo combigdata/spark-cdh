@@ -219,6 +219,12 @@ package object config {
     .bytesConf(ByteUnit.MiB)
     .createWithDefaultString("512m")
 
+  private[spark] val AM_LOCALITY = ConfigBuilder("spark.yarn.am.locality")
+    .doc("Comma-separated list of strings defining the locality for the Spark client-mode AM.")
+    .stringConf
+    .toSequence
+    .createOptional
+
   /* Driver configuration. */
 
   private[spark] val DRIVER_CORES = ConfigBuilder("spark.driver.cores")
@@ -244,6 +250,13 @@ package object config {
       .doc("Node label expression for executors.")
       .stringConf
       .createOptional
+
+  private[spark] val DRIVER_LOCALITY = ConfigBuilder("spark.yarn.driver.locality")
+    .doc("Comma-separated list of strings defining the locality for the Spark driver " +
+      "(cluster mode AM).")
+    .stringConf
+    .toSequence
+    .createOptional
 
   /* Security configuration. */
 
