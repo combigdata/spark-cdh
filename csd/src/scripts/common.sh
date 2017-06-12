@@ -170,6 +170,18 @@ function has_config {
   grep -q "^$key=" "$file"
 }
 
+# Appends an item ($2) to a comma-separated list ($1).
+function add_to_list {
+  local list="$1"
+  local item="$2"
+  if [ -n "$list" ]; then
+    list="$list,$item"
+  else
+    list="$item"
+  fi
+  echo "$list"
+}
+
 # Set a configuration key ($1) to a value ($2) in the file ($3) only if it hasn't already been
 # set by the user.
 function set_config {
@@ -220,12 +232,52 @@ function start_history_server {
   local DEFAULT_FS=$(get_default_fs $HADOOP_CONF_DIR)
   local LOG_DIR=$(prepend_protocol "$HISTORY_LOG_DIR" "$DEFAULT_FS")
 
+  # Make a defensive copy of the config file; when startup fails, CM will retry the same
+  # process again, so we want to append configs to the original config file, not to the
+  # update version.
+  if [ ! -f "$CONF_FILE.orig" ]; then
+    cp -p "$CONF_FILE" "$CONF_FILE.orig"
+  fi
+  cp -p "$CONF_FILE.orig" "$CONF_FILE"
+
   echo "spark.history.fs.logDirectory=$LOG_DIR" >> "$CONF_FILE"
   if [ "$SPARK_PRINCIPAL" != "" ]; then
     echo "spark.history.kerberos.enabled=true" >> "$CONF_FILE"
     echo "spark.history.kerberos.principal=$SPARK_PRINCIPAL" >> "$CONF_FILE"
     echo "spark.history.kerberos.keytab=spark2_on_yarn.keytab" >> "$CONF_FILE"
   fi
+
+  local FILTERS_KEY="spark.ui.filters"
+  local FILTERS=$(read_spark_conf "$FILTERS_KEY" "$CONF_FILE")
+
+  if [ "$YARN_PROXY_REDIRECT" = "true" ]; then
+    FILTERS=$(add_to_list "$FILTERS" "org.apache.spark.deploy.yarn.YarnProxyRedirectFilter")
+  fi
+
+  if [ "$ENABLE_SPNEGO" = "true" ] && [ -n "$SPNEGO_PRINCIPAL" ]; then
+    local AUTH_FILTER="org.apache.hadoop.security.authentication.server.AuthenticationFilter"
+    FILTERS=$(add_to_list "$FILTERS" "$AUTH_FILTER")
+
+    local FILTER_CONF_KEY="spark.$AUTH_FILTER.param"
+    echo "$FILTER_CONF_KEY.type=kerberos" >> "$CONF_FILE"
+    echo "$FILTER_CONF_KEY.kerberos.principal=$SPNEGO_PRINCIPAL" >> "$CONF_FILE"
+    echo "$FILTER_CONF_KEY.kerberos.keytab=spark2_on_yarn.keytab" >> "$CONF_FILE"
+    echo "$FILTER_CONF_KEY.kerberos.name.rules=DEFAULT" >> "$CONF_FILE"
+
+    # Also enable ACLs in the History Server, otherwise auth is not very useful.
+    echo "spark.history.ui.acls.enable=true" >> "$CONF_FILE"
+  fi
+
+  if [ -n "$FILTERS" ]; then
+    replace_spark_conf "$FILTERS_KEY" "$FILTERS" "$CONF_FILE"
+  fi
+
+  # Write the keystore password to the config file. Disable logging while doing that.
+  set +x
+  if [ -n "$KEYSTORE_PASSWORD" ]; then
+    echo "spark.ssl.historyServer.keyStorePassword=$KEYSTORE_PASSWORD" >> "$CONF_FILE"
+  fi
+  set -x
 
   ARGS=(
     "org.apache.spark.deploy.history.HistoryServer"

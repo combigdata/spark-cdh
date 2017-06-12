@@ -129,13 +129,21 @@
         "args" : [ "start_history_server" ],
         "environmentVariables" : {
           "HISTORY_LOG_DIR" : "${spark_history_log_dir}",
-          "SPARK_DAEMON_MEMORY" : "${history_server_max_heapsize}"
+          "SPARK_DAEMON_MEMORY" : "${history_server_max_heapsize}",
+          "ENABLE_SPNEGO" : "${history_server_spnego_enabled}",
+          "YARN_PROXY_REDIRECT" : "true",
+          "KEYSTORE_PASSWORD" : "${ssl_server_keystore_password}"
         }
       },
       "kerberosPrincipals" : [
         {
           "name" : "SPARK_PRINCIPAL",
           "primary" : "${principal}",
+          "instance" : "${host}"
+        },
+        {
+          "name" : "SPNEGO_PRINCIPAL",
+          "primary" : "HTTP",
           "instance" : "${host}"
         }
       ],
@@ -220,8 +228,59 @@
           "type" : "long",
           "unit" : "seconds",
           "default" : 604800
+        },
+        {
+          "name" : "history_server_spnego_enabled",
+          "label" : "Enable User Authentication",
+          "description" : "Enables user authentication using SPNEGO (requires Kerberos), and enables access control to application history data.",
+          "required" : "false",
+          "type" : "boolean",
+          "default" : false
+        },
+        {
+          "name" : "history_server_admin_users",
+          "label" : "Admin Users",
+          "description" : "Comma-separated list of users who can view all applications when authentication is enabled.",
+          "configName" : "spark.history.ui.admin.acls",
+          "default" : "",
+          "type" : "string",
+          "required" : "false"
+        },
+        {
+          "name" : "ssl_server_port",
+          "label" : "TLS/SSL Port Number",
+          "description" : "Port where to listen for TLS/SSL connections. HTTP connections will be redirected to this port when TLS/SSL is enabled.",
+          "configName" : "spark.ssl.historyServer.port",
+          "default" : 18489,
+          "type" : "port",
+          "required" : "false"
+        },
+        {
+          "name" : "ssl_server_protocol",
+          "label" : "TLS/SSL Protocol",
+          "description" : "The version of the TLS/SSL  protocol to use when TLS/SSL is enabled.",
+          "configName" : "spark.ssl.historyServer.protocol",
+          "default" : "TLSv1.2",
+          "type" : "string",
+          "required" : "false"
+        },
+        {
+          "name" : "ssl_server_algorithms",
+          "label" : "Enabled SSL/TLS Algorithms",
+          "description" : "A comma-separated list of algorithm names to enable when TLS/SSL is enabled. By default, all algorithms supported by the JRE are enabled.",
+          "configName" : "spark.ssl.historyServer.enabledAlgorithms",
+          "default" : null,
+          "type" : "string",
+          "required" : "false"
         }
       ],
+      "sslServer" : {
+        "keyIdentifier" : "spark_history_server",
+        "enabledConfigName" : "spark.ssl.historyServer.enabled",
+        "keystoreLocationConfigName" : "spark.ssl.historyServer.keyStore",
+        "keystorePasswordCredentialProviderCompatible" : false,
+        "keystorePasswordScriptBased" : false
+      },
       "configWriter" : {
         "generators" : [
           {
@@ -233,7 +292,12 @@
               "history_server_fs_poll_interval",
               "event_log_cleaner_enabled",
               "event_log_cleaner_interval",
-              "event_log_cleaner_max_age"
+              "event_log_cleaner_max_age",
+              "ssl_enabled",
+              "ssl_server_keystore_location",
+              "ssl_server_protocol",
+              "ssl_server_algorithms",
+              "ssl_server_port"
             ],
             "additionalConfigs" : [
               {
@@ -414,6 +478,33 @@
         "type" : "string_enum",
         "validValues" : [ "0.9", "0.10", "None" ],
         "default" : "0.9"
+      },
+      {
+        "name" : "spark_network_encryption_enabled",
+        "label" : "Enable Network Encryption",
+        "description" : "Whether to encrypt communication between Spark processes belonging to the same application. Requires authentication (spark.authenticate) to be enabled.",
+        "configName" : "spark.network.crypto.enabled",
+        "required" : "false",
+        "type" : "boolean",
+        "default" : false
+      },
+      {
+        "name" : "spark_io_encryption_enabled",
+        "label" : "Enable I/O Encryption",
+        "description" : "Whether to encrypt temporary shuffle and cache files stored by Spark on the local disks.",
+        "configName" : "spark.io.encryption.enabled",
+        "required" : "false",
+        "type" : "boolean",
+        "default" : false
+      },
+      {
+        "name" : "spark_ui_enabled",
+        "label" : "Enable Spark Web UI",
+        "description" : "Whether to enable the Spark Web UI on individual applications. It's recommended that the UI be disabled in secure clusters.",
+        "configName" : "spark.ui.enabled",
+        "required" : "false",
+        "type" : "boolean",
+        "default" : true
       }
     ],
     "scriptRunner" : {
