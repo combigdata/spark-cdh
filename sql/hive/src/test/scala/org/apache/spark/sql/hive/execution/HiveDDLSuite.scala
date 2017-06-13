@@ -1952,7 +1952,7 @@ class HiveDDLSuite
     }
   }
 
-  hiveFormats.filter { t => t != "PARQUET" }.foreach { tableType =>
+  hiveFormats.foreach { tableType =>
     test(s"alter hive serde table add columns -- partitioned - $tableType") {
       withTable("tab") {
         sql(
@@ -1987,7 +1987,7 @@ class HiveDDLSuite
     }
   }
 
-  hiveFormats.filter { t => t != "PARQUET" }.foreach { tableType =>
+  hiveFormats.foreach { tableType =>
     test(s"alter hive serde table add columns -- with predicate - $tableType ") {
       withTable("tab") {
         sql(s"CREATE TABLE tab (c1 int, c2 int) STORED AS $tableType")
