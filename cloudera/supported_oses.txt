@@ -7,3 +7,4 @@ Debian8
 Debian7
 SLES11
 SLES12
+Ubuntu1604
