@@ -339,7 +339,9 @@ function publish {
   curl http://${BUILDDB_HOST}/save?gbn=${GBN}
   if [[ $PATCH_NUMBER -eq 0 ]]; then
     curl "http://${BUILDDB_HOST}/addtag?gbn=${GBN}&value=${SHORT_VERSION}-latest"
-    curl "http://${BUILDDB_HOST}/addtag?gbn=${GBN}&value=${BUILD_TYPE_TAG}"
+    if [[ "$BUILD_CAUSE" != "TIMERTRIGGER" ]]; then
+      curl "http://${BUILDDB_HOST}/addtag?gbn=${GBN}&value=${BUILD_TYPE_TAG}"
+    fi
   else
     curl "http://${BUILDDB_HOST}/addtag?gbn=${GBN}&value=released"
   fi
