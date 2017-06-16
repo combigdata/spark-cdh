@@ -115,10 +115,12 @@ private[parquet] class ParquetFilters(
       (n: String, v: Any) => FilterApi.eq(doubleColumn(n), v.asInstanceOf[JDouble])
 
     // Binary.fromString and Binary.fromByteArray don't accept null values
+    /*
     case ParquetStringType =>
       (n: String, v: Any) => FilterApi.eq(
         binaryColumn(n),
         Option(v).map(s => Binary.fromString(s.asInstanceOf[String])).orNull)
+    */
     case ParquetBinaryType =>
       (n: String, v: Any) => FilterApi.eq(
         binaryColumn(n),
@@ -164,11 +166,12 @@ private[parquet] class ParquetFilters(
       (n: String, v: Any) => FilterApi.notEq(floatColumn(n), v.asInstanceOf[JFloat])
     case ParquetDoubleType =>
       (n: String, v: Any) => FilterApi.notEq(doubleColumn(n), v.asInstanceOf[JDouble])
-
+    /*
     case ParquetStringType =>
       (n: String, v: Any) => FilterApi.notEq(
         binaryColumn(n),
         Option(v).map(s => Binary.fromString(s.asInstanceOf[String])).orNull)
+    */
     case ParquetBinaryType =>
       (n: String, v: Any) => FilterApi.notEq(
         binaryColumn(n),
@@ -211,10 +214,11 @@ private[parquet] class ParquetFilters(
       (n: String, v: Any) => FilterApi.lt(floatColumn(n), v.asInstanceOf[JFloat])
     case ParquetDoubleType =>
       (n: String, v: Any) => FilterApi.lt(doubleColumn(n), v.asInstanceOf[JDouble])
-
+    /*
     case ParquetStringType =>
       (n: String, v: Any) =>
         FilterApi.lt(binaryColumn(n), Binary.fromString(v.asInstanceOf[String]))
+    */
     case ParquetBinaryType =>
       (n: String, v: Any) =>
         FilterApi.lt(binaryColumn(n), Binary.fromReusedByteArray(v.asInstanceOf[Array[Byte]]))
@@ -251,10 +255,11 @@ private[parquet] class ParquetFilters(
       (n: String, v: Any) => FilterApi.ltEq(floatColumn(n), v.asInstanceOf[JFloat])
     case ParquetDoubleType =>
       (n: String, v: Any) => FilterApi.ltEq(doubleColumn(n), v.asInstanceOf[JDouble])
-
+    /*
     case ParquetStringType =>
       (n: String, v: Any) =>
         FilterApi.ltEq(binaryColumn(n), Binary.fromString(v.asInstanceOf[String]))
+    */
     case ParquetBinaryType =>
       (n: String, v: Any) =>
         FilterApi.ltEq(binaryColumn(n), Binary.fromReusedByteArray(v.asInstanceOf[Array[Byte]]))
@@ -291,10 +296,11 @@ private[parquet] class ParquetFilters(
       (n: String, v: Any) => FilterApi.gt(floatColumn(n), v.asInstanceOf[JFloat])
     case ParquetDoubleType =>
       (n: String, v: Any) => FilterApi.gt(doubleColumn(n), v.asInstanceOf[JDouble])
-
+    /*
     case ParquetStringType =>
       (n: String, v: Any) =>
         FilterApi.gt(binaryColumn(n), Binary.fromString(v.asInstanceOf[String]))
+    */
     case ParquetBinaryType =>
       (n: String, v: Any) =>
         FilterApi.gt(binaryColumn(n), Binary.fromReusedByteArray(v.asInstanceOf[Array[Byte]]))
@@ -331,10 +337,11 @@ private[parquet] class ParquetFilters(
       (n: String, v: Any) => FilterApi.gtEq(floatColumn(n), v.asInstanceOf[JFloat])
     case ParquetDoubleType =>
       (n: String, v: Any) => FilterApi.gtEq(doubleColumn(n), v.asInstanceOf[JDouble])
-
+    /*
     case ParquetStringType =>
       (n: String, v: Any) =>
         FilterApi.gtEq(binaryColumn(n), Binary.fromString(v.asInstanceOf[String]))
+    */
     case ParquetBinaryType =>
       (n: String, v: Any) =>
         FilterApi.gtEq(binaryColumn(n), Binary.fromReusedByteArray(v.asInstanceOf[Array[Byte]]))
