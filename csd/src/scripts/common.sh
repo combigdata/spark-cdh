@@ -33,6 +33,15 @@ function log {
 log "Running Spark2 CSD control script..."
 log "Detected CDH_VERSION of [$CDH_VERSION]"
 
+# Check whether JDK 1.8 is available for spark 2.2
+PATH_TO_JAVA="$JAVA_HOME/bin/java"
+JAVA_VER=$("$PATH_TO_JAVA" -version 2>&1 | awk -F '"' '/version/ {print $2}')
+JAVA_VER_SHORT=${JAVA_VER:0:3}
+if [[ "$JAVA_VER_SHORT" != "1.8" ]]; then
+  echo "Java version 1.8 is required for Spark 2.2."
+  exit 1
+fi
+
 # Set this to not source defaults
 export BIGTOP_DEFAULTS_DIR=""
 
