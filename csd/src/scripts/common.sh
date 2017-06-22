@@ -114,7 +114,10 @@ function replace_spark_conf {
   local value="$2"
   local file="$3"
   local temp="$file.tmp"
-  grep -v "^$key=" "$file" > "$temp"
+  touch "$temp"
+  chown --reference="$file" "$temp"
+  chmod --reference="$file" "$temp"
+  grep -v "^$key=" "$file" >> "$temp"
   echo "$key=$value" >> "$temp"
   mv "$temp" "$file"
 }
