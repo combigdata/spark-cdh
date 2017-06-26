@@ -60,6 +60,8 @@ private[scheduler] class BlacklistTracker (
   private val MAX_FAILED_EXEC_PER_NODE = conf.getInt(BlacklistConfs.MAX_FAILED_EXEC_PER_NODE, 2)
   private val BLACKLIST_KILL_ENABLED = conf.getBoolean(BlacklistConfs.BLACKLIST_KILL_ENABLED, false)
   val BLACKLIST_TIMEOUT_MILLIS = BlacklistTracker.getBlacklistTimeout(conf)
+  private val BLACKLIST_FETCH_FAILURE_ENABLED =
+    conf.getBoolean(BlacklistConfs.BLACKLIST_FETCH_FAILURE_ENABLED, false)
 
   /**
    * A map from executorId to information on task failures.  Tracks the time of each task failure,
@@ -144,6 +146,74 @@ private[scheduler] class BlacklistTracker (
     nextExpiryTime = math.min(execMinExpiry, nodeMinExpiry)
   }
 
+  private def killBlacklistedExecutor(exec: String): Unit = {
+    if (BLACKLIST_KILL_ENABLED) {
+      allocationClient match {
+        case Some(a) =>
+          logInfo(s"Killing blacklisted executor id $exec " +
+            s"since ${BlacklistConfs.BLACKLIST_KILL_ENABLED} is set.")
+          a.killExecutors(Seq(exec), true, true)
+        case None =>
+          logWarning(s"Not attempting to kill blacklisted executor id $exec " +
+            s"since allocation client is not defined.")
+      }
+    }
+  }
+
+  private def killExecutorsOnBlacklistedNode(node: String): Unit = {
+    if (BLACKLIST_KILL_ENABLED) {
+      allocationClient match {
+        case Some(a) =>
+          logInfo(s"Killing all executors on blacklisted host $node " +
+            s"since ${BlacklistConfs.BLACKLIST_KILL_ENABLED} is set.")
+          if (a.killExecutorsOnHost(node) == false) {
+            logError(s"Killing executors on node $node failed.")
+          }
+        case None =>
+          logWarning(s"Not attempting to kill executors on blacklisted host $node " +
+            s"since allocation client is not defined.")
+      }
+    }
+  }
+
+  def updateBlacklistForFetchFailure(host: String, exec: String): Unit = {
+    if (BLACKLIST_FETCH_FAILURE_ENABLED) {
+      // If we blacklist on fetch failures, we are implicitly saying that we believe the failure is
+      // non-transient, and can't be recovered from (even if this is the first fetch failure,
+      // stage is retried after just one failure, so we don't always get a chance to collect
+      // multiple fetch failures).
+      // If the external shuffle-service is on, then every other executor on this node would
+      // be suffering from the same issue, so we should blacklist (and potentially kill) all
+      // of them immediately.
+
+      val now = clock.getTimeMillis()
+      val expiryTimeForNewBlacklists = now + BLACKLIST_TIMEOUT_MILLIS
+
+      if (conf.getBoolean("spark.shuffle.service.enabled", false)) {
+        if (!nodeIdToBlacklistExpiryTime.contains(host)) {
+          logInfo(s"blacklisting node $host due to fetch failure of external shuffle service")
+
+          nodeIdToBlacklistExpiryTime.put(host, expiryTimeForNewBlacklists)
+          listenerBus.post(SparkListenerNodeBlacklisted(now, host, 1))
+          _nodeBlacklist.set(nodeIdToBlacklistExpiryTime.keySet.toSet)
+          killExecutorsOnBlacklistedNode(host)
+          updateNextExpiryTime()
+        }
+      } else if (!executorIdToBlacklistStatus.contains(exec)) {
+        logInfo(s"Blacklisting executor $exec due to fetch failure")
+
+        executorIdToBlacklistStatus.put(exec, BlacklistedExecutor(host, expiryTimeForNewBlacklists))
+        // We hardcoded number of failure tasks to 1 for fetch failure, because there's no
+        // reattempt for such failure.
+        listenerBus.post(SparkListenerExecutorBlacklisted(now, exec, 1))
+        updateNextExpiryTime()
+        killBlacklistedExecutor(exec)
+
+        val blacklistedExecsOnNode = nodeToBlacklistedExecs.getOrElseUpdate(exec, HashSet[String]())
+        blacklistedExecsOnNode += exec
+      }
+    }
+  }
 
   def updateBlacklistForSuccessfulTaskSet(
       stageId: Int,
@@ -173,17 +243,7 @@ private[scheduler] class BlacklistTracker (
         listenerBus.post(SparkListenerExecutorBlacklisted(now, exec, newTotal))
         executorIdToFailureList.remove(exec)
         updateNextExpiryTime()
-        if (BLACKLIST_KILL_ENABLED) {
-          allocationClient match {
-            case Some(allocationClient) =>
-              logInfo(s"Killing blacklisted executor id $exec " +
-                s"since spark.blacklist.killBlacklistedExecutors is set.")
-              allocationClient.killExecutors(Seq(exec), true, true)
-            case None =>
-              logWarning(s"Not attempting to kill blacklisted executor id $exec " +
-                s"since allocation client is not defined.")
-          }
-        }
+        killBlacklistedExecutor(exec)
 
         // In addition to blacklisting the executor, we also update the data for failures on the
         // node, and potentially put the entire node into a blacklist as well.
@@ -195,19 +255,7 @@ private[scheduler] class BlacklistTracker (
           nodeIdToBlacklistExpiryTime.put(node, expiryTimeForNewBlacklists)
           listenerBus.post(SparkListenerNodeBlacklisted(now, node, blacklistedExecsOnNode.size))
           _nodeBlacklist.set(nodeIdToBlacklistExpiryTime.keySet.toSet)
-          if (BLACKLIST_KILL_ENABLED) {
-            allocationClient match {
-              case Some(allocationClient) =>
-                logInfo(s"Killing all executors on blacklisted host $node " +
-                  s"since spark.blacklist.killBlacklistedExecutors is set.")
-                if (allocationClient.killExecutorsOnHost(node) == false) {
-                  logError(s"Killing executors on node $node failed.")
-                }
-              case None =>
-                logWarning(s"Not attempting to kill executors on blacklisted host $node " +
-                  s"since allocation client is not defined.")
-            }
-          }
+          killExecutorsOnBlacklistedNode(node)
         }
       }
     }
@@ -440,6 +488,8 @@ private[spark] object BlacklistConfs {
   val BLACKLIST_KILL_ENABLED = "spark.blacklist.killBlacklistedExecutors"
 
   val BLACKLIST_LEGACY_TIMEOUT_CONF = "spark.scheduler.executorTaskBlacklistTime"
+
+  val BLACKLIST_FETCH_FAILURE_ENABLED = "spark.blacklist.application.fetchFailure.enabled"
 }
 
 private final case class BlacklistedExecutor(node: String, expiryTime: Long)

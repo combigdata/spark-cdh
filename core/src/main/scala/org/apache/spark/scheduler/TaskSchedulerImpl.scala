@@ -49,28 +49,21 @@ import org.apache.spark.storage.BlockManagerId
  * acquire a lock on us, so we need to make sure that we don't try to lock the backend while
  * we are holding a lock on ourselves.
  */
-private[spark] class TaskSchedulerImpl private[scheduler](
+private[spark] class TaskSchedulerImpl(
     val sc: SparkContext,
     val maxTaskFailures: Int,
-    blacklistTrackerOpt: Option[BlacklistTracker],
     isLocal: Boolean = false)
   extends TaskScheduler with Logging
 {
 
   def this(sc: SparkContext) = {
-    this(
-      sc,
-      sc.conf.getInt(BlacklistConfs.MAX_TASK_FAILURES, 4),
-      TaskSchedulerImpl.maybeCreateBlacklistTracker(sc))
+    this(sc, sc.conf.getInt(BlacklistConfs.MAX_TASK_FAILURES, 4))
   }
 
-  def this(sc: SparkContext, maxTaskFailures: Int, isLocal: Boolean) = {
-    this(
-      sc,
-      maxTaskFailures,
-      TaskSchedulerImpl.maybeCreateBlacklistTracker(sc),
-      isLocal = isLocal)
-  }
+  // Lazily initializing blackListTrackOpt to avoid getting empty ExecutorAllocationClient,
+  // because ExecutorAllocationClient is created after this TaskSchedulerImpl.
+  private[scheduler] lazy val blacklistTrackerOpt =
+    TaskSchedulerImpl.maybeCreateBlacklistTracker(sc)
 
   val conf = sc.conf
 
