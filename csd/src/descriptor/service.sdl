@@ -552,7 +552,10 @@
             "spark_dynamic_allocation_cached_idle_timeout",
             "spark_dynamic_allocation_scheduler_backlog_timeout",
             "spark_dynamic_allocation_sustained_scheduler_backlog_timeout",
-            "spark_gateway_ui_kill_enabled"
+            "spark_gateway_ui_kill_enabled",
+            "spark_network_encryption_enabled",
+            "spark_io_encryption_enabled",
+            "spark_ui_enabled"
           ]
         }
       ],
