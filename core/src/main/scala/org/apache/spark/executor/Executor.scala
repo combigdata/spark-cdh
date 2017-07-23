@@ -337,24 +337,33 @@ private[spark] class Executor(
           // the default uncaught exception handler, which will terminate the Executor.
           logError(s"Exception in $taskName (TID $taskId)", t)
 
-          val metrics: Option[TaskMetrics] = Option(task).flatMap { task =>
-            task.metrics.map { m =>
-              m.setExecutorRunTime(System.currentTimeMillis() - taskStart)
-              m.setJvmGCTime(computeTotalGcTime() - startGCTime)
-              m.updateAccumulators()
-              m
+          // SPARK-20904: Do not report failure to driver if if happened during shut down. Because
+          // libraries may set up shutdown hooks that race with running tasks during shutdown,
+          // spurious failures may occur and can result in improper accounting in the driver (e.g.
+          // the task failure would not be ignored if the shutdown happened because of premption,
+          // instead of an app issue).
+          if (!ShutdownHookManager.inShutdown()) {
+            val metrics: Option[TaskMetrics] = Option(task).flatMap { task =>
+              task.metrics.map { m =>
+                m.setExecutorRunTime(System.currentTimeMillis() - taskStart)
+                m.setJvmGCTime(computeTotalGcTime() - startGCTime)
+                m.updateAccumulators()
+                m
+              }
             }
-          }
-          val serializedTaskEndReason = {
-            try {
-              ser.serialize(new ExceptionFailure(t, metrics))
-            } catch {
-              case _: NotSerializableException =>
-                // t is not serializable so just send the stacktrace
-                ser.serialize(new ExceptionFailure(t, metrics, false))
+            val serializedTaskEndReason = {
+              try {
+                ser.serialize(new ExceptionFailure(t, metrics))
+              } catch {
+                case _: NotSerializableException =>
+                  // t is not serializable so just send the stacktrace
+                  ser.serialize(new ExceptionFailure(t, metrics, false))
+              }
             }
+            execBackend.statusUpdate(taskId, TaskState.FAILED, serializedTaskEndReason)
+          } else {
+            logInfo("Not reporting error to driver during JVM shutdown.")
           }
-          execBackend.statusUpdate(taskId, TaskState.FAILED, serializedTaskEndReason)
 
           // Don't forcibly exit unless the exception was inherently fatal, to avoid
           // stopping other tasks unnecessarily.
