@@ -22,6 +22,7 @@ import java.io.File;
 import java.io.IOException;
 import java.util.LinkedList;
 import java.util.Queue;
+import java.util.function.Supplier;
 
 import com.google.common.annotations.VisibleForTesting;
 import org.slf4j.Logger;
@@ -48,8 +49,16 @@ public final class UnsafeExternalSorter extends MemoryConsumer {
 
   @Nullable
   private final PrefixComparator prefixComparator;
+
+  /**
+   * {@link RecordComparator} may probably keep the reference to the records they compared last
+   * time, so we should not keep a {@link RecordComparator} instance inside
+   * {@link UnsafeExternalSorter}, because {@link UnsafeExternalSorter} is referenced by
+   * {@link TaskContext} and thus can not be garbage collected until the end of the task.
+   */
   @Nullable
-  private final RecordComparator recordComparator;
+  private final Supplier<RecordComparator> recordComparatorSupplier;
+
   private final TaskMemoryManager taskMemoryManager;
   private final BlockManager blockManager;
   private final SerializerManager serializerManager;
@@ -91,14 +100,14 @@ public final class UnsafeExternalSorter extends MemoryConsumer {
       BlockManager blockManager,
       SerializerManager serializerManager,
       TaskContext taskContext,
-      RecordComparator recordComparator,
+      Supplier<RecordComparator> recordComparatorSupplier,
       PrefixComparator prefixComparator,
       int initialSize,
       long pageSizeBytes,
       long numElementsForSpillThreshold,
       UnsafeInMemorySorter inMemorySorter) throws IOException {
     UnsafeExternalSorter sorter = new UnsafeExternalSorter(taskMemoryManager, blockManager,
-      serializerManager, taskContext, recordComparator, prefixComparator, initialSize,
+      serializerManager, taskContext, recordComparatorSupplier, prefixComparator, initialSize,
         numElementsForSpillThreshold, pageSizeBytes, inMemorySorter, false /* ignored */);
     sorter.spill(Long.MAX_VALUE, sorter);
     // The external sorter will be used to insert records, in-memory sorter is not needed.
@@ -111,14 +120,14 @@ public final class UnsafeExternalSorter extends MemoryConsumer {
       BlockManager blockManager,
       SerializerManager serializerManager,
       TaskContext taskContext,
-      RecordComparator recordComparator,
+      Supplier<RecordComparator> recordComparatorSupplier,
       PrefixComparator prefixComparator,
       int initialSize,
       long pageSizeBytes,
       long numElementsForSpillThreshold,
       boolean canUseRadixSort) {
     return new UnsafeExternalSorter(taskMemoryManager, blockManager, serializerManager,
-      taskContext, recordComparator, prefixComparator, initialSize, pageSizeBytes,
+      taskContext, recordComparatorSupplier, prefixComparator, initialSize, pageSizeBytes,
       numElementsForSpillThreshold, null, canUseRadixSort);
   }
 
@@ -127,7 +136,7 @@ public final class UnsafeExternalSorter extends MemoryConsumer {
       BlockManager blockManager,
       SerializerManager serializerManager,
       TaskContext taskContext,
-      RecordComparator recordComparator,
+      Supplier<RecordComparator> recordComparatorSupplier,
       PrefixComparator prefixComparator,
       int initialSize,
       long pageSizeBytes,
@@ -139,7 +148,7 @@ public final class UnsafeExternalSorter extends MemoryConsumer {
     this.blockManager = blockManager;
     this.serializerManager = serializerManager;
     this.taskContext = taskContext;
-    this.recordComparator = recordComparator;
+    this.recordComparatorSupplier = recordComparatorSupplier;
     this.prefixComparator = prefixComparator;
     // Use getSizeAsKb (not bytes) to maintain backwards compatibility for units
     // this.fileBufferSizeBytes = (int) conf.getSizeAsKb("spark.shuffle.file.buffer", "32k") * 1024
@@ -150,8 +159,17 @@ public final class UnsafeExternalSorter extends MemoryConsumer {
     this.writeMetrics = new ShuffleWriteMetrics();
 
     if (existingInMemorySorter == null) {
+      RecordComparator comparator = null;
+      if (recordComparatorSupplier != null) {
+        comparator = recordComparatorSupplier.get();
+      }
       this.inMemSorter = new UnsafeInMemorySorter(
-        this, taskMemoryManager, recordComparator, prefixComparator, initialSize, canUseRadixSort);
+        this,
+        taskMemoryManager,
+        comparator,
+        prefixComparator,
+        initialSize,
+        canUseRadixSort);
     } else {
       this.inMemSorter = existingInMemorySorter;
     }
@@ -454,14 +472,14 @@ public final class UnsafeExternalSorter extends MemoryConsumer {
    * after consuming this iterator.
    */
   public UnsafeSorterIterator getSortedIterator() throws IOException {
-    assert(recordComparator != null);
+    assert(recordComparatorSupplier != null);
     if (spillWriters.isEmpty()) {
       assert(inMemSorter != null);
       readingIterator = new SpillableIterator(inMemSorter.getSortedIterator());
       return readingIterator;
     } else {
-      final UnsafeSorterSpillMerger spillMerger =
-        new UnsafeSorterSpillMerger(recordComparator, prefixComparator, spillWriters.size());
+      final UnsafeSorterSpillMerger spillMerger = new UnsafeSorterSpillMerger(
+        recordComparatorSupplier.get(), prefixComparator, spillWriters.size());
       for (UnsafeSorterSpillWriter spillWriter : spillWriters) {
         spillMerger.addSpillIfNotEmpty(spillWriter.getReader(serializerManager));
       }
