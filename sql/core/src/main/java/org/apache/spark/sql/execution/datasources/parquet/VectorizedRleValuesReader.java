@@ -17,6 +17,8 @@
 
 package org.apache.spark.sql.execution.datasources.parquet;
 
+import java.nio.ByteBuffer;
+
 import org.apache.parquet.Preconditions;
 import org.apache.parquet.bytes.BytesUtils;
 import org.apache.parquet.column.values.ValuesReader;
@@ -78,6 +80,11 @@ public final class VectorizedRleValuesReader extends ValuesReader
   public VectorizedRleValuesReader(int bitWidth) {
     fixedWidth = true;
     init(bitWidth);
+  }
+
+  @Override
+  public void initFromPage(int valueCount, ByteBuffer page, int start) {
+    throw new UnsupportedOperationException();
   }
 
   @Override
