@@ -1467,6 +1467,16 @@
             <groupId>jline</groupId>
             <artifactId>jline</artifactId>
           </exclusion>
+
+          <!--
+            CDH-57332: exclude dependencies that bring unwanted transitive dependencies and
+            are not needed by Spark.
+          -->
+          <exclusion>
+            <groupId>${hive.group}</groupId>
+            <artifactId>hive-llap-tez</artifactId>
+          </exclusion>
+
           <!-- Cat X license now; see SPARK-18262 -->
           <exclusion>
             <groupId>org.json</groupId>
