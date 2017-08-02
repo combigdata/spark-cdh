@@ -2798,6 +2798,11 @@
 
     <profile>
       <id>hadoop-cloud</id>
+      <activation>
+        <property>
+          <name>cdh.build</name>
+        </property>
+      </activation>
       <modules>
         <module>hadoop-cloud</module>
       </modules>

@@ -173,6 +173,12 @@
     <profile>
       <id>hadoop-2.7</id>
       <!-- 2.7+ adds the azure Jar to the set of dependencies -->
+      <activation>
+        <property>
+          <name>cdh.build</name>
+        </property>
+      </activation>
+      <!-- Hadoop Azure is a new Jar with -->
       <dependencies>
 
         <!--
