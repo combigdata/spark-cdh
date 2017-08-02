@@ -247,6 +247,11 @@
     -->
     <profile>
       <id>hadoop-cloud</id>
+      <activation>
+        <property>
+          <name>cdh.build</name>
+        </property>
+      </activation>
       <dependencies>
         <dependency>
           <groupId>org.apache.spark</groupId>
