@@ -19,9 +19,9 @@ package org.apache.spark.sql.query.analysis
 import com.fasterxml.jackson.module.scala.JsonScalaEnumeration
 import com.fasterxml.jackson.core.`type`.TypeReference
 import org.apache.hadoop.fs.Path
-import org.apache.spark.SparkContext
+import org.apache.spark.{Logging, SparkContext}
 import org.apache.spark.sql.catalyst.TableIdentifier
-import org.apache.spark.sql.catalyst.expressions.{Alias, AttributeReference, NamedExpression}
+import org.apache.spark.sql.catalyst.expressions.{AttributeReference, Expression, NamedExpression, UnaryExpression}
 import org.apache.spark.sql.catalyst.plans.logical.{UnaryNode, _}
 import org.apache.spark.sql.execution.QueryExecution
 import org.apache.spark.sql.execution.datasources.parquet.ParquetRelation
@@ -39,7 +39,7 @@ import scala.collection.mutable.ListBuffer
  * This class is responsible for analyzing the {@link QueryExecution} and extracting the input
  * and output metadata
  */
-object QueryAnalysis {
+object QueryAnalysis extends Logging {
 
   def getOutputMetaData(qe: QueryExecution): Option[QueryDetails] = {
     getTopLevelNamedExpressions(qe.optimizedPlan, true) match {
@@ -103,9 +103,12 @@ object QueryAnalysis {
    * @return
    */
   def getInputMetadata(qe: QueryExecution): List[FieldDetails] = {
-    getTopLevelAttributes(qe).foldLeft(List.empty[FieldDetails]) { (acc, a) =>
+    val tlas = getTopLevelAttributes(qe)
+    logDebug(s"Top level attributes = $tlas")
+    tlas.foldLeft(List.empty[FieldDetails]) { (acc, a) =>
       getRelation(qe.optimizedPlan, a) match {
         case Some(rel) =>
+          logDebug(s"relation for attribute($a) is $rel")
           rel match {
             case LogicalRelation(_, _, Some(tableId)) =>
               FieldDetails(Array(tableId.unquotedString), a.name, DataSourceType.HIVE) :: acc
@@ -121,7 +124,9 @@ object QueryAnalysis {
                 DataSourceType.HIVE) :: acc
             case _ => acc
           }
-        case None => acc
+        case None =>
+          logDebug(s"no root relation found for attribute $a")
+          acc
       }
     }
   }
@@ -165,12 +170,16 @@ object QueryAnalysis {
    * {@link LogicalRelation}
    */
   private def getTopLevelAttributes(plan: LogicalPlan): Option[List[AttributeReference]] = {
-    getTopLevelNamedExpressions(plan).map(getAttributesReferences)
+    val namedExpressions = getTopLevelNamedExpressions(plan)
+    logDebug(s"namedExpressions: ${namedExpressions}")
+    val res = namedExpressions.map(getAttributesReferences)
+    res
   }
 
   private def getTopLevelNamedExpressions(
       plan: LogicalPlan,
       output: Boolean = false): Option[List[NamedExpression]] = {
+    logDebug(s"plan is: ${plan}")
     plan.collectFirst {
       case p @ Project(_, _) => p.projectList.toList
       case Join(left, right, _, _) => {
@@ -190,11 +199,24 @@ object QueryAnalysis {
    */
   private def getAttributesReferences(
       seqExpression: Seq[NamedExpression]): List[AttributeReference] = {
-    seqExpression.foldLeft(List.empty[AttributeReference]) { (acc, node) =>
-        node match {
-          case ar: AttributeReference => ar :: acc
-          case Alias(child: AttributeReference, _) => child :: acc
-          case _ => acc
+    resolveAttributeReferences(seqExpression, List.empty[AttributeReference])
+  }
+
+  private def resolveAttributeReferences(
+      seqExpression: Seq[Expression],
+      runningList: List[AttributeReference]): List[AttributeReference] = {
+    seqExpression.foldLeft(runningList) { (acc, node) =>
+      logDebug(s"Calling resolveAttributeReferences on ${node}")
+      node.children match {
+        case Nil =>
+          logDebug("resolveAttributeReferences: no children found")
+          node match {
+            case ar: AttributeReference =>
+              ar :: acc
+            case _ => acc
+          }
+        case _ =>
+          resolveAttributeReferences(node.children, acc)
       }
     }
   }
@@ -209,26 +231,73 @@ object QueryAnalysis {
    * @return An Option representing a LeafNode
    */
   private def getRelation(plan: LogicalPlan, attr: AttributeReference): Option[LeafNode] = {
+    logDebug(s"trying to get relation for ${attr.simpleString} in:\n$plan")
     plan match {
       case r: LogicalRelation =>
         if (getAttributesReferences(r.output).exists(a => a.sameRef(attr))) {
           Some(r)
         } else {
+          logDebug("Unable to find a matching LogicalRelation.")
           None
         }
       case m: MetastoreRelation => Some(m)
       case CreateTableAsSelect(_, query, _) => getRelation(query, attr)
       case InsertIntoHiveTable(_, _, child, _, _) => getRelation(child, attr)
       case p @ Project(_, _) =>
-        if (getAttributesReferences(p.projectList).exists(a => a.sameRef(attr))) {
+        val attrRefs = getAttributesReferences(p.projectList)
+        val childRefsAttr = attrRefs.exists(a => a.sameRef(attr))
+        logDebug(s"project w/ attrRefs = $attrRefs; checking for $attr; $childRefsAttr")
+        if (childRefsAttr) {
           getRelation(p.child, attr)
         } else {
+          logDebug("Unable to find a matching Project.")
           None
         }
       case binaryNode: BinaryNode => getRelation(binaryNode.children(0), attr).orElse(
           getRelation(binaryNode.children(1), attr))
-      case unaryNode: UnaryNode => getRelation(unaryNode.children(0), attr)
-      case _ => None
+      case agg: Aggregate =>
+        // For each of the top level attributes (i.e. elements in select clause), the logical
+        // plan is recursively traversed. That means this case is hit for every single attribute
+        // in the select clause.
+        // Aggregation can be present in one of two ways today - #1 at the top level in which all
+        // works well, or #2 in a sub-query in which case it appears as avg(my_col) instead of
+        // my_col in lineage. So, for #2, the question is what table should avg(my_col) be shown
+        // from. The answer in such a case is, of course, the table which my_col is from. But what
+        // if there was another UDAF called my_udaf that took two parameters -
+        // my_udaf(table1.my_col1, table2.my_col2) - that's of course a join query with an
+        // aggregation on the output of the join results. In such a case, we may ask, what table
+        // should my_udaf(table1.my_col1, table2.my_col2) be tied to, given the current state.
+        // And, this piece of code  below ties the said state, arbitrarily to the table where the
+        // first column comes from.
+        // The way to fix that long term is CDH-57411, it's to allow recursive traversal to add more
+        // elements to the "input" in lineage json. Currently you can only start with the top level
+        // attributes.
+        //
+        // For #1, this case isn't all that relevant because if an aggregation function is included
+        // in the top level attributes, we resolve the attributes in the top level itself -
+        // so covar(col1, col2) turns into col1, col2 right at the beginning.
+        // So, none of matching is relevant for that.
+        //
+        val aggOption = agg.aggregateExpressions.collectFirst{
+          case aggExp if (aggExp.exprId == attr.exprId) =>
+            if (aggExp.references.isEmpty) {
+              logDebug(s"Found an aggregate with no references. agg = ${agg}")
+              None
+            } else {
+              getRelation(agg.child, aggExp.references.head.asInstanceOf[AttributeReference])
+            }
+        }
+        // aggOption is none when the top level attribute for which lineage is being generated
+        // is non in aggregateExpressions.
+        // For a query like "select city, sum(income) from foo group by city",
+        // agg.aggregateExpression is city. So when lineage is being generated for income column
+        // aggOption will be none.
+        aggOption.getOrElse(getRelation(agg.child, attr))
+      case unaryNode: UnaryNode =>
+        getRelation(unaryNode.child, attr)
+      case _ =>
+        logDebug(s"unhandled plan node: $plan")
+        None
     }
   }
 }

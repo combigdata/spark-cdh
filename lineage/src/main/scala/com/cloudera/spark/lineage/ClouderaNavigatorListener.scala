@@ -85,8 +85,8 @@ private[lineage] class ClouderaNavigatorListener
 
       if (QueryAnalysis.hasAggregateFunction(qe.optimizedPlan)) {
         lineageElement.errorCode = "01"
-        logInfo(s"Lineage Error code: ${lineageElement.errorCode}. Query Plan has group " +
-          s"by/aggregate clause and lineage for such queries isn 't supported :\n" +
+        logInfo(s"Lineage Error code: ${lineageElement.errorCode}. Query Plan has an " +
+          s"aggregate clause and lineage for such queries isn't supported:\n" +
           s"${qe.optimizedPlan.toString}")
       }
 

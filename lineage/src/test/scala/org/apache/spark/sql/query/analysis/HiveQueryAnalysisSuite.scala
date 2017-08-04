@@ -20,6 +20,7 @@ package org.apache.spark.sql.query.analysis
 import java.io.File
 
 import org.apache.spark.SparkFunSuite
+import org.apache.spark.sql.catalyst.plans.logical.Project
 import org.apache.spark.sql.hive.test.TestHiveSingleton
 import org.apache.spark.sql.test.SQLTestUtils
 import org.apache.spark.sql.hive.test.TestHive._
@@ -69,6 +70,12 @@ class HiveQueryAnalysisSuite
         "budget" -> "int"
       )
     )
+
+    TestUtils.createTable(hiveContext, "array_table",
+      Map(
+        "array_col" -> "array<string>"
+      )
+    )
   }
 
   test("QueryAnalysis.getInputMetadata returns back InputMetadata for simple queries") {
@@ -77,11 +84,11 @@ class HiveQueryAnalysisSuite
   }
 
   test("QueryAnalysis.getInputMetadata return back InputMetadata for complex joins") {
-    var df2 = hiveContext.sql(
+    val df1 = hiveContext.sql(
         "select code, sal from (select o.code as code,c.description as desc," +
           "c.salary as sal from test_table_1 c join test_table_2 o on (c.code = o.code)"
           + " where c.salary > 170000 sort by sal)t1 limit 3")
-    df2 = df2.filter(df2("sal") > 100000)
+    val df2 = df1.filter(df1("sal") > 100000)
     df2.write.saveAsTable("mytable")
     val qe = TestQeListener.getAndClear()
     val inputMetadata = QueryAnalysis.getInputMetadata(qe)
@@ -315,6 +322,142 @@ class HiveQueryAnalysisSuite
     assertComplexInsert()
   }
 
+  test("CDH-56549 : Lineage when using UDFs") {
+    hiveContext.sql("select lower(city) from employee").write.saveAsTable("udf1")
+    val qe1 = TestQeListener.getAndClear()
+    assertHiveInputs(qe1, "employee", Seq("city"))
+
+    hiveContext.sql("select concat(city, address) from employee").write.saveAsTable("udf2")
+    val qe2 = TestQeListener.getAndClear()
+    assertHiveInputs(qe2, "employee", Seq("city", "address"))
+
+  }
+
+  test("CDH-51486 : Simple aggregation test using SQL") {
+    hiveContext
+      .sql("select city, address, avg(salary) from employee group by city, address")
+      .write
+      .saveAsTable("agg1")
+    val qe = TestQeListener.getAndClear()
+    assertHiveInputs(qe, "employee", Seq("salary", "city", "address"))
+  }
+
+
+  test("CDH-51486 : Simple aggregation using DF API") {
+    val df1 = hiveContext
+      .sql("select city, address, salary from employee")
+      .groupBy("city","address")
+      .avg("salary")
+    val df2 = df1.withColumnRenamed(df1.columns(2),"avgsal")
+    df2.write.saveAsTable("agg2")
+    val qe = TestQeListener.getAndClear()
+    assertHiveInputs(qe, "employee", Seq("city", "address", "avg(salary)"))
+  }
+
+  test("CDH-51486 : Multiple aggregations using DF API") {
+    val df1 = hiveContext
+      .sql("select city, salary, id from employee")
+      .groupBy("city")
+      .agg("salary" -> "avg", "id" -> "sum")
+    val df2 = df1
+      .withColumnRenamed(df1.columns(1),"avgsal")
+      .withColumnRenamed(df1.columns(2), "sumid")
+    df2.write.saveAsTable("agg3")
+
+    val qe = TestQeListener.getAndClear()
+    // TODO: Technically, the lineage should be on just "salary" instead of "avg(salary)"
+    // but it's been difficult to work around that without rewriting entirety of QueryAnalysis.scala
+    assertHiveInputs(qe, "employee", Seq("city", "avg(salary)", "sum(id)"))
+  }
+
+  test("CDH-51486: Aggregation of UDF result") {
+    hiveContext
+      .sql("select city, address, sum(ceil(salary)) from employee group by city, address")
+      .write
+      .saveAsTable("agg4")
+    val qe = TestQeListener.getAndClear()
+    assertHiveInputs(qe, "employee", Seq("salary", "city", "address"))
+  }
+
+  test("CDH-51486: Aggregation accepting multiple columns as input") {
+    val df = hiveContext.sql(
+      s"""select
+            covar_pop(budget, dept_id) as aggClause,
+            location,
+            name
+          from department
+            group by location, name
+          limit 15"""
+    )
+    val inputMetadata = QueryAnalysis.getInputMetadata(df.queryExecution)
+    assert(inputMetadata.length === 4)
+    assertHiveFieldExists(inputMetadata, "department", "location")
+    assertHiveFieldExists(inputMetadata, "department", "name")
+    assertHiveFieldExists(inputMetadata, "department", "budget")
+    assertHiveFieldExists(inputMetadata, "department", "dept_id")
+  }
+
+  test("CDH-51486: Aggregation with multiple UDAFs in the same query") {
+    val df = hiveContext.sql(
+      """select
+            sum(dept_id) as meaningless_sum, avg(budget) as avgbudget,
+            location, name
+          from department
+            group by location, name
+          limit 15"""
+    )
+    val inputMetadata = QueryAnalysis.getInputMetadata(df.queryExecution)
+    assert(inputMetadata.length === 4)
+    assertHiveFieldExists(inputMetadata, "department", "location")
+    assertHiveFieldExists(inputMetadata, "department", "name")
+    assertHiveFieldExists(inputMetadata, "department", "budget")
+    assertHiveFieldExists(inputMetadata, "department", "dept_id")
+  }
+
+  test("subquery test") {
+    val df = hiveContext.sql(
+      """select fn
+            from
+            (
+              select
+                upper(first_name) as fn
+              from employee
+            )t
+        """
+    )
+    val inputMetadata = QueryAnalysis.getInputMetadata(df.queryExecution)
+    assert(inputMetadata.length === 1)
+    assertHiveFieldExists(inputMetadata, "employee", "first_name")
+  }
+
+  test("join with nested subquery test") {
+    val df = hiveContext.sql(
+      """select emp.first_name, emp.last_name, emp.city, dept.location
+            from employee emp
+          join
+            (
+              select
+                *
+              from department
+              limit 15
+            ) dept
+              on emp.city = dept.location"""
+    )
+    val inputMetadata = QueryAnalysis.getInputMetadata(df.queryExecution)
+    assert(inputMetadata.length === 4)
+    assertHiveFieldExists(inputMetadata, "employee", "first_name")
+    assertHiveFieldExists(inputMetadata, "employee", "last_name")
+    assertHiveFieldExists(inputMetadata, "employee", "city")
+    assertHiveFieldExists(inputMetadata, "department", "location")
+  }
+
+  test("UDTF test") {
+    val df = hiveContext.sql("select explode(array_col) from array_table")
+    val inputMetadata = QueryAnalysis.getInputMetadata(df.queryExecution)
+    assert(inputMetadata.length === 1)
+    assertHiveFieldExists(inputMetadata, "array_table", "array_col")
+  }
+
   test("CDH-51486 : Add an error code to lineage data to indicate an aggregated function is used") {
     // Assert DESCRIBE, CREATE, DROP queries
     val descDf = hiveContext.sql("DESCRIBE employee")
@@ -338,8 +481,12 @@ class HiveQueryAnalysisSuite
       val df = hiveContext.sql(
         s"select aggClause from (select $agg as aggClause from employee group by city, address)t1")
       assert(QueryAnalysis.hasAggregateFunction(df.queryExecution.optimizedPlan))
-      // The below line fails because of CDH-51222
-      // assertHiveInputs(df.queryExecution, "employee", "salary")
+      // This should really check for Seq(agg) instead of Seq("aggClause").
+      // This is a known issue described in CDH-57411
+      // See why count(*) is special in getAggregateClauses()
+      if (agg != "count(*)") {
+        assertHiveInputs(df.queryExecution, "employee", Seq("aggClause"))
+      }
     }
 
     // Test complex joins are flagged as aggregate
@@ -362,16 +509,18 @@ class HiveQueryAnalysisSuite
       // Assert aggregate function is detected
       assert(QueryAnalysis.hasAggregateFunction(df.queryExecution.optimizedPlan))
 
-      // Assert that the input metadata has all columns other than the aggregated column
-      // After fixing CDH-51222 assert on that column too.
       val inputMetadata = QueryAnalysis.getInputMetadata(df.queryExecution)
-      // When CDH-51222 is fixed change 3 to 4
-      assert(inputMetadata.length === 3)
+      val expectedLength = if (agg != "count(*)") 4 else 3
+      assert(inputMetadata.length === expectedLength)
       assertHiveFieldExists(inputMetadata, "employee", "first_name")
       assertHiveFieldExists(inputMetadata, "employee", "last_name")
       assertHiveFieldExists(inputMetadata, "department", "location")
-      // The below line fails because of CDH-51222
-      // assertHiveFieldExists(inputMetadata, "department", "budget")
+      // The below assert should really be assert on "budget"
+      // but due to a known issue (CDH-57411), we only see the input column to be aggClause
+      // See why count(*) is special in getAggregateClauses()
+      if (agg != "count(*)") {
+        assertHiveFieldExists(inputMetadata, "department", "aggClause")
+      }
     }
 
     // Test ctas with complex joins are flagged as aggregate
@@ -379,7 +528,7 @@ class HiveQueryAnalysisSuite
       hiveContext.sql("drop table if exists new_employee")
       val df = hiveContext.sql(
         s"""create table new_employee as
-            select emp.first_name, emp.last_name, aggClause,location
+            select emp.first_name, emp.last_name, aggClause, location
               from employee emp
             join
               (
@@ -396,16 +545,18 @@ class HiveQueryAnalysisSuite
       // Assert aggregate function is detected
       assert(QueryAnalysis.hasAggregateFunction(df.queryExecution.optimizedPlan))
 
-      // Assert that the input metadata has all columns other than the aggregated column
-      // After fixing CDH-51222 assert on that column too.
       val inputMetadata = QueryAnalysis.getInputMetadata(df.queryExecution)
-      // When CDH-51222 is fixed change 3 to 4
-      assert(inputMetadata.length === 3)
+      val expectedLength = if (agg != "count(*)") 4 else 3
+      assert(inputMetadata.length === expectedLength)
       assertHiveFieldExists(inputMetadata, "employee", "first_name")
       assertHiveFieldExists(inputMetadata, "employee", "last_name")
       assertHiveFieldExists(inputMetadata, "department", "location")
-      // The below line fails because of CDH-51222
-      // assertHiveFieldExists(inputMetadata, "department", "budget")
+      // The below assert should really be assert on "budget" (and optionally dept_id)
+      // but due to a known issue (CDH-57411), we only see the input column to be aggClause
+      // See why count(*) is special in getAggregateClauses()
+      if (agg != "count(*)") {
+        assertHiveFieldExists(inputMetadata, "department", "aggClause")
+      }
       assertHiveOutputs(df.queryExecution, "new_employee",
         Seq("first_name", "last_name", "aggClause", "location"))
     }
@@ -415,8 +566,8 @@ class HiveQueryAnalysisSuite
       "String", "agg_clause" -> "Float", "location" -> "String"))
     Seq("sum(budget)", "max(budget)", "min(budget)", "avg(budget)", "count(*)")
       .foreach { agg =>
-      val df = hiveContext.sql(
-        s"""insert into emp_insert
+        val df = hiveContext.sql(
+          s"""insert into emp_insert
             select emp.first_name as fname, emp.last_name as lname, aggClauseInsert,location
               from employee emp
             join
@@ -430,34 +581,44 @@ class HiveQueryAnalysisSuite
                 limit 15
               ) dept
                 on emp.city = dept.location"""
-      )
-      // Assert aggregate function is detected
-      assert(QueryAnalysis.hasAggregateFunction(df.queryExecution.optimizedPlan))
+        )
+        // Assert aggregate function is detected
+        assert(QueryAnalysis.hasAggregateFunction(df.queryExecution.optimizedPlan))
 
-      // Assert that the input metadata has all columns other than the aggregated column
-      // After fixing CDH-51222 assert on that column too.
-      val inputMetadata = QueryAnalysis.getInputMetadata(df.queryExecution)
-      // When CDH-51222 is fixed change 3 to 4
-      assert(inputMetadata.length === 3)
-      assertHiveFieldExists(inputMetadata, "employee", "first_name")
-      assertHiveFieldExists(inputMetadata, "employee", "last_name")
-      assertHiveFieldExists(inputMetadata, "department", "location")
-      // The below line fails because of CDH-51222
-      // assertHiveFieldExists(inputMetadata, "department", "budget")
-      assertHiveOutputs(df.queryExecution, "emp_insert",
-        Seq("first_name", "last_name", "agg_clause", "location"))
-    }
+        val inputMetadata = QueryAnalysis.getInputMetadata(df.queryExecution)
+        val expectedLength = if (agg != "count(*)") 4 else 3
+        assert(inputMetadata.length === expectedLength)
+        assertHiveFieldExists(inputMetadata, "employee", "first_name")
+        assertHiveFieldExists(inputMetadata, "employee", "last_name")
+        assertHiveFieldExists(inputMetadata, "department", "location")
+        // Technically, the below assert should assert on "budget" column.
+        // However, there's a known issue (CDH-57411) due to which the column showing in lineage
+        // is aggClauseInsert instead of budget.
+        if (agg != "count(*)") {
+          assertHiveFieldExists(inputMetadata, "department", "aggClauseInsert")
+        }
+        assertHiveOutputs(df.queryExecution, "emp_insert",
+          Seq("first_name", "last_name", "agg_clause", "location"))
+      }
   }
-  
+
   private def getAggregateClauses(col1: String, col2: String): Seq[String] = {
+    // count(*) can't be included in the same category because other functions
+    // use one or more columns in lineage, while count(*) uses no columns.
+    // So the number of columns in input metadata are different.
     Seq(
       s"sum($col1)",
       s"avg($col1)",
-      s"count(*)",
       s"max($col1)",
       s"min($col1)",
       s"variance($col1)",
       s"stddev_pop($col1)",
+      // Ideally, we shouldn't include covar_pop and corr in this list. This is because those
+      // UDAFs include 2 columns instead of one, so the final lineage would have 2 columns instead
+      // 1. However, right now, due to CDH-57411, they are not resolved and show up as one column
+      // named covar_pop() and corr() respectively, so asserting on the number of column names
+      // in the lineage json returns the same number regardless of the number of input args to UDAF.
+      s"count(*)",
       s"covar_pop($col1, $col2)",
       s"corr($col1, $col2)",
       s"percentile($col1,0)",
