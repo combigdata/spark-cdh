@@ -89,7 +89,7 @@ object Main extends Logging {
     }
 
     val builder = SparkSession.builder.config(conf)
-    if (conf.get(CATALOG_IMPLEMENTATION.key, "hive").toLowerCase(Locale.ROOT) == "hive") {
+    if (conf.get(CATALOG_IMPLEMENTATION).toLowerCase(Locale.ROOT) == "hive") {
       if (SparkSession.hiveClassesArePresent) {
         // In the case that the property is not set at all, builder's config
         // does not have this value set to 'hive' yet. The original default
