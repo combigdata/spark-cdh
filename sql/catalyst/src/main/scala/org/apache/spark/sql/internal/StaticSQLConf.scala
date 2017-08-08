@@ -17,6 +17,7 @@
 
 package org.apache.spark.sql.internal
 
+import org.apache.spark.internal.Logging
 import org.apache.spark.util.Utils
 
 
@@ -24,7 +25,7 @@ import org.apache.spark.util.Utils
  * Static SQL configuration is a cross-session, immutable Spark configuration. External users can
  * see the static sql configs via `SparkSession.conf`, but can NOT set/unset them.
  */
-object StaticSQLConf {
+object StaticSQLConf extends Logging {
 
   import SQLConf.buildStaticConf
 
@@ -37,7 +38,22 @@ object StaticSQLConf {
     .internal()
     .stringConf
     .checkValues(Set("hive", "in-memory"))
-    .createWithDefault("in-memory")
+    .createWithDefaultFunction{ () => defaultHiveCatalogImplementation }
+
+  def defaultHiveCatalogImplementation: String = {
+    // CDH-57638
+    // Because our CSD can't depend on hive (circular dependency), we can't directly set the
+    // catalog implementation in the csd.  So instead we do it here at runtime.
+    val hiveSiteXML = Utils.getContextOrSparkClassLoader.getResource("hive-site.xml")
+    if (hiveSiteXML != null) {
+      logDebug("found hive-site.xml on classpath, enabling hive support")
+      "hive"
+    } else {
+      logDebug("no hive-site.xml found on classpath, disabling hive support")
+      "in-memory"
+    }
+
+  }
 
   val GLOBAL_TEMP_DATABASE = buildStaticConf("spark.sql.globalTempDatabase")
     .internal()
