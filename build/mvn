@@ -131,7 +131,7 @@ install_zinc() {
 EXTRA_MAVEN_ARGS=()
 if [ -n "$AMPLAB_JENKINS" ]; then
   wget -nc http://github.mtv.cloudera.com/raw/CDH/cdh/cdh6.x/gbn-m2-settings.xml
-  export CDH_GBN=$(curl 'http://builddb.infra.cloudera.com:8080/query?product=cdh&user=jenkins&version=6.x&tag=official')
+  export CDH_GBN=$(curl 'http://builddb.infra.cloudera.com:8080/resolvealias?alias=cdh6.x')
   EXTRA_MAVEN_ARGS+=("-s" "${_DIR}/../gbn-m2-settings.xml")
 fi
 
