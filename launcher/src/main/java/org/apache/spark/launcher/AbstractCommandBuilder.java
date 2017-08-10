@@ -194,6 +194,9 @@ abstract class AbstractCommandBuilder {
     String jarsDir = findJarsDir(getSparkHome(), getScalaVersion(), !isTesting && !isTestingSql);
     if (jarsDir != null) {
       addToClassPath(cp, join(File.separator, jarsDir, "*"));
+
+      String hiveDir = new File(join(File.separator, jarsDir, "..", "hive")).getAbsolutePath();
+      addToClassPath(cp, join(File.separator, hiveDir, "*"));
     }
 
     addToClassPath(cp, getenv("HADOOP_CONF_DIR"));

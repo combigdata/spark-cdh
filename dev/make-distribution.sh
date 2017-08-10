@@ -196,6 +196,11 @@ echo "Build flags: $@" >> "$DISTDIR/RELEASE"
 # Copy jars
 cp "$SPARK_HOME"/assembly/target/scala*/jars/* "$DISTDIR/jars/"
 
+if [ -d "$SPARK_HOME"/assembly/target/scala*/hive ]; then
+  mkdir -p "$DISTDIR/hive"
+  cp "$SPARK_HOME"/assembly/target/scala*/hive/* "$DISTDIR/hive/"
+fi
+
 # Only create the yarn directory if the yarn artifacts were build.
 if [ -f "$SPARK_HOME"/common/network-yarn/target/scala*/spark-*-yarn-shuffle.jar ]; then
   mkdir "$DISTDIR/yarn"

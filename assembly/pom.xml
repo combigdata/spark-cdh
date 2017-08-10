@@ -170,8 +170,41 @@
           <groupId>org.apache.spark</groupId>
           <artifactId>spark-hive_${scala.binary.version}</artifactId>
           <version>${project.version}</version>
+          <exclusions>
+            <exclusion>
+              <groupId>${hive.group}</groupId>
+              <artifactId>*</artifactId>
+            </exclusion>
+          </exclusions>
         </dependency>
       </dependencies>
+      <build>
+        <plugins>
+          <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-dependency-plugin</artifactId>
+            <executions>
+              <execution>
+                <id>copy-hive-dependencies</id>
+                <phase>${build.copyDependenciesPhase}</phase>
+                <goals>
+                  <goal>copy</goal>
+                </goals>
+                <configuration>
+                  <artifactItems>
+                    <artifactItem>
+                      <groupId>${hive.group}</groupId>
+                      <artifactId>hive-exec</artifactId>
+                      <version>${hive.version}</version>
+                    </artifactItem>
+                  </artifactItems>
+                  <outputDirectory>${jars.target.dir}/../hive</outputDirectory>
+                </configuration>
+              </execution>
+            </executions>
+          </plugin>
+        </plugins>
+      </build>
     </profile>
     <profile>
       <id>hive-thriftserver</id>
