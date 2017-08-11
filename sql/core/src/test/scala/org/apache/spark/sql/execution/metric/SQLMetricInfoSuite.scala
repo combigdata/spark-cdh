@@ -17,30 +17,19 @@
 
 package org.apache.spark.sql.execution.metric
 
-import com.fasterxml.jackson.annotation.{JsonIgnore, JsonProperty}
+import org.apache.spark.SparkFunSuite
+import org.apache.spark.scheduler.ReplayListenerBus
 
-import org.apache.spark.annotation.DeveloperApi
+class SQLMetricInfoSuite extends SparkFunSuite {
 
-/**
- * :: DeveloperApi ::
- * Stores information about a SQL Metric.
- */
-@DeveloperApi
-class SQLMetricInfo(
-    val name: String,
-    val accumulatorId: Long,
-    _type: String) {
-
-  // CDH-46123: compatibility for C5-generated event logs.
-  @JsonProperty("metricType")
-  private var _metricType = _type
-
-  @JsonProperty("metricParam")
-  private def setMetricParam(value: String): Unit = {
-    _metricType = value
+  test("CDH-46123: make sure C5 event logs can be loaded") {
+    val replayBus = new ReplayListenerBus()
+    val in = getClass().getResourceAsStream("/event-logs/cdh-46123")
+    try {
+      replayBus.replay(in, "CDH-46123")
+    } finally {
+      in.close()
+    }
   }
-
-  @JsonIgnore
-  def metricType: String = _metricType
 
 }
