@@ -45,7 +45,14 @@ object StaticSQLConf extends Logging {
     // Because our CSD can't depend on hive (circular dependency), we can't directly set the
     // catalog implementation in the csd.  So instead we do it here at runtime.
     val hiveSiteXML = Utils.getContextOrSparkClassLoader.getResource("hive-site.xml")
-    if (hiveSiteXML != null) {
+    val hasHiveClasses = try {
+      Utils.classForName("org.apache.spark.sql.hive.HiveExternalCatalog")
+      true
+    } catch {
+      case _: Exception => false
+    }
+
+    if (hiveSiteXML != null && hasHiveClasses) {
       logDebug("found hive-site.xml on classpath, enabling hive support")
       "hive"
     } else {
