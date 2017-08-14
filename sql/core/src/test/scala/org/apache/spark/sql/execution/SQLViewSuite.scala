@@ -442,7 +442,9 @@ abstract class SQLViewSuite extends QueryTest with SQLTestUtils {
       val updatedViewMeta = catalog.getTableMetadata(TableIdentifier("test_view"))
       assert(updatedViewMeta.comment == Some("test"))
       assert(updatedViewMeta.properties("key") == "a")
-      assert(updatedViewMeta.createTime == viewMeta.createTime)
+      // CDH-57884. The changes for CDH-56492 drop the view first to work around checks in the
+      // Hive 2.1 metastore, so the creation time may change.
+      // assert(updatedViewMeta.createTime == viewMeta.createTime)
       // The view should be updated.
       checkAnswer(spark.table("test_view"), Row(3, 4))
     }
