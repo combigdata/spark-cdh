@@ -19,6 +19,7 @@ package org.apache.spark.sql.hive
 
 import java.io.IOException
 import java.lang.reflect.InvocationTargetException
+import java.net.URI
 import java.util
 import java.util.Locale
 
@@ -251,12 +252,13 @@ private[spark] class HiveExternalCatalog(conf: SparkConf, hadoopConf: Configurat
       if (tableDefinition.tableType == MANAGED) {
         val metastoreURIs = client.getConf(HiveConf.ConfVars.METASTOREURIS.varname, "")
         if (metastoreURIs.nonEmpty) {
-          val fs = FileSystem.get(hadoopConf)
-          val metastoreTableLocation = fs.makeQualified(
-            new Path(defaultTablePath(tableDefinition.identifier)))
           tableDefinition.storage.locationUri
-            .map { path => fs.makeQualified(new Path(path)).toUri }
-            .filter(_ != metastoreTableLocation)
+            .map(makeQualified)
+            .filter { loc =>
+              val metastoreTableLocation = makeQualified(
+                CatalogUtils.stringToURI(defaultTablePath(tableDefinition.identifier)))
+              loc != metastoreTableLocation
+            }
         } else {
           tableDefinition.storage.locationUri
             .orElse(Some(CatalogUtils.stringToURI(defaultTablePath(tableDefinition.identifier))))
@@ -284,6 +286,12 @@ private[spark] class HiveExternalCatalog(conf: SparkConf, hadoopConf: Configurat
         properties = tableDefinition.properties ++ tableMetaToTableProps(tableDefinition))
       client.createTable(tableWithDataSourceProps, ignoreIfExists)
     }
+  }
+
+  private def makeQualified(uri: URI): URI = {
+    val path = new Path(uri)
+    val fs = path.getFileSystem(hadoopConf)
+    fs.makeQualified(path).toUri
   }
 
   private def createDataSourceTable(table: CatalogTable, ignoreIfExists: Boolean): Unit = {
