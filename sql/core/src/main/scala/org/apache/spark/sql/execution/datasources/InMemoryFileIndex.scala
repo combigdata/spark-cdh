@@ -317,7 +317,7 @@ object InMemoryFileIndex extends Logging {
         try {
           val locations = fs.getFileBlockLocations(f, 0, f.getLen)
           val lfs = new LocatedFileStatus(f.getLen, f.isDirectory, f.getReplication, f.getBlockSize,
-            f.getModificationTime, 0, null, null, null, null, f.getPath, locations)
+            f.getModificationTime, 0, f.getPermission, null, null, null, f.getPath, locations)
           if (f.isSymlink) {
             lfs.setSymlink(f.getSymlink)
           }
