@@ -147,7 +147,7 @@ class YarnClusterSuite extends BaseYarnClusterSuite {
     val timeout = 2000
     val finalState = runSpark(false, mainClassName(SparkContextTimeoutApp.getClass),
       appArgs = Seq((timeout * 4).toString),
-      extraConf = Map("spark.yarn.am.waitTime" -> timeout.toString))
+      extraConf = Map("spark.yarn.am.waitTime" -> s"${timeout / 1000}s"))
     finalState should be (SparkAppHandle.State.FAILED)
   }
 
