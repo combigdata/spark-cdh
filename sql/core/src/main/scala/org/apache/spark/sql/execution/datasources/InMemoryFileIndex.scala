@@ -23,6 +23,7 @@ import scala.collection.mutable
 
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs._
+import org.apache.hadoop.fs.permission.{FsAction, FsPermission}
 import org.apache.hadoop.mapred.{FileInputFormat, JobConf}
 
 import org.apache.spark.internal.Logging
@@ -295,9 +296,13 @@ object InMemoryFileIndex extends Logging {
         // The other constructor of LocatedFileStatus will call FileStatus.getPermission(),
         // which is very slow on some file system (RawLocalFileSystem, which is launch a
         // subprocess and parse the stdout).
+        //
+        // CDH-58187: use a dummy permission object since the Hadoop library requires non-null
+        // permissions.
+        val perm = new FsPermission(FsAction.READ_WRITE, FsAction.NONE, FsAction.NONE)
         val locations = fs.getFileBlockLocations(f, 0, f.getLen)
         val lfs = new LocatedFileStatus(f.getLen, f.isDirectory, f.getReplication, f.getBlockSize,
-          f.getModificationTime, 0, f.getPermission(), null, null, null, f.getPath, locations)
+          f.getModificationTime, 0, perm, null, null, null, f.getPath, locations)
         if (f.isSymlink) {
           lfs.setSymlink(f.getSymlink)
         }
