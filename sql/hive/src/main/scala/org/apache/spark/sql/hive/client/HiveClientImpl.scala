@@ -404,10 +404,7 @@ private[hive] class HiveClientImpl(
         unsupportedFeatures += "partitioned view"
       }
 
-      val properties = Option(h.getParameters).map(_.asScala.toMap).getOrElse(Map())
-
-      val provider = properties.get(HiveExternalCatalog.DATASOURCE_PROVIDER)
-        .orElse(Some(DDLUtils.HIVE_PROVIDER))
+      val properties = Option(h.getParameters).map(_.asScala.toMap).orNull
 
       CatalogTable(
         identifier = TableIdentifier(h.getTableName, Option(h.getDbName)),
@@ -419,7 +416,6 @@ private[hive] class HiveClientImpl(
             throw new AnalysisException("Hive index table is not supported.")
         },
         schema = schema,
-        provider = provider,
         partitionColumnNames = partCols.map(_.name),
         // We can not populate bucketing information for Hive tables as Spark SQL has a different
         // implementation of hash function from Hive.
