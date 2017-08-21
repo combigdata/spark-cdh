@@ -337,7 +337,7 @@ private[spark] class ApplicationMaster(
     // This a bit hacky, but we need to wait until the spark.driver.port property has
     // been set by the Thread executing the user class.
     logInfo("Waiting for spark context initialization...")
-    val totalWaitTime = sparkConf.getLong("spark.yarn.am.waitTime", 100000L)
+    val totalWaitTime = sparkConf.getTimeAsMs("spark.yarn.am.waitTime", "100s")
     try {
       val sc = Await.result(sparkContextPromise.future,
         Duration(totalWaitTime, TimeUnit.MILLISECONDS))
