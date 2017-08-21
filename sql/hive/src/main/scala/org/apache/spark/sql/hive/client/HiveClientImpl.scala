@@ -414,10 +414,7 @@ private[hive] class HiveClientImpl(
         unsupportedFeatures += "partitioned view"
       }
 
-      val properties = Option(h.getParameters).map(_.asScala.toMap).getOrElse(Map())
-
-      val provider = properties.get(HiveExternalCatalog.DATASOURCE_PROVIDER)
-        .orElse(Some(DDLUtils.HIVE_PROVIDER))
+      val properties = Option(h.getParameters).map(_.asScala.toMap).orNull
 
       // Hive-generated Statistics are also recorded in ignoredProperties
       val ignoredProperties = scala.collection.mutable.Map.empty[String, String]
@@ -448,7 +445,6 @@ private[hive] class HiveClientImpl(
             throw new AnalysisException("Hive index table is not supported.")
         },
         schema = schema,
-        provider = provider,
         partitionColumnNames = partCols.map(_.name),
         // If the table is written by Spark, we will put bucketing information in table properties,
         // and will always overwrite the bucket spec in hive metastore by the bucketing information
