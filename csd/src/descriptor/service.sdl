@@ -253,6 +253,9 @@
             "sourceFilename" : "meta/version"
           }
         ]
+      },
+      "healthAggregation" : {
+        "type" : "singleton"
       }
     }
   ],
