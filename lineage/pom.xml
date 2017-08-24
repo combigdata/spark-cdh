@@ -23,7 +23,7 @@
   <parent>
     <artifactId>spark-parent_2.10</artifactId>
     <groupId>org.apache.spark</groupId>
-    <version>1.6.0-cdh5.13.0-SNAPSHOT</version>
+    <version>1.6.0-cdh5.14.0-SNAPSHOT</version>
     <relativePath>../pom.xml</relativePath>
   </parent>
   <properties>
