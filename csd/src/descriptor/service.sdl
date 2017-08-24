@@ -18,7 +18,7 @@
   "label" : "Spark 2",
   "description" : "Apache Spark is an open source cluster computing system. This service runs Spark 2 as an application on YARN. <span class=\"error\">Before adding this service, ensure that you have installed the Spark2 binaries, which are not included in CDH.</span>",
   "version" : "2.1.0.cloudera2",
-  "compatibility" : { "cdhVersion" : { "min" : "5.7.0" } },
+  "compatibility" : { "cdhVersion" : { "min" : "5.7.0", "max" : "5" } },
   "runAs" : {
     "user" : "spark",
     "group" : "spark",
