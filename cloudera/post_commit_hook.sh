@@ -9,24 +9,6 @@
 # -e will make the script exit if an error happens on any command executed
 set -ex
 
-# Script created by Cloudcat with useful environment information
-[ -f /opt/toolchain/toolchain.sh ] && . /opt/toolchain/toolchain.sh
-
-# Use JAVA8_HOME if exists
-export JAVA_HOME=${JAVA8_HOME:-$JAVA_HOME}
-
-# If JDK_VERSION exists, then try to get the value from JAVAX_HOME
-if [ -n "$JDK_VERSION" ]; then
-  # Get JAVAX_HOME value, where X is the JDK version
-  java_home=`eval echo \\$JAVA${JDK_VERSION}_HOME`
-  if [ -n "$java_home" ]; then
-    export JAVA_HOME="$java_home"
-  else
-    echo "ERROR: USE_JDK_VERSION=$JDK_VERSION, but JAVA${JDK_VERSION}_HOME is not found."
-    exit 1
-  fi
-fi
-
 export PATH=${JAVA_HOME}/bin:${PATH}
 
 # To make some of the output quieter
