@@ -128,7 +128,8 @@ class OrderingSuite extends SparkFunSuite with ExpressionEvalHelper {
     }
   }
 
-  test("SPARK-16845: GeneratedClass$SpecificOrdering grows beyond 64 KB") {
+  // CDH-59077: test is flaky on 2.2 (see SPARK-20201; fix is in 2.3 only).
+  ignore("SPARK-16845: GeneratedClass$SpecificOrdering grows beyond 64 KB") {
     val sortOrder = Literal("abc").asc
 
     // this is passing prior to SPARK-16845, and it should also be passing after SPARK-16845
