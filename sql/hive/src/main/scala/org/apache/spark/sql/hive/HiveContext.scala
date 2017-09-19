@@ -751,7 +751,6 @@ private[hive] object HiveContext {
     propMap.put(HiveConf.ConfVars.SCRATCHDIR.varname, scratchDir.toURI.toString)
     propMap.put("datanucleus.rdbms.datastoreAdapterClassName",
       "org.datanucleus.store.rdbms.adapter.DerbyAdapter")
-    
     // The execution client will generate garbage events, therefore the listeners that are generated
     // for the execution clients are useless. In order to not output garbage, we don't generate
     // these listeners.
