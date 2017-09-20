@@ -294,4 +294,11 @@ package object config {
         "above this threshold. This is to avoid a giant request takes too much memory.")
       .bytesConf(ByteUnit.BYTE)
       .createWithDefault(Long.MaxValue)
+
+  private[spark] val EXTRA_LISTENERS = ConfigBuilder("spark.extraListeners")
+    .doc("Class names of listeners to add to SparkContext during initialization.")
+    .stringConf
+    .toSequence
+    .createOptional
+
 }
