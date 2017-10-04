@@ -189,8 +189,8 @@ private[hive] class HiveClientImpl(
 
         // CDH-56492: When not using a HMS, enable auto-creation of data in Derby metastores.
         if (HiveConfUtil.isEmbeddedMetaStore(hiveConf.getVar(ConfVars.METASTOREURIS))) {
-          hiveConf.setVar(ConfVars.METASTORE_AUTO_CREATE_ALL, "true")
-          hiveConf.setVar(ConfVars.METASTORE_SCHEMA_VERIFICATION, "false")
+          hiveConf.setBoolVar(ConfVars.METASTORE_AUTO_CREATE_ALL, true)
+          hiveConf.setBoolVar(ConfVars.METASTORE_SCHEMA_VERIFICATION, false)
         }
 
         val state = new SessionState(hiveConf)
