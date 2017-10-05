@@ -247,6 +247,11 @@ function set_config {
   fi
 }
 
+# Parse a x.y.z version into an integer.
+function parse_version_string {
+  echo "$1" | awk -F. '{ printf("%02d%02d%02d", $1, $2, $3) }'
+}
+
 # Copies config files from a source directory ($1) into the Spark client config dir ($2).
 # $3 should be the final location of the client config. Ignores logging configuration, and
 # does not overwrite files, so that multiple source config directories can be merged.
@@ -302,7 +307,7 @@ function start_history_server {
   fi
 
   local FILTERS_KEY="spark.ui.filters"
-  local FILTERS=$(read_spark_conf "$FILTERS_KEY" "$CONF_FILE")
+  local FILTERS=$(read_property "$FILTERS_KEY" "$CONF_FILE")
 
   if [ "$YARN_PROXY_REDIRECT" = "true" ]; then
     FILTERS=$(add_to_list "$FILTERS" "org.apache.spark.deploy.yarn.YarnProxyRedirectFilter")
@@ -493,6 +498,39 @@ function deploy_client_config {
       echo "$key=\${shell.log.level}" >> "$LOG_CONFIG"
     fi
   done
+
+  local LINEAGE_ENABLED_KEY="spark.lineage.enabled"
+
+  # Detect whether a supported CM version for lineage is being used, otherwise disable the
+  # feature
+  local MIN_CM_VERSION=$(parse_version_string "5.14.0")
+  local LINEAGE_SUPPORTED=0
+  if [ -n "$CM_VERSION" ]; then
+    if [ $(parse_version_string "$CM_VERSION") -ge $MIN_CM_VERSION ]; then
+      LINEAGE_SUPPORTED=1
+    fi
+  fi
+
+  if [ $LINEAGE_SUPPORTED = 0 ]; then
+    log "Spark 2 lineage is not supported by CM, disabling."
+    replace_spark_conf "$LINEAGE_ENABLED_KEY" "false" "$SPARK_DEFAULTS"
+  fi
+
+  # If lineage is enabled, add the Navigator listeners to the client config.
+  local LINEAGE_ENABLED=$(read_property "$LINEAGE_ENABLED_KEY" "$SPARK_DEFAULTS")
+  if [ "$LINEAGE_ENABLED" = "true" ]; then
+    local SC_LISTENERS_KEY="spark.extraListeners"
+    local SQL_LISTENERS_KEY="spark.sql.queryExecutionListeners"
+    local LINEAGE_PKG="com.cloudera.spark.lineage"
+
+    local LISTENERS=$(read_property "$SC_LISTENERS_KEY" "$SPARK_DEFAULTS")
+    LISTENERS=$(add_to_list "$LISTENERS" "$LINEAGE_PKG.NavigatorAppListener")
+    replace_spark_conf "$SC_LISTENERS_KEY" "$LISTENERS" "$SPARK_DEFAULTS"
+
+    local LISTENERS=$(read_property "$SQL_LISTENERS_KEY" "$SPARK_DEFAULTS")
+    LISTENERS=$(add_to_list "$LISTENERS" "$LINEAGE_PKG.NavigatorQueryListener")
+    replace_spark_conf "$SQL_LISTENERS_KEY" "$LISTENERS" "$SPARK_DEFAULTS"
+  fi
 }
 
 function clean_history_cache {
