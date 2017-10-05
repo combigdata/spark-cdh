@@ -18,7 +18,7 @@
   "label" : "Spark 2",
   "description" : "Apache Spark is an open source cluster computing system. This service runs Spark 2 as an application on YARN. <span class=\"error\">Before adding this service, ensure that you have installed the Spark2 binaries, which are not included in CDH.</span>",
   "version" : "2.3.0.cloudera1",
-  "compatibility" : { "cdhVersion" : { "min" : "5.9.0", "max" : "5" } },
+  "compatibility" : { "cdhVersion" : { "min" : "5.11.0", "max" : "5" } },
   "runAs" : {
     "user" : "spark",
     "group" : "spark",
@@ -119,6 +119,10 @@
       "required" : "true",
       "type" : "boolean",
       "default" : false
+    },
+    {
+        "name" : "navigator_lineage_enabled",
+        "type" : "provided"
     }
   ],
   "rolesWithExternalLinks" : ["SPARK2_YARN_HISTORY_SERVER"],
@@ -555,6 +559,10 @@
         "required" : "false",
         "type" : "boolean",
         "default" : true
+      },
+      {
+        "name" : "lineage_event_log_dir",
+        "type" : "provided"
       }
     ],
     "scriptRunner" : {
@@ -564,6 +572,9 @@
         "DEPLOY_MODE" : "${spark_deploy_mode}",
         "PYTHON_PATH" : "${spark_python_path}",
         "DEFAULT_SPARK_KAFKA_VERSION" : "${spark_kafka_version}"
+      },
+      "referencedEnvironmentVariables" : {
+        "CM_VERSION" : "${cm_version}"
       }
     },
     "logging" : {
@@ -582,6 +593,15 @@
         { "key" : "log4j.logger.org.apache.hadoop.hive.ql.exec.FunctionRegistry", "value" : "ERROR" }
       ]
     },
+    "dependencyExtensions": [
+      {
+        "extensionId" : "navigator_lineage_client",
+        "defaultDir" : "/var/log/spark2/lineage",
+        "permissions" : "1777",
+        "singleUserModeAllowed": false,
+        "type" : "lineage"
+      }
+    ],
     "configWriter" : {
       "generators" : [
         {
@@ -606,6 +626,16 @@
             "spark_network_encryption_enabled",
             "spark_io_encryption_enabled",
             "spark_ui_enabled"
+          ],
+          "additionalConfigs" : [
+            {
+              "key" : "spark.lineage.log.dir",
+              "value" : "${lineage_event_log_dir}"
+            },
+            {
+              "key" : "spark.lineage.enabled",
+              "value" : "${navigator_lineage_enabled}"
+            }
           ]
         }
       ],
