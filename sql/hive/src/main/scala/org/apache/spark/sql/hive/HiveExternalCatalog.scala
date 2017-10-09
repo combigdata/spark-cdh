@@ -251,7 +251,7 @@ private[spark] class HiveExternalCatalog(conf: SparkConf, hadoopConf: Configurat
       // the CDH change.
       if (tableDefinition.tableType == MANAGED) {
         val metastoreURIs = client.getConf(HiveConf.ConfVars.METASTOREURIS.varname, "")
-        if (metastoreURIs.nonEmpty) {
+        if (metastoreURIs.nonEmpty && DDLUtils.isHiveTable(tableDefinition)) {
           tableDefinition.storage.locationUri
             .map(makeQualified)
             .filter { loc =>
