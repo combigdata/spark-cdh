@@ -88,3 +88,6 @@ spark-warehouse/
 *.Rproj.*
 
 .Rproj.user
+
+# Cauldron
+gbn-m2-settings.xml
