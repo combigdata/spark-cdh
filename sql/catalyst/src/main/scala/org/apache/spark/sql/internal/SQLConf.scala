@@ -269,10 +269,10 @@ object SQLConf {
 
   val PARQUET_OUTPUT_COMMITTER_CLASS = buildConf("spark.sql.parquet.output.committer.class")
     .doc("The output committer class used by Parquet. The specified class needs to be a " +
-      "subclass of org.apache.hadoop.mapreduce.OutputCommitter.  Typically, it's also a subclass " +
-      "of parquet.hadoop.ParquetOutputCommitter.  NOTE: 1. Instead of SQLConf, this " +
-      "option must be set in Hadoop Configuration.  2. This option overrides " +
-      "\"spark.sql.sources.outputCommitterClass\".")
+      "subclass of org.apache.hadoop.mapreduce.OutputCommitter. Typically, it's also a subclass " +
+      "of parquet.hadoop.ParquetOutputCommitter. If it is not, then metadata summaries" +
+      "will never be created, irrespective of the value of parquet.enable.summary-metadata")
+    .internal()
     .stringConf
     .createWithDefault("parquet.hadoop.ParquetOutputCommitter")
 
