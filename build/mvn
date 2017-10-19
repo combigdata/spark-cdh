@@ -129,10 +129,8 @@ install_zinc() {
 ## HACK to workaround bad cloudera-mirrors in cauldron
 ## see CDH-45755
 EXTRA_MAVEN_ARGS=()
-if [ -n "$AMPLAB_JENKINS" ]; then
-  wget -nc http://github.mtv.cloudera.com/raw/CDH/cdh/cdh6.x/gbn-m2-settings.xml
-  export CDH_GBN=$(curl 'http://builddb.infra.cloudera.com:8080/resolvealias?alias=cdh6.x')
-  EXTRA_MAVEN_ARGS+=("-s" "${_DIR}/../gbn-m2-settings.xml")
+if [ -n "$MVN_SETTINGS_FILE" ]; then
+  EXTRA_MAVEN_ARGS+=("-s" "$MVN_SETTINGS_FILE")
 fi
 
 
