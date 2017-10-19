@@ -30,7 +30,9 @@ import org.apache.hadoop.security.{Credentials, UserGroupInformation}
 import org.apache.hadoop.security.token.Token
 
 import org.apache.spark.SparkConf
+import org.apache.spark.deploy.SparkHadoopUtil
 import org.apache.spark.internal.Logging
+import org.apache.spark.internal.config.KEYTAB
 import org.apache.spark.util.Utils
 
 private[security] class HiveCredentialProvider extends ServiceCredentialProvider with Logging {
@@ -55,9 +57,21 @@ private[security] class HiveCredentialProvider extends ServiceCredentialProvider
     }
   }
 
-  override def credentialsRequired(hadoopConf: Configuration): Boolean = {
+  override def credentialsRequired(
+      sparkConf: SparkConf,
+      hadoopConf: Configuration): Boolean = {
+    // Delegation tokens are needed only when:
+    // - trying to connect to a secure metastore
+    // - either deploying in cluster mode without a keytab, or impersonating another user
+    //
+    // Other modes (such as client with or without keytab, or cluster mode with keytab) do not need
+    // a delegation token, since there's a valid kerberos TGT for the right user available to the
+    // driver, which is the only process that connects to the HMS.
+    val deployMode = sparkConf.get("spark.submit.deployMode", "client")
     UserGroupInformation.isSecurityEnabled &&
-      hiveConf(hadoopConf).getTrimmed("hive.metastore.uris", "").nonEmpty
+      hiveConf(hadoopConf).getTrimmed("hive.metastore.uris", "").nonEmpty &&
+      (SparkHadoopUtil.get.isProxyUser(UserGroupInformation.getCurrentUser()) ||
+        (deployMode == "cluster" && !sparkConf.contains(KEYTAB)))
   }
 
   override def obtainCredentials(
@@ -93,7 +107,7 @@ private[security] class HiveCredentialProvider extends ServiceCredentialProvider
           .asInstanceOf[String]
         val hive2Token = new Token[DelegationTokenIdentifier]()
         hive2Token.decodeFromUrlString(tokenStr)
-        logInfo(s"Get Token from hive metastore: ${hive2Token.toString}")
+        logDebug(s"Get Token from hive metastore: ${hive2Token.toString}")
         creds.addToken(new Text("hive.server2.delegation.token"), hive2Token)
       }
     } catch {

@@ -38,7 +38,7 @@ trait ServiceCredentialProvider {
    * To decide whether credential is required for this service. By default it based on whether
    * Hadoop security is enabled.
    */
-  def credentialsRequired(hadoopConf: Configuration): Boolean = {
+  def credentialsRequired(sparkConf: SparkConf, hadoopConf: Configuration): Boolean = {
     UserGroupInformation.isSecurityEnabled
   }
 

@@ -57,7 +57,9 @@ private[security] class HBaseCredentialProvider extends ServiceCredentialProvide
     None
   }
 
-  override def credentialsRequired(hadoopConf: Configuration): Boolean = {
+  override def credentialsRequired(
+      sparkConf: SparkConf,
+      hadoopConf: Configuration): Boolean = {
     try {
       hbaseConf(hadoopConf).get("hbase.security.authentication") == "kerberos"
     } catch {

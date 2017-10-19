@@ -118,7 +118,7 @@ class ConfigurableCredentialManagerSuite extends SparkFunSuite with Matchers wit
 
     // HBaseConfiguration is brought transitively by Hive, so credentialsRequired() works;
     // but obtainCredentials needs classes not available in the test classpath.
-    assert(hbaseTokenProvider.credentialsRequired(hadoopConf))
+    assert(hbaseTokenProvider.credentialsRequired(sparkConf, hadoopConf))
     intercept[ClassNotFoundException] {
       hbaseTokenProvider.obtainCredentials(hadoopConf, sparkConf, creds)
     }
@@ -131,7 +131,7 @@ class TestCredentialProvider extends ServiceCredentialProvider {
 
   override def serviceName: String = "test"
 
-  override def credentialsRequired(conf: Configuration): Boolean = true
+  override def credentialsRequired(sparkConf: SparkConf, conf: Configuration): Boolean = true
 
   override def obtainCredentials(
       hadoopConf: Configuration,
