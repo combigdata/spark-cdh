@@ -78,7 +78,7 @@ private[yarn] final class ConfigurableCredentialManager(
    */
   def obtainCredentials(hadoopConf: Configuration, creds: Credentials): Long = {
     credentialProviders.values.flatMap { provider =>
-      if (provider.credentialsRequired(hadoopConf)) {
+      if (provider.credentialsRequired(sparkConf, hadoopConf)) {
         provider.obtainCredentials(hadoopConf, sparkConf, creds)
       } else {
         logDebug(s"Service ${provider.serviceName} does not require a token." +

@@ -106,21 +106,6 @@ private[hive] class HiveClientImpl(
     // Switch to the initClassLoader.
     Thread.currentThread().setContextClassLoader(initClassLoader)
 
-    // Set up kerberos credentials for UserGroupInformation.loginUser within
-    // current class loader
-    if (sparkConf.contains("spark.yarn.principal") && sparkConf.contains("spark.yarn.keytab")) {
-      val principalName = sparkConf.get("spark.yarn.principal")
-      val keytabFileName = sparkConf.get("spark.yarn.keytab")
-      if (!new File(keytabFileName).exists()) {
-        throw new SparkException(s"Keytab file: ${keytabFileName}" +
-          " specified in spark.yarn.keytab does not exist")
-      } else {
-        logInfo("Attempting to login to Kerberos" +
-          s" using principal: ${principalName} and keytab: ${keytabFileName}")
-        UserGroupInformation.loginUserFromKeytab(principalName, keytabFileName)
-      }
-    }
-
     def isCliSessionState(state: SessionState): Boolean = {
       var temp: Class[_] = if (state != null) state.getClass else null
       var found = false

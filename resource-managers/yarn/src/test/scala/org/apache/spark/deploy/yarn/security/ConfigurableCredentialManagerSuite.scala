@@ -127,7 +127,7 @@ class TestCredentialProvider extends ServiceCredentialProvider {
 
   override def serviceName: String = "test"
 
-  override def credentialsRequired(conf: Configuration): Boolean = true
+  override def credentialsRequired(sparkConf: SparkConf, conf: Configuration): Boolean = true
 
   override def obtainCredentials(
       hadoopConf: Configuration,
