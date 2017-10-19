@@ -46,6 +46,14 @@ private[spark] object JettyUtils extends Logging {
   val SPARK_CONNECTOR_NAME = "Spark"
   val REDIRECT_CONNECTOR_NAME = "HttpsRedirect"
 
+  private val UI_X_XSS_PROTECTION = "spark.ui.xXssProtection"
+  private val UI_X_XSS_PROTECTION_DEFAULT = "1; mode=block"
+
+  private val UI_X_CONTENT_TYPE_OPTIONS = "spark.ui.xContentTypeOptions.enabled"
+  private val UI_X_CONTENT_TYPE_OPTIONS_DEFAULT = true
+
+  private val UI_STRICT_TRANSPORT_SECURITY = "spark.ui.strictTransportSecurity"
+
   // Base type for a function that returns something based on an HTTP request. Allows for
   // implicit conversion from many types of functions to jetty Handlers.
   type Responder[T] = HttpServletRequest => T
@@ -86,6 +94,15 @@ private[spark] object JettyUtils extends Logging {
             val result = servletParams.responder(request)
             response.setHeader("Cache-Control", "no-cache, no-store, must-revalidate")
             response.setHeader("X-Frame-Options", xFrameOptionsValue)
+            response.setHeader("X-XSS-Protection",
+              conf.get(UI_X_XSS_PROTECTION, UI_X_XSS_PROTECTION_DEFAULT))
+            if (conf.getBoolean(UI_X_CONTENT_TYPE_OPTIONS, UI_X_CONTENT_TYPE_OPTIONS_DEFAULT)) {
+              response.setHeader("X-Content-Type-Options", "nosniff")
+            }
+            if (request.getScheme == "https") {
+              conf.getOption(UI_STRICT_TRANSPORT_SECURITY).foreach(
+                response.setHeader("Strict-Transport-Security", _))
+            }
             // scalastyle:off println
             response.getWriter.println(servletParams.extractFn(result))
             // scalastyle:on println
