@@ -97,9 +97,7 @@ private[spark] class ApplicationMaster(args: ApplicationMasterArguments) extends
     }
   }
 
-  private val client = ugi.doAs(new PrivilegedExceptionAction[YarnRMClient]() {
-    def run: YarnRMClient = new YarnRMClient()
-  })
+  private val client = doAsUser { new YarnRMClient() }
 
   // Default to twice the number of executors (twice the maximum number of executors if dynamic
   // allocation is enabled), with a minimum of 3.
@@ -159,7 +157,7 @@ private[spark] class ApplicationMaster(args: ApplicationMasterArguments) extends
   // Load the list of localized files set by the client. This is used when launching executors,
   // and is loaded here so that these configs don't pollute the Web UI's environment page in
   // cluster mode.
-  private val localResources = {
+  private val localResources = doAsUser {
     logInfo("Preparing Local resources")
     val resources = HashMap[String, LocalResource]()
 
@@ -221,9 +219,9 @@ private[spark] class ApplicationMaster(args: ApplicationMasterArguments) extends
   }
 
   final def run(): Int = {
-    ugi.doAs(new PrivilegedExceptionAction[Unit]() {
-      def run: Unit = runImpl()
-    })
+    doAsUser {
+      runImpl()
+    }
     exitCode
   }
 
@@ -782,6 +780,12 @@ private[spark] class ApplicationMaster(args: ApplicationMasterArguments) extends
         finish(FinalApplicationStatus.SUCCEEDED, ApplicationMaster.EXIT_SUCCESS)
       }
     }
+  }
+
+  private def doAsUser[T](fn: => T): T = {
+    ugi.doAs(new PrivilegedExceptionAction[T]() {
+      override def run: T = fn
+    })
   }
 
 }
