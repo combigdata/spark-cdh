@@ -249,11 +249,16 @@ private[kafka] class KafkaTestUtils extends Logging {
   private def waitUntilMetadataIsPropagated(topic: String, partition: Int): Unit = {
     def isPropagated = server.apis.metadataCache.getPartitionInfo(topic, partition) match {
       case Some(partitionState) =>
-        val leaderAndInSyncReplicas = partitionState.leaderIsrAndControllerEpoch.leaderAndIsr
 
+        /**
+         * The following code is compliant with CDH only,
+         * as the CDH distribution of the kafka-0-8 module
+         * uses the latest Kafka client libs bundled with the CDH package.
+         * See: CDH-61699
+         */
         zkUtils.getLeaderForPartition(topic, partition).isDefined &&
-          Request.isValidBrokerId(leaderAndInSyncReplicas.leader) &&
-          leaderAndInSyncReplicas.isr.size >= 1
+          Request.isValidBrokerId(partitionState.basePartitionState.leader) &&
+          partitionState.basePartitionState.isr.size >= 1
 
       case _ =>
         false
