@@ -37,7 +37,7 @@ import org.apache.kafka.clients.producer._
 import org.apache.kafka.common.TopicPartition
 import org.apache.kafka.common.errors.TopicExistsException
 import org.apache.kafka.common.network.ListenerName
-import org.apache.kafka.common.protocol.SecurityProtocol
+import org.apache.kafka.common.security.auth.SecurityProtocol
 import org.apache.kafka.common.serialization.{StringDeserializer, StringSerializer}
 import org.apache.zookeeper.server.{NIOServerCnxnFactory, ZooKeeperServer}
 import org.scalatest.concurrent.Eventually._
@@ -204,7 +204,11 @@ class KafkaTestUtils(withBrokerProps: Map[String, Object] = Map.empty) extends L
 
   /** Add new paritions to a Kafka topic */
   def addPartitions(topic: String, partitions: Int): Unit = {
-    AdminUtils.addPartitions(zkUtils, topic, partitions)
+    val brokers = AdminUtils.getBrokerMetadatas(zkUtils)
+    val existingAssignment = zkUtils.getReplicaAssignmentForTopics(List(topic)).map {
+      case (topicPartition, replicas) => topicPartition.partition -> replicas
+    }
+    AdminUtils.addPartitions(zkUtils, topic, existingAssignment, brokers, partitions)
     // wait until metadata is propagated
     (0 until partitions).foreach { p =>
       waitUntilMetadataIsPropagated(topic, p)
@@ -345,7 +349,7 @@ class KafkaTestUtils(withBrokerProps: Map[String, Object] = Map.empty) extends L
       s"topic $topic still exists in log mananger")
     // ensure that topic is removed from all cleaner offsets
     assert(servers.forall(server => topicAndPartitions.forall { tp =>
-      val checkpoints = server.getLogManager().logDirs.map { logDir =>
+      val checkpoints = server.getLogManager().liveLogDirs.map { logDir =>
         new OffsetCheckpointFile(new File(logDir, "cleaner-offset-checkpoint")).read()
       }
       checkpoints.forall(checkpointsPerLogDir => !checkpointsPerLogDir.contains(tp))
@@ -379,11 +383,10 @@ class KafkaTestUtils(withBrokerProps: Map[String, Object] = Map.empty) extends L
   private def waitUntilMetadataIsPropagated(topic: String, partition: Int): Unit = {
     def isPropagated = server.apis.metadataCache.getPartitionInfo(topic, partition) match {
       case Some(partitionState) =>
-        val leaderAndInSyncReplicas = partitionState.leaderIsrAndControllerEpoch.leaderAndIsr
 
         zkUtils.getLeaderForPartition(topic, partition).isDefined &&
-          Request.isValidBrokerId(leaderAndInSyncReplicas.leader) &&
-          leaderAndInSyncReplicas.isr.size >= 1
+          Request.isValidBrokerId(partitionState.basePartitionState.leader) &&
+          partitionState.basePartitionState.isr.size >= 1
 
       case _ =>
         false
