@@ -44,6 +44,9 @@ private[spark] object CryptoStreamUtils extends Logging {
   // The prefix of IO encryption related configurations in Spark configuration.
   val SPARK_IO_ENCRYPTION_COMMONS_CONFIG_PREFIX = "spark.io.encryption.commons.config."
 
+  // CDH-61938: C5 prefix for crypto library config.
+  val C5_SPARK_CRYPTO_CONFIG_PREFIX = "spark.shuffle.crypto."
+
   /**
    * Helper method to wrap `OutputStream` with `CryptoOutputStream` for encryption.
    */
@@ -105,8 +108,21 @@ private[spark] object CryptoStreamUtils extends Logging {
   }
 
   def toCryptoConf(conf: SparkConf): Properties = {
-    CryptoUtils.toCryptoConf(SPARK_IO_ENCRYPTION_COMMONS_CONFIG_PREFIX,
-      conf.getAll.toMap.asJava.entrySet())
+    val entrySet = conf.getAll.toMap.asJava.entrySet()
+    val newConf = CryptoUtils.toCryptoConf(SPARK_IO_ENCRYPTION_COMMONS_CONFIG_PREFIX, entrySet)
+
+    if (newConf.size() != 0) {
+      newConf
+    } else {
+      // CDH-61938: if no new configuration keys are set, try to translate old ones.
+      val oldConf = CryptoUtils.toCryptoConf(C5_SPARK_CRYPTO_CONFIG_PREFIX, entrySet)
+      if (oldConf.size() != 0) {
+        logWarning("Detected deprecated crypto configuration under old prefix " +
+          s"'$C5_SPARK_CRYPTO_CONFIG_PREFIX'; please update configuration based on the " +
+          "Apache Commons Crypto documentation.")
+      }
+      oldConf
+    }
   }
 
   /**

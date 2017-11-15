@@ -726,7 +726,16 @@ private[spark] object SparkConf extends Logging {
     DRIVER_MEMORY_OVERHEAD.key -> Seq(
       AlternateConfig("spark.yarn.driver.memoryOverhead", "2.3")),
     EXECUTOR_MEMORY_OVERHEAD.key -> Seq(
-      AlternateConfig("spark.yarn.executor.memoryOverhead", "2.3"))
+      AlternateConfig("spark.yarn.executor.memoryOverhead", "2.3")),
+    // CDH-61938: translate C5-specific configuration to C6.
+    IO_ENCRYPTION_ENABLED.key -> Seq(
+      AlternateConfig("spark.shuffle.encryption.enabled", "2.0")),
+    IO_ENCRYPTION_KEY_SIZE_BITS.key -> Seq(
+      AlternateConfig("spark.shuffle.encryption.keySizeBits", "2.0")),
+    IO_ENCRYPTION_KEYGEN_ALGORITHM.key -> Seq(
+      AlternateConfig("spark.shuffle.encryption.keygen.algorithm", "2.0")),
+    IO_CRYPTO_CIPHER_TRANSFORMATION.key -> Seq(
+      AlternateConfig("spark.shuffle.crypto.cipher.transformation", "2.0"))
   )
 
   /**
