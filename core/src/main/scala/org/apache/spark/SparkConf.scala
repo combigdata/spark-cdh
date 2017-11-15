@@ -17,6 +17,7 @@
 
 package org.apache.spark
 
+import java.util.{Map => JMap}
 import java.util.concurrent.ConcurrentHashMap
 
 import scala.collection.JavaConverters._
@@ -370,7 +371,7 @@ class SparkConf(loadDefaults: Boolean) extends Cloneable with Logging with Seria
 
   /** Get a parameter as an Option */
   def getOption(key: String): Option[String] = {
-    Option(settings.get(key)).orElse(getDeprecatedConfig(key, this))
+    Option(settings.get(key)).orElse(getDeprecatedConfig(key, settings))
   }
 
   /** Get an optional value, applying variable substitution. */
@@ -645,7 +646,16 @@ private[spark] object SparkConf extends Logging {
     "spark.yarn.jars" -> Seq(
       AlternateConfig("spark.yarn.jar", "2.0")),
     "spark.yarn.access.hadoopFileSystems" -> Seq(
-      AlternateConfig("spark.yarn.access.namenodes", "2.2"))
+      AlternateConfig("spark.yarn.access.namenodes", "2.2")),
+    // CDH-61938: translate C5-specific configuration to C6.
+    IO_ENCRYPTION_ENABLED.key -> Seq(
+      AlternateConfig("spark.shuffle.encryption.enabled", "2.0")),
+    IO_ENCRYPTION_KEY_SIZE_BITS.key -> Seq(
+      AlternateConfig("spark.shuffle.encryption.keySizeBits", "2.0")),
+    IO_ENCRYPTION_KEYGEN_ALGORITHM.key -> Seq(
+      AlternateConfig("spark.shuffle.encryption.keygen.algorithm", "2.0")),
+    IO_CRYPTO_CIPHER_TRANSFORMATION.key -> Seq(
+      AlternateConfig("spark.shuffle.crypto.cipher.transformation", "2.0"))
   )
 
   /**
@@ -685,9 +695,9 @@ private[spark] object SparkConf extends Logging {
    * Looks for available deprecated keys for the given config option, and return the first
    * value available.
    */
-  def getDeprecatedConfig(key: String, conf: SparkConf): Option[String] = {
+  def getDeprecatedConfig(key: String, conf: JMap[String, String]): Option[String] = {
     configsWithAlternatives.get(key).flatMap { alts =>
-      alts.collectFirst { case alt if conf.contains(alt.key) =>
+      alts.collectFirst { case alt if conf.containsKey(alt.key) =>
         val value = conf.get(alt.key)
         if (alt.translation != null) alt.translation(value) else value
       }

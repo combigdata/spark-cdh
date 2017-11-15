@@ -163,6 +163,33 @@ class CryptoStreamUtilsSuite extends SparkFunSuite {
     }
   }
 
+  test("CDH-61938: C5 configuration translation") {
+    val oldConf = new SparkConf(false)
+      .set("spark.shuffle.encryption.enabled", "true")
+      .set("spark.shuffle.encryption.keySizeBits", "256")
+      .set("spark.shuffle.encryption.keygen.algorithm", "FooBar")
+      .set("spark.shuffle.crypto.cipher.transformation", "BarFoo")
+      .set("spark.shuffle.crypto.some.conf", "SomeValue")
+
+    assert(oldConf.get(IO_ENCRYPTION_ENABLED))
+    assert(oldConf.get(IO_ENCRYPTION_KEY_SIZE_BITS) === 256)
+    assert(oldConf.get(IO_ENCRYPTION_KEYGEN_ALGORITHM) === "FooBar")
+    assert(oldConf.get(IO_CRYPTO_CIPHER_TRANSFORMATION) === "BarFoo")
+
+    val translated = toCryptoConf(oldConf)
+    assert(translated.get(CryptoUtils.COMMONS_CRYPTO_CONFIG_PREFIX + "some.conf") === "SomeValue")
+
+    val mixedConf = new SparkConf(false)
+      .set(SPARK_IO_ENCRYPTION_COMMONS_CONFIG_PREFIX + "some.conf", "Value1")
+      .set(C5_SPARK_CRYPTO_CONFIG_PREFIX + "some.conf", "Value2")
+      .set(C5_SPARK_CRYPTO_CONFIG_PREFIX + "other.conf", "Value3")
+
+    val mixedTranslation = toCryptoConf(mixedConf)
+    assert(mixedTranslation.size() === 1)
+    assert(mixedTranslation.get(CryptoUtils.COMMONS_CRYPTO_CONFIG_PREFIX + "some.conf") ===
+      "Value1")
+  }
+
   private def createConf(extra: (String, String)*): SparkConf = {
     val conf = new SparkConf()
     extra.foreach { case (k, v) => conf.set(k, v) }
