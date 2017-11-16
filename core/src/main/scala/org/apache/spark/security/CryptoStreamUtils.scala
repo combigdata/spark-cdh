@@ -108,14 +108,19 @@ private[spark] object CryptoStreamUtils extends Logging {
   }
 
   def toCryptoConf(conf: SparkConf): Properties = {
-    val entrySet = conf.getAll.toMap.asJava.entrySet()
-    val newConf = CryptoUtils.toCryptoConf(SPARK_IO_ENCRYPTION_COMMONS_CONFIG_PREFIX, entrySet)
+    val entrySet = conf.getAll
+    val jEntrySet = entrySet.toMap.asJava.entrySet()
+    val newConf = CryptoUtils.toCryptoConf(SPARK_IO_ENCRYPTION_COMMONS_CONFIG_PREFIX, jEntrySet)
 
     if (newConf.size() != 0) {
+      if (entrySet.exists { case (k, _) => k.startsWith(C5_SPARK_CRYPTO_CONFIG_PREFIX) }) {
+        logWarning("Ignoring deprecated crypto configuration under old prefix " +
+          s"'$C5_SPARK_CRYPTO_CONFIG_PREFIX', since new configuration was detected.")
+      }
       newConf
     } else {
       // CDH-61938: if no new configuration keys are set, try to translate old ones.
-      val oldConf = CryptoUtils.toCryptoConf(C5_SPARK_CRYPTO_CONFIG_PREFIX, entrySet)
+      val oldConf = CryptoUtils.toCryptoConf(C5_SPARK_CRYPTO_CONFIG_PREFIX, jEntrySet)
       if (oldConf.size() != 0) {
         logWarning("Detected deprecated crypto configuration under old prefix " +
           s"'$C5_SPARK_CRYPTO_CONFIG_PREFIX'; please update configuration based on the " +
