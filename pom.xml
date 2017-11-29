@@ -653,6 +653,17 @@
         <artifactId>jackson-module-jaxb-annotations</artifactId>
         <version>${fasterxml.jackson.version}</version>
       </dependency>
+      <!-- CDH-62099. Include extra artifacts pulled in transitively by Kafka. -->
+      <dependency>
+        <groupId>com.fasterxml.jackson.jaxrs</groupId>
+        <artifactId>jackson-jaxrs-base</artifactId>
+        <version>${fasterxml.jackson.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>com.fasterxml.jackson.jaxrs</groupId>
+        <artifactId>jackson-jaxrs-json-provider</artifactId>
+        <version>${fasterxml.jackson.version}</version>
+      </dependency>
       <dependency>
         <groupId>org.glassfish.jersey.core</groupId>
         <artifactId>jersey-server</artifactId>
