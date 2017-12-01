@@ -1035,6 +1035,11 @@ class JsonSuite extends QueryTest with SharedSQLContext with TestJsonData {
   }
 
   test("Corrupt records: FAILFAST mode") {
+    // Jackson 2.9.2 doesn't seem to consistently throw the same exception here.
+    def checkExceptionMessage(msg: String): Unit = {
+      assert(msg.contains("JsonParseException") || msg.contains("JsonEOFException"))
+    }
+
     val schema = StructType(
         StructField("a", StringType, true) :: Nil)
     // `FAILFAST` mode should throw an exception for corrupt records.
@@ -1043,7 +1048,7 @@ class JsonSuite extends QueryTest with SharedSQLContext with TestJsonData {
         .option("mode", "FAILFAST")
         .json(corruptRecords)
     }
-    assert(exceptionOne.getMessage.contains("JsonParseException"))
+    checkExceptionMessage(exceptionOne.getMessage())
 
     val exceptionTwo = intercept[SparkException] {
       spark.read
@@ -1052,7 +1057,7 @@ class JsonSuite extends QueryTest with SharedSQLContext with TestJsonData {
         .json(corruptRecords)
         .collect()
     }
-    assert(exceptionTwo.getMessage.contains("JsonParseException"))
+    checkExceptionMessage(exceptionTwo.getMessage())
   }
 
   test("Corrupt records: DROPMALFORMED mode") {

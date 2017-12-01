@@ -81,12 +81,10 @@
       <!--
         Netty explicitly added in test as it has been excluded from
         Flume dependency (to avoid runtime problems when running with
-        Spark) but unit tests need it. Version of Netty on which
-        Flume 1.4.0 depends on is "3.4.0.Final" .
+        Spark) but unit tests need it.
       -->
       <groupId>io.netty</groupId>
       <artifactId>netty</artifactId>
-      <version>3.4.0.Final</version>
       <scope>test</scope>
     </dependency>
     <dependency>

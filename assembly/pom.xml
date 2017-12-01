@@ -104,6 +104,8 @@
       <groupId>com.google.guava</groupId>
       <artifactId>guava</artifactId>
       <scope>${hadoop.deps.scope}</scope>
+      <!-- Match CDH version so that Spark packages the version used by the rest of CDH. -->
+      <version>${cdh.guava.version}</version>
     </dependency>
     <dependency>
       <groupId>com.databricks</groupId>
