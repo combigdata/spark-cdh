@@ -150,7 +150,8 @@
       "externalLink" : {
         "name" : "history_server_web_ui",
         "label" : "History Server Web UI",
-        "url" : "http://${host}:${history_server_web_port}"
+        "url" : "http://${host}:${history_server_web_port}",
+        "secureUrl" : "https://${host}:${ssl_server_port}"
       },
       "topology" : { "minInstances" : 1, "maxInstances" : 1 },
       "logging" : {
