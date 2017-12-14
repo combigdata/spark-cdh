@@ -51,8 +51,7 @@
     <dependency>
       <groupId>org.apache.kafka</groupId>
       <artifactId>kafka_${scala.binary.version}</artifactId>
-      <version>${cdh.kafka.version}</version>
-      <scope>${flume.deps.scope}</scope>
+      <version>0.9.0-kafka-2.0.2</version>
       <exclusions>
         <exclusion>
           <groupId>com.sun.jmx</groupId>
