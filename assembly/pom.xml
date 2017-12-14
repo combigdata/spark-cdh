@@ -68,16 +68,6 @@
       <groupId>org.apache.spark</groupId>
       <artifactId>spark-streaming-kafka_${scala.binary.version}</artifactId>
       <version>${project.version}</version>
-      <exclusions>
-        <!--
-          Kafka is already packaged with Flume, and on CDH all of Flume's libraries are
-          added to Spark's classpath. So avoid repackaging it.
-        -->
-        <exclusion>
-          <groupId>org.apache.kafka</groupId>
-          <artifactId>kafka_${scala.binary.version}</artifactId>
-        </exclusion>
-      </exclusions>
     </dependency>
     <dependency>
       <groupId>org.apache.spark</groupId>
