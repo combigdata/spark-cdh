@@ -584,7 +584,7 @@
       <dependency>
         <groupId>io.netty</groupId>
         <artifactId>netty-all</artifactId>
-        <version>4.0.43.Final</version>
+        <version>${cdh.io.netty-all.version}</version>
       </dependency>
       <dependency>
         <groupId>io.netty</groupId>
