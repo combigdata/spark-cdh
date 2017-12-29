@@ -206,7 +206,11 @@ class ExecutorAllocationManagerSuite
 
     val task2Info = createTaskInfo(1, 0, "executor-1")
     sc.listenerBus.postToAll(SparkListenerTaskStart(2, 0, task2Info))
+
+    task1Info.markSuccessful(System.currentTimeMillis())
     sc.listenerBus.postToAll(SparkListenerTaskEnd(2, 0, null, Success, task1Info, null))
+
+    task2Info.markSuccessful(System.currentTimeMillis())
     sc.listenerBus.postToAll(SparkListenerTaskEnd(2, 0, null, Success, task2Info, null))
 
     assert(adjustRequestedExecutors(manager) === -1)
@@ -906,6 +910,9 @@ class ExecutorAllocationManagerSuite
         s"${sustainedSchedulerBacklogTimeout.toString}s")
       .set("spark.dynamicAllocation.executorIdleTimeout", s"${executorIdleTimeout.toString}s")
       .set("spark.dynamicAllocation.testing", "true")
+      // SPARK-22864: effectively disable the allocation schedule by setting the period to a
+      // really long value.
+      .set(TESTING_SCHEDULE_INTERVAL_KEY, "10000")
     val sc = new SparkContext(conf)
     contexts += sc
     sc
