@@ -114,8 +114,8 @@ private class AsyncEventQueue(val name: String, conf: SparkConf)
       throw new IllegalStateException(s"Attempted to stop $name that has not yet started!")
     }
     if (stopped.compareAndSet(false, true)) {
-      eventQueue.put(POISON_PILL)
       eventCount.incrementAndGet()
+      eventQueue.put(POISON_PILL)
     }
     dispatchThread.join()
   }
