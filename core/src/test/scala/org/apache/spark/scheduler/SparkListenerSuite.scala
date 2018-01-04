@@ -56,22 +56,25 @@ class SparkListenerSuite extends SparkFunSuite with LocalSparkContext with Match
 
   test("basic creation and shutdown of LiveListenerBus") {
     val conf = new SparkConf()
-    sc = new SparkContext("local", "SparkListenerSuite", conf)
     val counter = new BasicJobCounter
     val bus = new LiveListenerBus(conf)
-    bus.addToSharedQueue(counter)
 
     // Post five events:
     (1 to 5).foreach { _ => bus.post(SparkListenerJobEnd(0, jobCompletionTime, JobSucceeded)) }
 
     // Five messages should be marked as received and queued, but no messages should be posted to
     // listeners yet because the the listener bus hasn't been started.
+    // Add the counter to the bus after messages have been queued for later delivery.
+    bus.addToSharedQueue(counter)
     assert(counter.count === 0)
 
     // Starting listener bus should flush all buffered events
     bus.start(mockSparkContext)
     bus.waitUntilEmpty(WAIT_TIMEOUT_MILLIS)
     assert(counter.count === 5)
+
+    // After the bus is started, there should be no more queued events.
+    assert(bus.queuedEvents === null)
 
     // After listener bus has stopped, posting events should not increment counter
     bus.stop()
