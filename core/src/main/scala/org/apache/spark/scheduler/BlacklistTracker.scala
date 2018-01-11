@@ -332,7 +332,7 @@ private[scheduler] object BlacklistTracker extends Logging {
    * order:
    * 1. Is it specifically enabled or disabled?
    * 2. Is it enabled via the legacy timeout conf?
-   * 3. Default is off
+   * 3. If local mode, the default is false.  Else, the default is true. (CDH-43331)
    */
   def isBlacklistEnabled(conf: SparkConf): Boolean = {
     conf.get(config.BLACKLIST_ENABLED) match {
@@ -342,7 +342,7 @@ private[scheduler] object BlacklistTracker extends Logging {
         // if they've got a non-zero setting for the legacy conf, always enable the blacklist,
         // otherwise, use the default.
         val legacyKey = config.BLACKLIST_LEGACY_TIMEOUT_CONF.key
-        conf.get(config.BLACKLIST_LEGACY_TIMEOUT_CONF).exists { legacyTimeout =>
+        conf.get(config.BLACKLIST_LEGACY_TIMEOUT_CONF).map { legacyTimeout =>
           if (legacyTimeout == 0) {
             logWarning(s"Turning off blacklisting due to legacy configuration: $legacyKey == 0")
             false
@@ -350,7 +350,7 @@ private[scheduler] object BlacklistTracker extends Logging {
             logWarning(s"Turning on blacklisting due to legacy configuration: $legacyKey > 0")
             true
           }
-        }
+        }.getOrElse(!Utils.isLocalMaster(conf))
     }
   }
 

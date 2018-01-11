@@ -404,8 +404,12 @@ class BlacklistTrackerSuite extends SparkFunSuite with BeforeAndAfterEach with M
   }
 
   test("blacklist still respects legacy configs") {
-    val conf = new SparkConf().setMaster("local")
+    val conf = new SparkConf().setMaster("yarn")
+    assert(BlacklistTracker.isBlacklistEnabled(conf))
+    // if you explicitly set the legacy conf to 0, that would disable blacklisting
+    conf.set(config.BLACKLIST_LEGACY_TIMEOUT_CONF, 0L)
     assert(!BlacklistTracker.isBlacklistEnabled(conf))
+    // make it non-zero, its re-enabled
     conf.set(config.BLACKLIST_LEGACY_TIMEOUT_CONF, 5000L)
     assert(BlacklistTracker.isBlacklistEnabled(conf))
     assert(5000 === BlacklistTracker.getBlacklistTimeout(conf))
@@ -413,13 +417,14 @@ class BlacklistTrackerSuite extends SparkFunSuite with BeforeAndAfterEach with M
     conf.set(config.BLACKLIST_TIMEOUT_CONF, 1000L)
     assert(1000 === BlacklistTracker.getBlacklistTimeout(conf))
 
-    // if you explicitly set the legacy conf to 0, that also would disable blacklisting
-    conf.set(config.BLACKLIST_LEGACY_TIMEOUT_CONF, 0L)
+    // no matter what the legacy timeout value is, if the new conf is explicitly set to false, it is
+    // turned off
+    conf.set(config.BLACKLIST_ENABLED, false)
     assert(!BlacklistTracker.isBlacklistEnabled(conf))
-    // but again, the new conf takes precedence
-    conf.set(config.BLACKLIST_ENABLED, true)
-    assert(BlacklistTracker.isBlacklistEnabled(conf))
-    assert(1000 === BlacklistTracker.getBlacklistTimeout(conf))
+
+    // when running locally, default blacklist to off
+    val localConf = new SparkConf().setMaster("local")
+    assert(!BlacklistTracker.isBlacklistEnabled(localConf))
   }
 
   test("check blacklist configuration invariants") {

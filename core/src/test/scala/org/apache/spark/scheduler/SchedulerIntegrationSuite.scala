@@ -33,7 +33,7 @@ import org.scalatest.time.SpanSugar._
 
 import org.apache.spark._
 import org.apache.spark.TaskState._
-import org.apache.spark.internal.Logging
+import org.apache.spark.internal.{config, Logging}
 import org.apache.spark.rdd.RDD
 import org.apache.spark.util.{CallSite, ThreadUtils, Utils}
 
@@ -73,6 +73,9 @@ abstract class SchedulerIntegrationSuite[T <: MockBackend: ClassTag] extends Spa
     conf.setAppName(this.getClass().getSimpleName())
     val backendClassName = implicitly[ClassTag[T]].runtimeClass.getName()
     conf.setMaster(s"mock[${backendClassName}]")
+    if (!conf.contains(config.BLACKLIST_ENABLED)) {
+      conf.set(config.BLACKLIST_ENABLED, false)
+    }
     sc = new SparkContext(conf)
     backend = sc.schedulerBackend.asInstanceOf[T]
     taskScheduler = sc.taskScheduler.asInstanceOf[TestTaskScheduler]
