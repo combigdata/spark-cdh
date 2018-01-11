@@ -38,6 +38,14 @@ class DistributedSuite extends SparkFunSuite with Matchers with LocalSparkContex
 
   val clusterUrl = "local-cluster[2,1,1024]"
 
+  def testContext(): SparkContext = {
+    val conf = new SparkConf()
+      .setMaster(clusterUrl)
+      .setAppName("test")
+      .set(config.BLACKLIST_ENABLED, false)
+    new SparkContext(conf)
+  }
+
   test("task throws not serializable exception") {
     // Ensures that executors do not crash when an exn is not serializable. If executors crash,
     // this test will hang. Correct behavior is that executors don't crash but fail tasks
@@ -114,7 +122,7 @@ class DistributedSuite extends SparkFunSuite with Matchers with LocalSparkContex
   }
 
   test("repeatedly failing task") {
-    sc = new SparkContext(clusterUrl, "test")
+    sc = testContext()
     val thrown = intercept[SparkException] {
       // scalastyle:off println
       sc.parallelize(1 to 10, 10).foreach(x => println(x / 0))
@@ -129,7 +137,7 @@ class DistributedSuite extends SparkFunSuite with Matchers with LocalSparkContex
     // than hanging due to retrying the failed task infinitely many times (eventually the
     // standalone scheduler will remove the application, causing the job to hang waiting to
     // reconnect to the master).
-    sc = new SparkContext(clusterUrl, "test")
+    sc = testContext()
     failAfter(Span(100000, Millis)) {
       val thrown = intercept[SparkException] {
         // One of the tasks always fails.
@@ -143,7 +151,7 @@ class DistributedSuite extends SparkFunSuite with Matchers with LocalSparkContex
   test("repeatedly failing task that crashes JVM with a zero exit code (SPARK-16925)") {
     // Ensures that if a task which causes the JVM to exit with a zero exit code will cause the
     // Spark job to eventually fail.
-    sc = new SparkContext(clusterUrl, "test")
+    sc = testContext()
     failAfter(Span(100000, Millis)) {
       val thrown = intercept[SparkException] {
         sc.parallelize(1 to 1, 1).foreachPartition { _ => System.exit(0) }
