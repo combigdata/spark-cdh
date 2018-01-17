@@ -392,41 +392,31 @@ While those functions are designed for DataFrames, Spark SQL also has type-safe 
 Moreover, users are not limited to the predefined aggregate functions and can create their own.
 
 ### Untyped User-Defined Aggregate Functions
-
-<div class="codetabs">
-
-<div data-lang="scala"  markdown="1">
-
 Users have to extend the [UserDefinedAggregateFunction](api/scala/index.html#org.apache.spark.sql.expressions.UserDefinedAggregateFunction)
 abstract class to implement a custom untyped aggregate function. For example, a user-defined average
 can look like:
 
+<div class="codetabs">
+<div data-lang="scala"  markdown="1">
 {% include_example untyped_custom_aggregation scala/org/apache/spark/examples/sql/UserDefinedUntypedAggregation.scala%}
 </div>
-
 <div data-lang="java"  markdown="1">
-
 {% include_example untyped_custom_aggregation java/org/apache/spark/examples/sql/JavaUserDefinedUntypedAggregation.java%}
 </div>
-
 </div>
 
 ### Type-Safe User-Defined Aggregate Functions
 
 User-defined aggregations for strongly typed Datasets revolve around the [Aggregator](api/scala/index.html#org.apache.spark.sql.expressions.Aggregator) abstract class.
 For example, a type-safe user-defined average can look like:
+
 <div class="codetabs">
-
 <div data-lang="scala"  markdown="1">
-
 {% include_example typed_custom_aggregation scala/org/apache/spark/examples/sql/UserDefinedTypedAggregation.scala%}
 </div>
-
 <div data-lang="java"  markdown="1">
-
 {% include_example typed_custom_aggregation java/org/apache/spark/examples/sql/JavaUserDefinedTypedAggregation.java%}
 </div>
-
 </div>
 
 # Data Sources
@@ -743,8 +733,9 @@ SELECT * FROM parquetTable
 
 Table partitioning is a common optimization approach used in systems like Hive. In a partitioned
 table, data are usually stored in different directories, with partitioning column values encoded in
-the path of each partition directory. The Parquet data source is now able to discover and infer
-partitioning information automatically. For example, we can store all our previously used
+the path of each partition directory. All built-in file sources (including Text/CSV/JSON/ORC/Parquet)
+are able to discover and infer partitioning information automatically.
+For example, we can store all our previously used
 population data into a partitioned table using the following directory structure, with two extra
 columns, `gender` and `country` as partitioning columns:
 
@@ -787,10 +778,11 @@ root
 {% endhighlight %}
 
 Notice that the data types of the partitioning columns are automatically inferred. Currently,
-numeric data types and string type are supported. Sometimes users may not want to automatically
-infer the data types of the partitioning columns. For these use cases, the automatic type inference
-can be configured by `spark.sql.sources.partitionColumnTypeInference.enabled`, which is default to
-`true`. When type inference is disabled, string type will be used for the partitioning columns.
+numeric data types, date, timestamp and string type are supported. Sometimes users may not want
+to automatically infer the data types of the partitioning columns. For these use cases, the
+automatic type inference can be configured by
+`spark.sql.sources.partitionColumnTypeInference.enabled`, which is default to `true`. When type
+inference is disabled, string type will be used for the partitioning columns.
 
 Starting from Spark 1.6.0, partition discovery only finds partitions under the given paths
 by default. For the above example, if users pass `path/to/table/gender=male` to either

@@ -126,12 +126,12 @@ object QueryAnalysis extends Logging {
     case CreateDataSourceTableAsSelectCommand(table, _, query) =>
       getOutputInfo(table, query, spark)
 
-    case InsertIntoHadoopFsRelationCommand(path, _, _, parts, _, format, _, query, _, table, _) =>
+    case InsertIntoHadoopFsRelationCommand(path, _, _, parts, _, fmt, _, query, _, table, _, _) =>
       val rel = table
         .flatMap { t => getRelationInfo(t.identifier, spark, query.output) }
         .getOrElse {
           val dsType = getDataSourceType(path.toUri())
-          val dsFormat = table.map(getDataSourceFormat).getOrElse(getDataSourceFormat(format))
+          val dsFormat = table.map(getDataSourceFormat).getOrElse(getDataSourceFormat(fmt))
           SQLRelationInfo(path.toString(), query.output, dsType, dsFormat)
         }
       Some((rel, Seq(query)))
@@ -139,7 +139,7 @@ object QueryAnalysis extends Logging {
     case CreateHiveTableAsSelectCommand(table, query, _) =>
       getOutputInfo(table, query, spark)
 
-    case InsertIntoHiveTable(table, _, query, _, _) =>
+    case InsertIntoHiveTable(table, _, query, _, _, _) =>
       getOutputInfo(table, query, spark)
 
     case _ => None
@@ -251,7 +251,7 @@ object QueryAnalysis extends Logging {
           }
         }
 
-      case CatalogRelation(table, cols, parts) =>
+      case HiveTableRelation(table, cols, parts) =>
         getRelationInfo(table.identifier, spark, cols ++ parts).toSeq
 
       case _ =>

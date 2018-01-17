@@ -32,7 +32,7 @@ import org.apache.hadoop.hive.ql.ErrorMsg
 import org.apache.hadoop.hive.ql.plan.TableDesc
 
 import org.apache.spark.internal.io.FileCommitProtocol
-import org.apache.spark.sql.{AnalysisException, Row, SparkSession}
+import org.apache.spark.sql.{AnalysisException, Dataset, Row, SparkSession}
 import org.apache.spark.sql.catalyst.catalog.CatalogTable
 import org.apache.spark.sql.catalyst.expressions.Attribute
 import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
@@ -80,7 +80,8 @@ case class InsertIntoHiveTable(
     partition: Map[String, Option[String]],
     query: LogicalPlan,
     overwrite: Boolean,
-    ifPartitionNotExists: Boolean) extends RunnableCommand {
+    ifPartitionNotExists: Boolean,
+    outputColumns: Seq[Attribute]) extends RunnableCommand {
 
   override def children: Seq[LogicalPlan] = query :: Nil
 
@@ -326,14 +327,21 @@ case class InsertIntoHiveTable(
       outputPath = tmpLocation.toString,
       isAppend = false)
 
+    val partitionAttributes = partitionColumnNames.takeRight(numDynamicPartitions).map { name =>
+      query.resolve(name :: Nil, sparkSession.sessionState.analyzer.resolver).getOrElse {
+        throw new AnalysisException(
+          s"Unable to resolve $name given [${query.output.map(_.name).mkString(", ")}]")
+      }.asInstanceOf[Attribute]
+    }
+
     FileFormatWriter.write(
       sparkSession = sparkSession,
       plan = children.head,
       fileFormat = new HiveFileFormat(fileSinkConf),
       committer = committer,
-      outputSpec = FileFormatWriter.OutputSpec(tmpLocation.toString, Map.empty),
+      outputSpec = FileFormatWriter.OutputSpec(tmpLocation.toString, Map.empty, outputColumns),
       hadoopConf = hadoopConf,
-      partitionColumnNames = partitionColumnNames.takeRight(numDynamicPartitions),
+      partitionColumns = partitionAttributes,
       bucketSpec = None,
       refreshFunction = _ => (),
       options = Map.empty)
@@ -405,7 +413,13 @@ case class InsertIntoHiveTable(
     // Attempt to delete the staging directory and the inclusive files. If failed, the files are
     // expected to be dropped at the normal termination of VM since deleteOnExit is used.
     try {
-      createdTempDir.foreach { path => path.getFileSystem(hadoopConf).delete(path, true) }
+      createdTempDir.foreach { path =>
+        val fs = path.getFileSystem(hadoopConf)
+        if (fs.delete(path, true)) {
+          // If we successfully delete the staging directory, remove it from FileSystem's cache.
+          fs.cancelDeleteOnExit(path)
+        }
+      }
     } catch {
       case NonFatal(e) =>
         logWarning(s"Unable to delete staging directory: $stagingDir.\n" + e)

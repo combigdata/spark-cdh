@@ -280,9 +280,15 @@ class Analyzer(
      *  We need to get all of its subsets for a given GROUPBY expression, the subsets are
      *  represented as sequence of expressions.
      */
-    def cubeExprs(exprs: Seq[Expression]): Seq[Seq[Expression]] = exprs.toList match {
+    def cubeExprs(exprs: Seq[Expression]): Seq[Seq[Expression]] = {
+      // `cubeExprs0` is recursive and returns a lazy Stream. Here we call `toIndexedSeq` to
+      // materialize it and avoid serialization problems later on.
+      cubeExprs0(exprs).toIndexedSeq
+    }
+
+    def cubeExprs0(exprs: Seq[Expression]): Seq[Seq[Expression]] = exprs.toList match {
       case x :: xs =>
-        val initial = cubeExprs(xs)
+        val initial = cubeExprs0(xs)
         initial.map(x +: _) ++ initial
       case Nil =>
         Seq(Seq.empty)
@@ -315,7 +321,7 @@ class Analyzer(
                 s"grouping columns (${groupByExprs.mkString(",")})")
           }
         case e @ Grouping(col: Expression) =>
-          val idx = groupByExprs.indexOf(col)
+          val idx = groupByExprs.indexWhere(_.semanticEquals(col))
           if (idx >= 0) {
             Alias(Cast(BitwiseAnd(ShiftRight(gid, Literal(groupByExprs.length - 1 - idx)),
               Literal(1)), ByteType), toPrettySQL(e))()
@@ -848,7 +854,12 @@ class Analyzer(
         q.transformExpressionsUp  {
           case u @ UnresolvedAttribute(nameParts) =>
             // Leave unchanged if resolution fails. Hopefully will be resolved next round.
-            val result = withPosition(u) { q.resolveChildren(nameParts, resolver).getOrElse(u) }
+            val result =
+              withPosition(u) {
+                q.resolveChildren(nameParts, resolver)
+                  .orElse(resolveLiteralFunction(nameParts, u, q))
+                  .getOrElse(u)
+              }
             logDebug(s"Resolving $u to $result")
             result
           case UnresolvedExtractValue(child, fieldExpr) if child.resolved =>
@@ -926,6 +937,30 @@ class Analyzer(
     exprs.exists(_.find(_.isInstanceOf[UnresolvedDeserializer]).isDefined)
   }
 
+  /**
+   * Literal functions do not require the user to specify braces when calling them
+   * When an attributes is not resolvable, we try to resolve it as a literal function.
+   */
+  private def resolveLiteralFunction(
+      nameParts: Seq[String],
+      attribute: UnresolvedAttribute,
+      plan: LogicalPlan): Option[Expression] = {
+    if (nameParts.length != 1) return None
+    val isNamedExpression = plan match {
+      case Aggregate(_, aggregateExpressions, _) => aggregateExpressions.contains(attribute)
+      case Project(projectList, _) => projectList.contains(attribute)
+      case Window(windowExpressions, _, _, _) => windowExpressions.contains(attribute)
+      case _ => false
+    }
+    val wrapper: Expression => Expression =
+      if (isNamedExpression) f => Alias(f, toPrettySQL(f))() else identity
+    // support CURRENT_DATE and CURRENT_TIMESTAMP
+    val literalFunctions = Seq(CurrentDate(), CurrentTimestamp())
+    val name = nameParts.head
+    val func = literalFunctions.find(e => resolver(e.prettyName, name))
+    func.map(wrapper)
+  }
+
   protected[sql] def resolveExpression(
       expr: Expression,
       plan: LogicalPlan,
@@ -938,7 +973,11 @@ class Analyzer(
       expr transformUp {
         case GetColumnByOrdinal(ordinal, _) => plan.output(ordinal)
         case u @ UnresolvedAttribute(nameParts) =>
-          withPosition(u) { plan.resolve(nameParts, resolver).getOrElse(u) }
+          withPosition(u) {
+            plan.resolve(nameParts, resolver)
+              .orElse(resolveLiteralFunction(nameParts, u, plan))
+              .getOrElse(u)
+          }
         case UnresolvedExtractValue(child, fieldName) if child.resolved =>
           ExtractValue(child, fieldName, resolver)
       }
@@ -2409,7 +2448,9 @@ object EliminateUnions extends Rule[LogicalPlan] {
 /**
  * Cleans up unnecessary Aliases inside the plan. Basically we only need Alias as a top level
  * expression in Project(project list) or Aggregate(aggregate expressions) or
- * Window(window expressions).
+ * Window(window expressions). Notice that if an expression has other expression parameters which
+ * are not in its `children`, e.g. `RuntimeReplaceable`, the transformation for Aliases in this
+ * rule can't work for those parameters.
  */
 object CleanupAliases extends Rule[LogicalPlan] {
   private def trimAliases(e: Expression): Expression = {

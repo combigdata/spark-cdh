@@ -483,7 +483,7 @@ class LogisticRegression @Since("1.2.0") (
   }
 
   override protected[spark] def train(dataset: Dataset[_]): LogisticRegressionModel = {
-    val handlePersistence = dataset.rdd.getStorageLevel == StorageLevel.NONE
+    val handlePersistence = dataset.storageLevel == StorageLevel.NONE
     train(dataset, handlePersistence)
   }
 
@@ -1727,11 +1727,13 @@ private class LogisticAggregator(
 
     val margins = new Array[Double](numClasses)
     features.foreachActive { (index, value) =>
-      val stdValue = value / localFeaturesStd(index)
-      var j = 0
-      while (j < numClasses) {
-        margins(j) += localCoefficients(index * numClasses + j) * stdValue
-        j += 1
+      if (localFeaturesStd(index) != 0.0 && value != 0.0) {
+        val stdValue = value / localFeaturesStd(index)
+        var j = 0
+        while (j < numClasses) {
+          margins(j) += localCoefficients(index * numClasses + j) * stdValue
+          j += 1
+        }
       }
     }
     var i = 0

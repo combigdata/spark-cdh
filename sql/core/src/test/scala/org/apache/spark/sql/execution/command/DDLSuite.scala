@@ -758,7 +758,7 @@ abstract class DDLSuite extends QueryTest with SQLTestUtils {
     val df = (1 to 2).map { i => (i, i.toString) }.toDF("age", "name")
     df.write.insertInto("students")
     spark.catalog.cacheTable("students")
-    assume(spark.table("students").collect().toSeq == df.collect().toSeq, "bad test: wrong data")
+    checkAnswer(spark.table("students"), df)
     assume(spark.catalog.isCached("students"), "bad test: table was not cached in the first place")
     sql("ALTER TABLE students RENAME TO teachers")
     sql("CREATE TABLE students (age INT, name STRING) USING parquet")
@@ -767,7 +767,7 @@ abstract class DDLSuite extends QueryTest with SQLTestUtils {
     assert(!spark.catalog.isCached("students"))
     assert(spark.catalog.isCached("teachers"))
     assert(spark.table("students").collect().isEmpty)
-    assert(spark.table("teachers").collect().toSeq == df.collect().toSeq)
+    checkAnswer(spark.table("teachers"), df)
   }
 
   test("rename temporary table - destination table with database name") {
@@ -800,10 +800,11 @@ abstract class DDLSuite extends QueryTest with SQLTestUtils {
       spark.range(10).createOrReplaceTempView("tab1")
       sql("ALTER TABLE tab1 RENAME TO tab2")
       checkAnswer(spark.table("tab2"), spark.range(10).toDF())
-      intercept[NoSuchTableException] { spark.table("tab1") }
+      val e = intercept[AnalysisException](spark.table("tab1")).getMessage
+      assert(e.contains("Table or view not found"))
       sql("ALTER VIEW tab2 RENAME TO tab1")
       checkAnswer(spark.table("tab1"), spark.range(10).toDF())
-      intercept[NoSuchTableException] { spark.table("tab2") }
+      intercept[AnalysisException] { spark.table("tab2") }
     }
   }
 

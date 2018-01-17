@@ -38,7 +38,7 @@ import org.apache.spark.sql.catalyst.expressions._
 import org.apache.spark.sql.catalyst.plans.physical.HashPartitioning
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.util.{CaseInsensitiveMap, DateTimeUtils}
-import org.apache.spark.sql.execution.{SortExec, SparkPlan, SQLExecution}
+import org.apache.spark.sql.execution.{QueryExecution, SortExec, SparkPlan, SQLExecution}
 import org.apache.spark.sql.types.StringType
 import org.apache.spark.util.{SerializableConfiguration, Utils}
 
@@ -55,7 +55,9 @@ object FileFormatWriter extends Logging {
 
   /** Describes how output files should be placed in the filesystem. */
   case class OutputSpec(
-    outputPath: String, customPartitionLocations: Map[TablePartitionSpec, String])
+    outputPath: String,
+    customPartitionLocations: Map[TablePartitionSpec, String],
+    outputColumns: Seq[Attribute])
 
   /** A shared job description for all the write tasks. */
   private class WriteJobDescription(
@@ -101,7 +103,7 @@ object FileFormatWriter extends Logging {
       committer: FileCommitProtocol,
       outputSpec: OutputSpec,
       hadoopConf: Configuration,
-      partitionColumnNames: Seq[String],
+      partitionColumns: Seq[Attribute],
       bucketSpec: Option[BucketSpec],
       refreshFunction: (Seq[TablePartitionSpec]) => Unit,
       options: Map[String, String]): Unit = {
@@ -111,18 +113,8 @@ object FileFormatWriter extends Logging {
     job.setOutputValueClass(classOf[InternalRow])
     FileOutputFormat.setOutputPath(job, new Path(outputSpec.outputPath))
 
-    val allColumns = plan.output
-    // Get the actual partition columns as attributes after matching them by name with
-    // the given columns names.
-    val partitionColumns = partitionColumnNames.map { col =>
-      val nameEquality = sparkSession.sessionState.conf.resolver
-      allColumns.find(f => nameEquality(f.name, col)).getOrElse {
-        throw new RuntimeException(
-          s"Partition column $col not found in schema ${plan.schema}")
-      }
-    }
     val partitionSet = AttributeSet(partitionColumns)
-    val dataColumns = allColumns.filterNot(partitionSet.contains)
+    val dataColumns = outputSpec.outputColumns.filterNot(partitionSet.contains)
 
     val bucketIdExpression = bucketSpec.map { spec =>
       val bucketColumns = spec.bucketColumnNames.map(c => dataColumns.find(_.name == c).get)
@@ -145,7 +137,7 @@ object FileFormatWriter extends Logging {
       uuid = UUID.randomUUID().toString,
       serializableHadoopConf = new SerializableConfiguration(job.getConfiguration),
       outputWriterFactory = outputWriterFactory,
-      allColumns = allColumns,
+      allColumns = outputSpec.outputColumns,
       dataColumns = dataColumns,
       partitionColumns = partitionColumns,
       bucketIdExpression = bucketIdExpression,
@@ -180,8 +172,11 @@ object FileFormatWriter extends Logging {
       val rdd = if (orderingMatched) {
         plan.execute()
       } else {
+        val orderingExpr = requiredOrdering
+          .map(SortOrder(_, Ascending))
+          .map(BindReferences.bindReference(_, outputSpec.outputColumns))
         SortExec(
-          requiredOrdering.map(SortOrder(_, Ascending)),
+          orderingExpr,
           global = false,
           child = plan).execute()
       }

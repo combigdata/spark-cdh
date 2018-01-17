@@ -111,14 +111,24 @@ class FileStreamSink(
         case _ =>  // Do nothing
       }
 
+      // Get the actual partition columns as attributes after matching them by name with
+      // the given columns names.
+      val partitionColumns: Seq[Attribute] = partitionColumnNames.map { col =>
+        val nameEquality = data.sparkSession.sessionState.conf.resolver
+        data.logicalPlan.output.find(f => nameEquality(f.name, col)).getOrElse {
+          throw new RuntimeException(s"Partition column $col not found in schema ${data.schema}")
+        }
+      }
+      val qe = data.queryExecution
+
       FileFormatWriter.write(
         sparkSession = sparkSession,
-        plan = data.queryExecution.executedPlan,
+        plan = qe.executedPlan,
         fileFormat = fileFormat,
         committer = committer,
-        outputSpec = FileFormatWriter.OutputSpec(path, Map.empty),
+        outputSpec = FileFormatWriter.OutputSpec(path, Map.empty, qe.analyzed.output),
         hadoopConf = hadoopConf,
-        partitionColumnNames = partitionColumnNames,
+        partitionColumns = partitionColumns,
         bucketSpec = None,
         refreshFunction = _ => (),
         options = options)

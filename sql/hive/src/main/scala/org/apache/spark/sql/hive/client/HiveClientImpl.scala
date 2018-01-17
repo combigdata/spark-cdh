@@ -47,8 +47,8 @@ import org.apache.spark.sql.catalyst.catalog.CatalogTypes.TablePartitionSpec
 import org.apache.spark.sql.catalyst.expressions.Expression
 import org.apache.spark.sql.catalyst.parser.{CatalystSqlParser, ParseException}
 import org.apache.spark.sql.execution.QueryExecutionException
-import org.apache.spark.sql.execution.command.DDLUtils
 import org.apache.spark.sql.hive.HiveExternalCatalog
+import org.apache.spark.sql.hive.HiveExternalCatalog.{DATASOURCE_SCHEMA, DATASOURCE_SCHEMA_NUMPARTS, DATASOURCE_SCHEMA_PART_PREFIX}
 import org.apache.spark.sql.hive.client.HiveClientImpl._
 import org.apache.spark.sql.types._
 import org.apache.spark.util.{CircularBuffer, Utils}
@@ -468,6 +468,33 @@ private[hive] class HiveClientImpl(
     // Do not use `table.qualifiedName` here because this may be a rename
     val qualifiedTableName = s"${table.database}.$tableName"
     shim.alterTable(client, qualifiedTableName, hiveTable)
+  }
+
+  override def alterTableDataSchema(
+      dbName: String,
+      tableName: String,
+      newDataSchema: StructType,
+      schemaProps: Map[String, String]): Unit = withHiveState {
+    val oldTable = client.getTable(dbName, tableName)
+    val hiveCols = newDataSchema.map(toHiveColumn)
+    oldTable.setFields(hiveCols.asJava)
+
+    // remove old schema table properties
+    val it = oldTable.getParameters.entrySet.iterator
+    while (it.hasNext) {
+      val entry = it.next()
+      val isSchemaProp = entry.getKey.startsWith(DATASOURCE_SCHEMA_PART_PREFIX) ||
+        entry.getKey == DATASOURCE_SCHEMA || entry.getKey == DATASOURCE_SCHEMA_NUMPARTS
+      if (isSchemaProp) {
+        it.remove()
+      }
+    }
+
+    // set new schema table properties
+    schemaProps.foreach { case (k, v) => oldTable.setProperty(k, v) }
+
+    val qualifiedTableName = s"$dbName.$tableName"
+    shim.alterTable(client, qualifiedTableName, oldTable)
   }
 
   override def createPartitions(
