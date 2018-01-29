@@ -79,7 +79,7 @@ class HiveClientSuite(version: String)
     client = init(true)
   }
 
-  test(s"getPartitionsByFilter returns all partitions when $tryDirectSqlKey=false") {
+  ignore(s"getPartitionsByFilter returns all partitions when $tryDirectSqlKey=false") {
     val client = init(false)
     val filteredPartitions = client.getPartitionsByFilter(client.getTable("default", "test"),
       Seq(attr("ds") === 20170101))
@@ -87,7 +87,7 @@ class HiveClientSuite(version: String)
     assert(filteredPartitions.size == testPartitionCount)
   }
 
-  test("getPartitionsByFilter: ds<=>20170101") {
+  ignore("getPartitionsByFilter: ds<=>20170101") {
     // Should return all partitions where <=> is not supported
     testMetastorePartitionFiltering(
       attr("ds") <=> 20170101,
@@ -96,7 +96,7 @@ class HiveClientSuite(version: String)
       "aa" :: "ab" :: "ba" :: "bb" :: Nil)
   }
 
-  test("getPartitionsByFilter: ds=20170101") {
+  ignore("getPartitionsByFilter: ds=20170101") {
     testMetastorePartitionFiltering(
       attr("ds") === 20170101,
       20170101 to 20170101,
@@ -104,7 +104,7 @@ class HiveClientSuite(version: String)
       "aa" :: "ab" :: "ba" :: "bb" :: Nil)
   }
 
-  test("getPartitionsByFilter: ds=(20170101 + 1) and h=0") {
+  ignore("getPartitionsByFilter: ds=(20170101 + 1) and h=0") {
     // Should return all partitions where h=0 because getPartitionsByFilter does not support
     // comparisons to non-literal values
     testMetastorePartitionFiltering(
@@ -114,7 +114,7 @@ class HiveClientSuite(version: String)
       "aa" :: "ab" :: "ba" :: "bb" :: Nil)
   }
 
-  test("getPartitionsByFilter: chunk='aa'") {
+  ignore("getPartitionsByFilter: chunk='aa'") {
     testMetastorePartitionFiltering(
       attr("chunk") === "aa",
       20170101 to 20170103,
@@ -122,7 +122,7 @@ class HiveClientSuite(version: String)
       "aa" :: Nil)
   }
 
-  test("getPartitionsByFilter: cast(chunk as int)=1 (not a valid partition predicate)") {
+  ignore("getPartitionsByFilter: cast(chunk as int)=1 (not a valid partition predicate)") {
     testMetastorePartitionFiltering(
       attr("chunk").cast(IntegerType) === 1,
       20170101 to 20170103,
@@ -130,7 +130,7 @@ class HiveClientSuite(version: String)
       "aa" :: "ab" :: "ba" :: "bb" :: Nil)
   }
 
-  test("getPartitionsByFilter: cast(chunk as boolean)=true (not a valid partition predicate)") {
+  ignore("getPartitionsByFilter: cast(chunk as boolean)=true (not a valid partition predicate)") {
     testMetastorePartitionFiltering(
       attr("chunk").cast(BooleanType) === true,
       20170101 to 20170103,
@@ -138,7 +138,7 @@ class HiveClientSuite(version: String)
       "aa" :: "ab" :: "ba" :: "bb" :: Nil)
   }
 
-  test("getPartitionsByFilter: 20170101=ds") {
+  ignore("getPartitionsByFilter: 20170101=ds") {
     testMetastorePartitionFiltering(
       Literal(20170101) === attr("ds"),
       20170101 to 20170101,
@@ -146,7 +146,7 @@ class HiveClientSuite(version: String)
       "aa" :: "ab" :: "ba" :: "bb" :: Nil)
   }
 
-  test("getPartitionsByFilter: ds=20170101 and h=10") {
+  ignore("getPartitionsByFilter: ds=20170101 and h=10") {
     testMetastorePartitionFiltering(
       attr("ds") === 20170101 && attr("h") === 10,
       20170101 to 20170101,
@@ -162,7 +162,7 @@ class HiveClientSuite(version: String)
       "aa" :: "ab" :: "ba" :: "bb" :: Nil)
   }
 
-  test("getPartitionsByFilter: ds=20170101 or ds=20170102") {
+  ignore("getPartitionsByFilter: ds=20170101 or ds=20170102") {
     testMetastorePartitionFiltering(
       attr("ds") === 20170101 || attr("ds") === 20170102,
       20170101 to 20170102,
@@ -170,7 +170,7 @@ class HiveClientSuite(version: String)
       "aa" :: "ab" :: "ba" :: "bb" :: Nil)
   }
 
-  test("getPartitionsByFilter: ds in (20170102, 20170103) (using IN expression)") {
+  ignore("getPartitionsByFilter: ds in (20170102, 20170103) (using IN expression)") {
     testMetastorePartitionFiltering(
       attr("ds").in(20170102, 20170103),
       20170102 to 20170103,
@@ -186,7 +186,7 @@ class HiveClientSuite(version: String)
       "aa" :: "ab" :: "ba" :: "bb" :: Nil)
   }
 
-  test("getPartitionsByFilter: ds in (20170102, 20170103) (using INSET expression)") {
+  ignore("getPartitionsByFilter: ds in (20170102, 20170103) (using INSET expression)") {
     testMetastorePartitionFiltering(
       attr("ds").in(20170102, 20170103),
       20170102 to 20170103,
@@ -209,7 +209,7 @@ class HiveClientSuite(version: String)
       })
   }
 
-  test("getPartitionsByFilter: chunk in ('ab', 'ba') (using IN expression)") {
+  ignore("getPartitionsByFilter: chunk in ('ab', 'ba') (using IN expression)") {
     testMetastorePartitionFiltering(
       attr("chunk").in("ab", "ba"),
       20170101 to 20170103,
@@ -217,7 +217,7 @@ class HiveClientSuite(version: String)
       "ab" :: "ba" :: Nil)
   }
 
-  test("getPartitionsByFilter: chunk in ('ab', 'ba') (using INSET expression)") {
+  ignore("getPartitionsByFilter: chunk in ('ab', 'ba') (using INSET expression)") {
     testMetastorePartitionFiltering(
       attr("chunk").in("ab", "ba"),
       20170101 to 20170103,
@@ -228,14 +228,14 @@ class HiveClientSuite(version: String)
       })
   }
 
-  test("getPartitionsByFilter: (ds=20170101 and h>=8) or (ds=20170102 and h<8)") {
+  ignore("getPartitionsByFilter: (ds=20170101 and h>=8) or (ds=20170102 and h<8)") {
     val day1 = (20170101 to 20170101, 8 to 23, Seq("aa", "ab", "ba", "bb"))
     val day2 = (20170102 to 20170102, 0 to 7, Seq("aa", "ab", "ba", "bb"))
     testMetastorePartitionFiltering((attr("ds") === 20170101 && attr("h") >= 8) ||
         (attr("ds") === 20170102 && attr("h") < 8), day1 :: day2 :: Nil)
   }
 
-  test("getPartitionsByFilter: (ds=20170101 and h>=8) or (ds=20170102 and h<(7+1))") {
+  ignore("getPartitionsByFilter: (ds=20170101 and h>=8) or (ds=20170102 and h<(7+1))") {
     val day1 = (20170101 to 20170101, 8 to 23, Seq("aa", "ab", "ba", "bb"))
     // Day 2 should include all hours because we can't build a filter for h<(7+1)
     val day2 = (20170102 to 20170102, 0 to 23, Seq("aa", "ab", "ba", "bb"))
@@ -243,7 +243,7 @@ class HiveClientSuite(version: String)
         (attr("ds") === 20170102 && attr("h") < (Literal(7) + 1)), day1 :: day2 :: Nil)
   }
 
-  test("getPartitionsByFilter: " +
+  ignore("getPartitionsByFilter: " +
       "chunk in ('ab', 'ba') and ((ds=20170101 and h>=8) or (ds=20170102 and h<8))") {
     val day1 = (20170101 to 20170101, 8 to 23, Seq("ab", "ba"))
     val day2 = (20170102 to 20170102, 0 to 7, Seq("ab", "ba"))
