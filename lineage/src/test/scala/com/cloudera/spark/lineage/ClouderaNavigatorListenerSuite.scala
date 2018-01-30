@@ -19,8 +19,10 @@ package com.cloudera.spark.lineage
 
 import java.io.{File, FileNotFoundException}
 import java.nio.file.Files
+import java.nio.file.attribute.PosixFilePermission
 import java.util.UUID
 
+import scala.collection.JavaConverters._
 import scala.io.Source
 
 import org.scalatest.BeforeAndAfter
@@ -53,7 +55,11 @@ class ClouderaNavigatorListenerSuite extends ClouderaFunSuite with BeforeAndAfte
       }
     }
 
-    assert(tmpDir.listFiles().length === 1)
+    val files = tmpDir.listFiles()
+    assert(files.length === 1)
+
+    val perms = Files.getPosixFilePermissions(files(0).toPath()).asScala
+    assert(perms === Set(PosixFilePermission.OWNER_READ, PosixFilePermission.OWNER_WRITE))
 
     val log = tmpDir.listFiles()(0)
     val lines = Source.fromFile(log, "UTF-8").getLines().toList

@@ -17,8 +17,9 @@
 
 package com.cloudera.spark.lineage
 
-import java.io.{Closeable, File, FileNotFoundException, FileOutputStream}
+import java.io.{Closeable, File, FileNotFoundException}
 import java.nio.charset.StandardCharsets.UTF_8
+import java.nio.file.{Files, Paths, StandardOpenOption}
 import java.util.concurrent.{ConcurrentHashMap, LinkedBlockingQueue}
 import java.util.concurrent.atomic.AtomicBoolean
 
@@ -51,13 +52,6 @@ private class LineageWriter private (
 
   private val queue = new LinkedBlockingQueue[LineageElementV1]()
   private val started = new AtomicBoolean(false)
-  private val outputFile = {
-    val dir = conf.get(SPARK_LINEAGE_DIR_PROPERTY, DEFAULT_SPARK_LINEAGE_DIR)
-    // Add the current time to the file since the application id may not be unique, due to
-    // multiple attempts.
-    val now = System.currentTimeMillis()
-    new File(dir, s"spark_lineage_log_${applicationId}-${now}.log")
-  }
 
   private val worker = new Thread(new Runnable() {
     override def run: Unit = {
@@ -92,7 +86,9 @@ private class LineageWriter private (
 
   private def doWrite(): Unit = {
     val mapper = createMapper()
-    val out = new FileOutputStream(outputFile, true)
+    val dir = Paths.get(conf.get(SPARK_LINEAGE_DIR_PROPERTY, DEFAULT_SPARK_LINEAGE_DIR))
+    val file = Files.createTempFile(dir, s"spark_lineage_log_$applicationId-", ".log")
+    val out = Files.newOutputStream(file, StandardOpenOption.WRITE)
 
     try {
       var next = queue.take()
