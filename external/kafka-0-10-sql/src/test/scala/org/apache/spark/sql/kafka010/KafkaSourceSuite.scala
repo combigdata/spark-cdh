@@ -25,7 +25,7 @@ import java.util.concurrent.ConcurrentLinkedQueue
 import java.util.concurrent.atomic.AtomicInteger
 
 import scala.collection.mutable
-import scala.util.Random
+import scala.util.{Random, Try}
 
 import org.apache.kafka.clients.producer.RecordMetadata
 import org.apache.kafka.common.TopicPartition
@@ -1052,6 +1052,11 @@ class KafkaSourceStressForDontFailOnDataLossSuite extends StreamTest with Shared
         throw query.exception.get
       }
     }
+
+    // KAFKA-3727 / KAFKA-3177: the consumer may get stuck if a topic is deleted
+    // during the test and not recreated, so let's not leave deleted topics before stopping.
+    // We enclose it in Try() as we don't care about failures at this point.
+    deletedTopics.foreach { topic => Try(testUtils.createTopic(topic)) }
 
     query.stop()
     // `failOnDataLoss` is `false`, we should not fail the query
