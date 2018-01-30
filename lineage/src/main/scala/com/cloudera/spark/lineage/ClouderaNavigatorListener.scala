@@ -17,18 +17,21 @@
 
 package com.cloudera.spark.lineage
 
-import java.io.{File, FileNotFoundException, FileOutputStream, OutputStreamWriter}
-import java.nio.charset.StandardCharsets
-import java.nio.file.{Files, Paths}
+import java.io.FileNotFoundException
+import java.nio.charset.StandardCharsets.UTF_8
+import java.nio.file.{Files, Path, Paths, StandardOpenOption}
+
+import scala.collection.mutable.HashMap
 
 import com.fasterxml.jackson.annotation.JsonInclude.Include
+import com.fasterxml.jackson.core.JsonGenerator
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.module.scala.DefaultScalaModule
 
 import org.apache.hadoop.hive.conf.HiveConf
 import org.apache.hadoop.hive.conf.HiveConf.ConfVars._
 
-import org.apache.spark.{Logging, SparkContext}
+import org.apache.spark.{Logging, SparkConf, SparkContext}
 import org.apache.spark.scheduler.{SparkListener, SparkListenerApplicationEnd}
 import org.apache.spark.sql.execution.QueryExecution
 import org.apache.spark.sql.query.analysis.{DataSourceType, QueryAnalysis, QueryDetails}
@@ -43,12 +46,7 @@ private[lineage] class ClouderaNavigatorListener
     with QueryExecutionListener
     with Logging {
 
-  private val mapper = new ObjectMapper()
-    .registerModule(DefaultScalaModule)
-    .setSerializationInclusion(Include.NON_NULL)
-    .setSerializationInclusion(Include.NON_EMPTY)
-  private val SPARK_LINEAGE_DIR_PROPERTY: String = "spark.lineage.log.dir"
-  private val DEFAULT_SPARK_LINEAGE_DIR: String = "/var/log/spark/lineage"
+  import ClouderaNavigatorListener._
 
   override def onFailure( funcName: String, qe: QueryExecution, exception: Exception): Unit = {}
 
@@ -61,8 +59,9 @@ private[lineage] class ClouderaNavigatorListener
     if (checkLineageEnabled(sc)) {
       val lineageElement = getNewLineageElement(sc)
       lineageElement.ended = true
-      writeToLineageFile(lineageElement, sc)
+      writeToLineageFile(lineageElement, sc.applicationId, sc.getConf)
     }
+    untrackOutputFile(sc.applicationId)
   }
 
   private def writeQueryMetadata( qe: QueryExecution, durationNs: Long): Unit = {
@@ -92,7 +91,7 @@ private[lineage] class ClouderaNavigatorListener
 
       if (lineageElement.inputs.size > 0 || lineageElement.outputs.size > 0 ||
           !lineageElement.errorCode.equals("00")) {
-        writeToLineageFile(lineageElement, sc)
+        writeToLineageFile(lineageElement, sc.applicationId, sc.getConf)
       }
     }
   }
@@ -125,6 +124,22 @@ private[lineage] class ClouderaNavigatorListener
     enabled
   }
 
+}
+
+private object ClouderaNavigatorListener {
+
+  val SPARK_LINEAGE_DIR_PROPERTY = "spark.lineage.log.dir"
+  val DEFAULT_SPARK_LINEAGE_DIR = "/var/log/spark/lineage"
+
+  private val NEW_LINE = System.lineSeparator().getBytes(UTF_8)
+  private val MAPPER = new ObjectMapper()
+    .registerModule(DefaultScalaModule)
+    .setSerializationInclusion(Include.NON_NULL)
+    .setSerializationInclusion(Include.NON_EMPTY)
+    .configure(JsonGenerator.Feature.AUTO_CLOSE_TARGET, false)
+
+  private val outputFiles = new HashMap[String, Path]()
+
   /**
    * Write the lineage element to the file, flush and close it so that navigator can see the data
    * immediately
@@ -132,20 +147,31 @@ private[lineage] class ClouderaNavigatorListener
    * @param lineageElement
    * @param sc
    */
-  private def writeToLineageFile(lineageElement: LineageElement, sc: SparkContext): Unit =
+  def writeToLineageFile(lineageElement: LineageElement, appId: String, conf: SparkConf): Unit = {
     synchronized {
-      val dir = sc.getConf.get(SPARK_LINEAGE_DIR_PROPERTY, DEFAULT_SPARK_LINEAGE_DIR)
-      var fileWriter: OutputStreamWriter = null
+      val file = outputFiles.getOrElseUpdate(appId, {
+        val dir = Paths.get(conf.get(SPARK_LINEAGE_DIR_PROPERTY, DEFAULT_SPARK_LINEAGE_DIR))
+        Files.createTempFile(dir, s"spark_lineage_log_$appId-", ".log")
+      })
+
+      val out = Files.newOutputStream(file, StandardOpenOption.WRITE, StandardOpenOption.APPEND)
       try {
-        fileWriter = new OutputStreamWriter(
-            new FileOutputStream(dir + File.separator + "spark_lineage_log_" + sc.applicationId
-                  + "-" + sc.startTime + ".log", true), StandardCharsets.UTF_8);
-        fileWriter.append(mapper.writeValueAsString(lineageElement) + System.lineSeparator())
+        MAPPER.writeValue(out, lineageElement)
+        out.write(NEW_LINE)
+        out.flush()
       } finally {
-        if (fileWriter != null) {
-          fileWriter.flush()
-          fileWriter.close()
-        }
+        out.close()
       }
     }
+  }
+
+  def untrackOutputFile(appId: String): Unit = synchronized {
+    outputFiles.remove(appId)
+  }
+
+  // Visible for testing.
+  def outputFile(appId: String): Option[Path] = synchronized {
+    outputFiles.get(appId)
+  }
+
 }
