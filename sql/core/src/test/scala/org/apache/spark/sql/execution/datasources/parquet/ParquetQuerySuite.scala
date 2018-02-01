@@ -235,7 +235,8 @@ class ParquetQuerySuite extends QueryTest with ParquetTest with SharedSQLContext
     }
   }
 
-  test("SPARK-10365 timestamp written and read as INT64 - TIMESTAMP_MICROS") {
+  // TIMESTAMP_MICROS is not supported because of old parquet library
+  ignore("SPARK-10365 timestamp written and read as INT64 - TIMESTAMP_MICROS") {
     val data = (1 to 10).map { i =>
       val ts = new java.sql.Timestamp(i)
       ts.setNanos(2000)
