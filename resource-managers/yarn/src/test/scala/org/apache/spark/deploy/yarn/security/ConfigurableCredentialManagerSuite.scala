@@ -115,9 +115,13 @@ class ConfigurableCredentialManagerSuite extends SparkFunSuite with Matchers wit
 
     val hbaseTokenProvider = new HBaseCredentialProvider()
     val creds = new Credentials()
-    hbaseTokenProvider.obtainCredentials(hadoopConf, sparkConf, creds)
 
-    creds.getAllTokens.size should be (0)
+    // HBaseConfiguration is brought transitively by Hive, so credentialsRequired() works;
+    // but obtainCredentials needs classes not available in the test classpath.
+    assert(hbaseTokenProvider.credentialsRequired(hadoopConf))
+    intercept[ClassNotFoundException] {
+      hbaseTokenProvider.obtainCredentials(hadoopConf, sparkConf, creds)
+    }
   }
 }
 

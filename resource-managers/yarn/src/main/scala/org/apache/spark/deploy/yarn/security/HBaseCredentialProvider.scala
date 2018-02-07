@@ -17,7 +17,8 @@
 
 package org.apache.spark.deploy.yarn.security
 
-import scala.reflect.runtime.universe
+import java.io.Closeable
+
 import scala.util.control.NonFatal
 
 import org.apache.hadoop.conf.Configuration
@@ -36,40 +37,41 @@ private[security] class HBaseCredentialProvider extends ServiceCredentialProvide
       hadoopConf: Configuration,
       sparkConf: SparkConf,
       creds: Credentials): Option[Long] = {
-    try {
-      val mirror = universe.runtimeMirror(Utils.getContextOrSparkClassLoader)
-      val obtainToken = mirror.classLoader.
-        loadClass("org.apache.hadoop.hbase.security.token.TokenUtil").
-        getMethod("obtainToken", classOf[Configuration])
+    val cl = Utils.getContextOrSparkClassLoader
+    val connClass = cl.loadClass("org.apache.hadoop.hbase.client.Connection")
+    val connFactory = cl.loadClass("org.apache.hadoop.hbase.client.ConnectionFactory")
+      .getMethod("createConnection", classOf[Configuration])
+    val obtainToken = cl.loadClass("org.apache.hadoop.hbase.security.token.TokenUtil")
+      .getMethod("obtainToken", connClass)
 
-      logDebug("Attempting to fetch HBase security token.")
-      val token = obtainToken.invoke(null, hbaseConf(hadoopConf))
-        .asInstanceOf[Token[_ <: TokenIdentifier]]
+    logDebug("Attempting to fetch HBase security token.")
+    val conn = connFactory.invoke(null, hbaseConf(hadoopConf))
+    try {
+      val token = obtainToken.invoke(null, conn).asInstanceOf[Token[_ <: TokenIdentifier]]
       logInfo(s"Get token from HBase: ${token.toString}")
       creds.addToken(token.getService, token)
-    } catch {
-      case NonFatal(e) =>
-        logDebug(s"Failed to get token from service $serviceName", e)
+    } finally {
+      conn.asInstanceOf[Closeable].close()
     }
 
     None
   }
 
   override def credentialsRequired(hadoopConf: Configuration): Boolean = {
-    hbaseConf(hadoopConf).get("hbase.security.authentication") == "kerberos"
+    try {
+      hbaseConf(hadoopConf).get("hbase.security.authentication") == "kerberos"
+    } catch {
+      case e: ClassNotFoundException =>
+        logDebug("HBase not found in class path, HBase tokens will not be fetched.", e)
+        false
+    }
   }
 
   private def hbaseConf(conf: Configuration): Configuration = {
-    try {
-      val mirror = universe.runtimeMirror(Utils.getContextOrSparkClassLoader)
-      val confCreate = mirror.classLoader.
-        loadClass("org.apache.hadoop.hbase.HBaseConfiguration").
-        getMethod("create", classOf[Configuration])
-      confCreate.invoke(null, conf).asInstanceOf[Configuration]
-    } catch {
-      case NonFatal(e) =>
-        logDebug("Fail to invoke HBaseConfiguration", e)
-        conf
-    }
+    val confCreate = Utils.getContextOrSparkClassLoader
+      .loadClass("org.apache.hadoop.hbase.HBaseConfiguration")
+      .getMethod("create", classOf[Configuration])
+    confCreate.invoke(null, conf).asInstanceOf[Configuration]
   }
+
 }
