@@ -106,9 +106,13 @@ class HadoopDelegationTokenManagerSuite extends SparkFunSuite with Matchers {
 
     val hbaseTokenProvider = new HBaseDelegationTokenProvider()
     val creds = new Credentials()
-    hbaseTokenProvider.obtainDelegationTokens(hadoopConf, sparkConf, creds)
 
-    creds.getAllTokens.size should be (0)
+    // HBaseConfiguration is brought transitively by Hive, so delegationTokensRequired() works;
+    // but obtainCredentials needs classes not available in the test classpath.
+    assert(hbaseTokenProvider.delegationTokensRequired(sparkConf, hadoopConf))
+    intercept[ClassNotFoundException] {
+      hbaseTokenProvider.obtainDelegationTokens(hadoopConf, sparkConf, creds)
+    }
   }
 
   test("SPARK-23209: obtain tokens when Hive classes are not available") {
