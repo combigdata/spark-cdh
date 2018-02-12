@@ -20,7 +20,7 @@ package org.apache.spark.sql.hive.execution
 import scala.language.existentials
 
 import org.apache.hadoop.conf.Configuration
-import org.scalatest.{BeforeAndAfterAll, BeforeAndAfterEach}
+import org.scalatest.{BeforeAndAfterAll, BeforeAndAfterEach, Ignore}
 
 import org.apache.spark.{SparkConf, SparkFunSuite}
 import org.apache.spark.launcher.SparkLauncher
@@ -38,6 +38,7 @@ import org.apache.spark.util.Utils
  * from the built-in ones.
  */
 @ExtendedHiveTest
+@Ignore
 class Hive_2_1_DDLSuite extends SparkFunSuite with TestHiveSingleton with BeforeAndAfterEach
   with BeforeAndAfterAll {
 
