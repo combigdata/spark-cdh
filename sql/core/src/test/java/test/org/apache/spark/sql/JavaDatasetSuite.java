@@ -675,6 +675,7 @@ public class JavaDatasetSuite implements Serializable {
     }
   }
 
+  @Ignore
   @Test
   public void testJavaBeanEncoder() {
     OuterScopes.addOuterScope(this);
@@ -806,6 +807,7 @@ public class JavaDatasetSuite implements Serializable {
   @Rule
   public transient ExpectedException nullabilityCheck = ExpectedException.none();
 
+  @Ignore
   @Test
   public void testRuntimeNullabilityCheck() {
     OuterScopes.addOuterScope(this);
