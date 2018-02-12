@@ -2708,6 +2708,11 @@
 
     <profile>
       <id>flume</id>
+      <activation>
+        <property>
+          <name>cdh.build</name>
+        </property>
+      </activation>
       <modules>
         <module>external/flume</module>
         <module>external/flume-sink</module>
