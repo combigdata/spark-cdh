@@ -20,13 +20,7 @@ export MAVEN_OPTS="-XX:ReservedCodeCacheSize=512m"
 
 export APACHE_MIRROR=http://mirror.infra.cloudera.com/apache
 
-# install mvn settings so dependencies come from a GBN of the latest build
-export CDH_GBN="$(curl "http://builddb.infra.cloudera.com:8080/query?product=cdh&version=6.x&user=jenkins&tag=official")"
-MVN_SETTINGS_FILE="$(mktemp)"
-function cleanup {
-  rm -f "$MVN_SETTINGS_FILE"
-}
-trap cleanup EXIT
-curl -L "http://github.mtv.cloudera.com/raw/CDH/cdh/cdh6.x/gbn-m2-settings.xml" > "$MVN_SETTINGS_FILE"
+# activate mvn-gbn wrapper
+mv "$(which mvn-gbn-wrapper)" "$(dirname "$(which mvn-gbn-wrapper)")/mvn"
 
-./build/mvn -U -s "$MVN_SETTINGS_FILE" -B -Dcdh.build=true package -fae -Dmaven.repo.local="$MVN_REPO_LOCAL"
+mvn -U -B -Dcdh.build=true package -fae -Dmaven.repo.local="$MVN_REPO_LOCAL"
