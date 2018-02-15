@@ -293,6 +293,12 @@ private[spark] object SQLConf {
       "nanoseconds field. This flag tells Spark SQL to interpret INT96 data as a timestamp to " +
       "provide compatibility with these systems.")
 
+  val PARQUET_INT96_TIMESTAMP_CONVERSION = booleanConf("spark.sql.parquet.int96TimestampConversion",
+    defaultValue = Some(false),
+    doc = "This controls whether timestamp adjustments should be applied to INT96 data when " +
+      "converting to timestamps, for data written by Impala.  This is necessary because Impala " +
+      "stores INT96 data with a different timezone offset than Hive & Spark.")
+
   val PARQUET_CACHE_METADATA = booleanConf("spark.sql.parquet.cacheMetadata",
     defaultValue = Some(true),
     doc = "Turns on caching of Parquet schema metadata. Can speed up querying of static data.")
@@ -547,6 +553,9 @@ private[sql] class SQLConf extends Serializable with CatalystConf {
 
   private[spark] def isParquetINT96AsTimestamp: Boolean = getConf(PARQUET_INT96_AS_TIMESTAMP)
 
+  private [spark] def convertParquetINT96Timestamps: Boolean =
+    getConf(PARQUET_INT96_TIMESTAMP_CONVERSION)
+
   private[spark] def writeLegacyParquetFormat: Boolean = getConf(PARQUET_WRITE_LEGACY_FORMAT)
 
   private[spark] def inMemoryPartitionPruning: Boolean = getConf(IN_MEMORY_PARTITION_PRUNING)
@@ -681,4 +690,3 @@ private[sql] class SQLConf extends Serializable with CatalystConf {
     settings.clear()
   }
 }
-

@@ -19,20 +19,27 @@ package org.apache.spark.sql.execution.datasources.parquet
 
 import java.math.{BigDecimal, BigInteger}
 import java.nio.ByteOrder
+import java.util.TimeZone
 
 import scala.collection.JavaConverters._
 import scala.collection.mutable.ArrayBuffer
 
+import org.apache.hadoop.conf.Configuration
+import org.apache.hadoop.fs.Path
 import parquet.column.Dictionary
+import parquet.format.converter.ParquetMetadataConverter.SKIP_ROW_GROUPS
+import parquet.hadoop.ParquetFileReader
 import parquet.io.api.{Binary, Converter, GroupConverter, PrimitiveConverter}
 import parquet.schema.OriginalType.{INT_32, LIST, UTF8}
 import parquet.schema.PrimitiveType.PrimitiveTypeName.{DOUBLE, INT32, INT64, BINARY, FIXED_LEN_BYTE_ARRAY}
 import parquet.schema.{GroupType, MessageType, PrimitiveType, Type}
 
 import org.apache.spark.Logging
+import org.apache.spark.rdd.SqlNewHadoopRDDState
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.expressions._
 import org.apache.spark.sql.catalyst.util.{GenericArrayData, ArrayBasedMapData, DateTimeUtils}
+import org.apache.spark.sql.SQLConf
 import org.apache.spark.sql.types._
 import org.apache.spark.unsafe.types.UTF8String
 
@@ -120,7 +127,8 @@ private[parquet] class CatalystPrimitiveConverter(val updater: ParentContainerUp
 private[parquet] class CatalystRowConverter(
     parquetType: GroupType,
     catalystType: StructType,
-    updater: ParentContainerUpdater)
+    updater: ParentContainerUpdater,
+    conf: Configuration)
   extends CatalystGroupConverter(updater) with Logging {
 
   assert(
@@ -167,6 +175,25 @@ private[parquet] class CatalystRowConverter(
 
   private val unsafeProjection = UnsafeProjection.create(catalystType)
 
+  private val enableInt96TimestampConversion: Boolean =
+    conf.getBoolean(SQLConf.PARQUET_INT96_TIMESTAMP_CONVERSION.key, false)
+
+  private def parquetFileCreatedByMr(path: String): Boolean = {
+    if (path != "") {
+      val footer = ParquetFileReader.readFooter(conf, new Path(path), SKIP_ROW_GROUPS)
+      footer.getFileMetaData().getCreatedBy().startsWith("parquet-mr")
+    } else {
+      false
+    }
+  }
+
+  private val convertTz = if (enableInt96TimestampConversion &&
+      !parquetFileCreatedByMr(SqlNewHadoopRDDState.getInputFileName().toString())) {
+    Some(TimeZone.getDefault())
+  } else {
+    None
+  }
+
   /**
    * The [[UnsafeRow]] converted from an entire Parquet record.
    */
@@ -199,6 +226,11 @@ private[parquet] class CatalystRowConverter(
       currentRow.setNullAt(i)
       i += 1
     }
+  }
+
+  private def shouldConvertTimestamps(): Boolean = {
+    // Conversion UTC->UTC is a no-op, so disable conversion if that happens to be the local TZ.
+    return convertTz.map(_ != DateTimeUtils.TimeZoneUTC).getOrElse(false)
   }
 
   /**
@@ -249,7 +281,7 @@ private[parquet] class CatalystRowConverter(
       case StringType =>
         new CatalystStringConverter(updater)
 
-      case TimestampType =>
+      case TimestampType if shouldConvertTimestamps() =>
         // TODO Implements `TIMESTAMP_MICROS` once parquet-mr has that.
         new CatalystPrimitiveConverter(updater) {
           // Converts nanosecond timestamps stored as INT96
@@ -262,7 +294,25 @@ private[parquet] class CatalystRowConverter(
             val buf = value.toByteBuffer.order(ByteOrder.LITTLE_ENDIAN)
             val timeOfDayNanos = buf.getLong
             val julianDay = buf.getInt
-            updater.setLong(DateTimeUtils.fromJulianDay(julianDay, timeOfDayNanos))
+            val rawTime = DateTimeUtils.fromJulianDay(julianDay, timeOfDayNanos)
+            updater.setLong(
+              DateTimeUtils.convertTz(rawTime, convertTz.get, DateTimeUtils.TimeZoneUTC))
+          }
+        }
+      case TimestampType =>
+        new CatalystPrimitiveConverter(updater) {
+          // Converts nanosecond timestamps stored as INT96
+          override def addBinary(value: Binary): Unit = {
+            assert(
+              value.length() == 12,
+              "Timestamps (with nanoseconds) are expected to be stored in 12-byte long binaries, " +
+                s"but got a ${value.length()}-byte binary.")
+
+            val buf = value.toByteBuffer.order(ByteOrder.LITTLE_ENDIAN)
+            val timeOfDayNanos = buf.getLong
+            val julianDay = buf.getInt
+            val rawTime = DateTimeUtils.fromJulianDay(julianDay, timeOfDayNanos)
+            updater.setLong(rawTime)
           }
         }
 
@@ -293,7 +343,7 @@ private[parquet] class CatalystRowConverter(
       case t: StructType =>
         new CatalystRowConverter(parquetType.asGroupType(), t, new ParentContainerUpdater {
           override def set(value: Any): Unit = updater.set(value.asInstanceOf[InternalRow].copy())
-        })
+        }, conf)
 
       case t =>
         throw new RuntimeException(

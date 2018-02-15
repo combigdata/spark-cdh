@@ -297,6 +297,7 @@ private[sql] class ParquetRelation(
     val parquetFilterPushDown = sqlContext.conf.parquetFilterPushDown
     val assumeBinaryIsString = sqlContext.conf.isParquetBinaryAsString
     val assumeInt96IsTimestamp = sqlContext.conf.isParquetINT96AsTimestamp
+    val convertInt96Timestamps = sqlContext.conf.convertParquetINT96Timestamps
 
     // When merging schemas is enabled and the column of the given filter does not exist,
     // Parquet emits an exception which is an issue of Parquet (PARQUET-389).
@@ -317,7 +318,8 @@ private[sql] class ParquetRelation(
         useMetadataCache,
         safeParquetFilterPushDown,
         assumeBinaryIsString,
-        assumeInt96IsTimestamp) _
+        assumeInt96IsTimestamp,
+        convertInt96Timestamps) _
 
     // Create the function to set input paths at the driver side.
     val setInputPaths =
@@ -563,7 +565,8 @@ private[sql] object ParquetRelation extends Logging {
       useMetadataCache: Boolean,
       parquetFilterPushDown: Boolean,
       assumeBinaryIsString: Boolean,
-      assumeInt96IsTimestamp: Boolean)(job: Job): Unit = {
+      assumeInt96IsTimestamp: Boolean,
+      convertInt96Timestamps: Boolean)(job: Job): Unit = {
     val conf = SparkHadoopUtil.get.getConfigurationFromJobContext(job)
     conf.set(ParquetInputFormat.READ_SUPPORT_CLASS, classOf[CatalystReadSupport].getName)
 
@@ -593,6 +596,7 @@ private[sql] object ParquetRelation extends Logging {
     // Sets flags for `CatalystSchemaConverter`
     conf.setBoolean(SQLConf.PARQUET_BINARY_AS_STRING.key, assumeBinaryIsString)
     conf.setBoolean(SQLConf.PARQUET_INT96_AS_TIMESTAMP.key, assumeInt96IsTimestamp)
+    conf.setBoolean(SQLConf.PARQUET_INT96_TIMESTAMP_CONVERSION.key, convertInt96Timestamps)
 
     overrideMinSplitSize(parquetBlockSize, conf)
   }
