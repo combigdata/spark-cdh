@@ -136,7 +136,8 @@
           "SPARK_DAEMON_MEMORY" : "${history_server_max_heapsize}",
           "ENABLE_SPNEGO" : "${history_server_spnego_enabled}",
           "YARN_PROXY_REDIRECT" : "true",
-          "KEYSTORE_PASSWORD" : "${ssl_server_keystore_password}"
+          "KEYSTORE_PASSWORD" : "${ssl_server_keystore_password}",
+          "ENABLE_LOCAL_STORAGE" : "${enable_local_storage}"
         }
       },
       "kerberosPrincipals" : [
@@ -277,6 +278,32 @@
           "default" : null,
           "type" : "string",
           "required" : "false"
+        },
+        {
+          "name" : "enable_local_storage",
+          "label" : "Use Local Storage",
+          "description" : "Whether to use local storage for caching application history data, which reduces memory usage and makes service restarts faster.",
+          "type" : "boolean",
+          "default" : false
+        },
+        {
+          "name" : "local_storage_dir",
+          "label" : "Local Storage Directory",
+          "description" : "Directory where to keep local caches of application history data.",
+          "configName" : "spark.history.store.path",
+          "default" : "/var/lib/spark2/history",
+          "type" : "path",
+          "pathType" : "localDataDir",
+          "mode" : "0700"
+        },
+        {
+          "name" : "local_storage_max_usage",
+          "label" : "Max Local Storage Size",
+          "description" : "Approximate maximum amount of data to use in local storage for caching application history data.",
+          "configName" : "spark.history.store.maxDiskUsage",
+          "type" : "long",
+          "unit" : "bytes",
+          "default" : 10737418240
         }
       ],
       "sslServer" : {
@@ -302,7 +329,9 @@
               "ssl_server_keystore_location",
               "ssl_server_protocol",
               "ssl_server_algorithms",
-              "ssl_server_port"
+              "ssl_server_port",
+              "local_storage_dir",
+              "local_storage_max_usage"
             ],
             "additionalConfigs" : [
               {
@@ -325,7 +354,20 @@
       },
       "healthAggregation" : {
         "type" : "singleton"
-      }
+      },
+      "commands" : [
+        {
+          "name" : "CleanHistoryCache",
+          "label" : "Clean History Server Cache",
+          "description" : "Remove all cached application history data from local storage.",
+          "expectedExitCodes" : [ 0 ],
+          "requiredRoleState" : "stopped",
+          "commandRunner" : {
+            "program" : "scripts/control.sh",
+            "args" : [ "clean_history_cache", "${local_storage_dir}" ]
+          }
+        }
+      ]
     }
   ],
   "gateway" : {

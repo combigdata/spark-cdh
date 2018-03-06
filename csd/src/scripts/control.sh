@@ -46,6 +46,11 @@ case $1 in
     deploy_client_config
     ;;
 
+  (clean_history_cache)
+    shift
+    clean_history_cache "$@"
+    ;;
+
   (*)
     log "Don't understand [$1]"
     exit 1
