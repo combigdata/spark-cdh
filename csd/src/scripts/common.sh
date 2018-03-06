@@ -50,6 +50,7 @@ export HADOOP_BIN=$HADOOP_HOME/bin/hadoop
 export HDFS_BIN=$HADOOP_HOME/../../bin/hdfs
 export HADOOP_CONF_DIR="$CONF_DIR/yarn-conf"
 export HIVE_CONF_DIR="$CONF_DIR/hive-conf"
+export HBASE_CONF_DIR="$CONF_DIR/hbase-conf"
 
 # If SPARK2_HOME is not set, make it the default
 DEFAULT_SPARK2_HOME=/usr/lib/spark2
@@ -133,6 +134,37 @@ function prepend_protocol {
   fi
 }
 
+# Blacklists certain jars from being added by optional Spark dependencies. The list here is mostly
+# based on what HBase adds to the classpath, and avoids adding conflicting versions of libraries
+# that Spark needs. Also avoids adding duplicate jars to the classpath since that makes the JVM open
+# the same file multiple times.
+#
+# This also explicitly blacklists the "hbase-spark" jar since the C5 version does not work with
+# Spark 2.
+function is_blacklisted {
+  local JAR="$1"
+  if [[ -f "$SPARK_HOME/jars/$JAR" ]]; then
+    return 0
+  elif [[ "$JAR" =~ ^jetty.* ]]; then
+    return 0
+  elif [[ "$JAR" =~ ^jersey.* ]]; then
+    return 0
+  elif [[ "$JAR" =~ .*servlet.* ]]; then
+    return 0
+  elif [[ "$JAR" =~ .*-tests.* ]]; then
+    return 0
+  elif [[ "$JAR" =~ ^junit-.* ]]; then
+    return 0
+  elif [[ "$JAR" =~ ^hbase-spark.* ]]; then
+    return 0
+  elif [[ "$JAR" =~ ^hbase-.*-it.* ]]; then
+    return 0
+  elif [[ "$JAR" =~ ^parquet.* ]]; then
+    return 0
+  fi
+  return 1
+}
+
 # Adds jars in classpath entry $2 to the classpath file $1, resolving symlinks so that duplicates
 # can be removed. Jars already present in Spark's distribution are also ignored. See CDH-27596.
 function add_to_classpath {
@@ -147,7 +179,7 @@ function add_to_classpath {
     for entry in $pattern; do
       entry=$(readlink -m "$entry")
       name=$(basename $entry)
-      if [ -f "$entry" ] && [ ! -f "$SPARK_HOME/$name" ] && ! grep -q "/$name\$" "$CLASSPATH_FILE"
+      if [ -f "$entry" ] && ! is_blacklisted "$name" && ! grep -q "/$name\$" "$CLASSPATH_FILE"
       then
         echo "$entry" >> "$CLASSPATH_FILE"
       fi
@@ -167,8 +199,16 @@ function prepare_spark_env {
 
   local CLASSPATH_FILE="$(dirname $SPARK_ENV)/classpath.txt"
   local CLASSPATH_FILE_TMP="${CLASSPATH_FILE}.tmp"
+  touch "$CLASSPATH_FILE_TMP"
+
   local HADOOP_CLASSPATH=$($HADOOP_BIN --config "$HADOOP_CONF_DIR" classpath)
   add_to_classpath "$CLASSPATH_FILE_TMP" "$HADOOP_CLASSPATH"
+
+  # For client configs, add HBase jars if the service dependency is configured.
+  if [ $client = 1 ] && [ -d "$HBASE_CONF_DIR" ]; then
+    local HBASE_CP="$(hbase --config $HBASE_CONF_DIR classpath)"
+    add_to_classpath "$CLASSPATH_FILE_TMP" "$HBASE_CP"
+  fi
 
   # De-duplicate the classpath when creating the target file.
   cat "$CLASSPATH_FILE_TMP" | sort | uniq > "$CLASSPATH_FILE"
@@ -230,7 +270,7 @@ function copy_client_config {
 function run_spark_class {
   local ARGS=($@)
   ARGS+=($ADDITIONAL_ARGS)
-  prepare_spark_env
+  prepare_spark_env 0
   export SPARK_DAEMON_JAVA_OPTS="$CSD_JAVA_OPTS $SPARK_DAEMON_JAVA_OPTS"
   export SPARK_JAVA_OPTS="$CSD_JAVA_OPTS $SPARK_JAVA_OPTS"
   cmd="$SPARK_HOME/bin/spark-class ${ARGS[@]}"
@@ -308,7 +348,7 @@ function start_history_server {
 function deploy_client_config {
   log "Deploying client configuration"
 
-  prepare_spark_env "client"
+  prepare_spark_env 1
 
   set_config 'spark.master' 'yarn' "$SPARK_DEFAULTS"
   set_config 'spark.submit.deployMode' "$DEPLOY_MODE" "$SPARK_DEFAULTS"
@@ -338,6 +378,11 @@ function deploy_client_config {
     catalog_impl='hive'
   fi
   set_config 'spark.sql.catalogImplementation' "$catalog_impl" "$SPARK_DEFAULTS"
+
+  # If there's an HBase configuration directory, copy its files to the Spark config dir.
+  if [ -d "$HBASE_CONF_DIR" ]; then
+    copy_client_config "$HBASE_CONF_DIR" "$HADOOP_CLIENT_CONF_DIR" "$TARGET_HADOOP_CONF_DIR"
+  fi
 
   DEFAULT_FS=$(get_default_fs "$HADOOP_CLIENT_CONF_DIR")
 
