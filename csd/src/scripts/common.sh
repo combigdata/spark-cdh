@@ -109,7 +109,7 @@ function read_property {
 
 # Replaces a configuration in the Spark config with a new value; keeps just
 # one entry for the configuration (in case the value is defined multiple times
-# because of safety valves).
+# because of safety valves). If the new value is empty, the entry is removed from the config.
 function replace_spark_conf {
   local key="$1"
   local value="$2"
@@ -119,7 +119,9 @@ function replace_spark_conf {
   chown --reference="$file" "$temp"
   chmod --reference="$file" "$temp"
   grep -v "^$key=" "$file" >> "$temp"
-  echo "$key=$value" >> "$temp"
+  if [ -n "$value" ]; then
+    echo "$key=$value" >> "$temp"
+  fi
   mv "$temp" "$file"
 }
 
@@ -337,6 +339,12 @@ function start_history_server {
   fi
   set -x
 
+  # If local storage is not configured, remove the entry from the properties file, since the
+  # mere presence of the configuration enables the feature.
+  if [ "$ENABLE_LOCAL_STORAGE" != "true" ]; then
+    replace_spark_conf "spark.history.store.path" "" "$CONF_FILE"
+  fi
+
   ARGS=(
     "org.apache.spark.deploy.history.HistoryServer"
     "--properties-file"
@@ -485,4 +493,13 @@ function deploy_client_config {
       echo "$key=\${shell.log.level}" >> "$LOG_CONFIG"
     fi
   done
+}
+
+function clean_history_cache {
+  local STORAGE_DIR="$1"
+  log "Cleaning history server cache in $STORAGE_DIR"
+
+  if [ -d "$STORAGE_DIR" ]; then
+    rm -r "$STORAGE_DIR"/*
+  fi
 }
