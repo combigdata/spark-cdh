@@ -20,6 +20,7 @@ package org.apache.spark.sql.kafka010
 import java.util.Properties
 import java.util.concurrent.atomic.AtomicInteger
 
+import org.scalatest.Ignore
 import org.scalatest.time.SpanSugar._
 import scala.collection.mutable
 import scala.util.Random
@@ -33,6 +34,7 @@ import org.apache.spark.sql.streaming.{StreamTest, Trigger}
 import org.apache.spark.sql.test.{SharedSQLContext, TestSparkSession}
 
 // Run tests in KafkaSourceSuiteBase in continuous execution mode.
+@Ignore
 class KafkaContinuousSourceSuite extends KafkaSourceSuiteBase with KafkaContinuousTest
 
 class KafkaContinuousSourceTopicDeletionSuite extends KafkaContinuousTest {
