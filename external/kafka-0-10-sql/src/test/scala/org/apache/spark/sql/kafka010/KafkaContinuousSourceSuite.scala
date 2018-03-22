@@ -24,6 +24,7 @@ import org.apache.spark.sql.execution.datasources.v2.StreamingDataSourceV2Relati
 import org.apache.spark.sql.execution.streaming.continuous.ContinuousTrigger
 import org.apache.spark.sql.streaming.Trigger
 
+@Ignore
 // Run tests in KafkaSourceSuiteBase in continuous execution mode.
 class KafkaContinuousSourceSuite extends KafkaSourceSuiteBase with KafkaContinuousTest {
   import testImplicits._
