@@ -538,6 +538,6 @@ function clean_history_cache {
   log "Cleaning history server cache in $STORAGE_DIR"
 
   if [ -d "$STORAGE_DIR" ]; then
-    rm -r "$STORAGE_DIR"/*
+    rm -rf "$STORAGE_DIR"/*
   fi
 }
