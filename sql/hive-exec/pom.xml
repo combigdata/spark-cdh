@@ -76,6 +76,12 @@
     <dependency>
       <groupId>${hive.group}</groupId>
       <artifactId>hive-shims</artifactId>
+      <exclusions>
+        <exclusion>
+          <groupId>org.mockito</groupId>
+          <artifactId>mockito-all</artifactId>
+        </exclusion>
+      </exclusions>
     </dependency>
     <dependency>
       <groupId>com.googlecode.javaewah</groupId>
