@@ -21,6 +21,7 @@ import scala.concurrent.duration._
 import scala.math.abs
 import scala.util.Random
 
+import org.scalatest.Ignore
 import org.scalatest.concurrent.Eventually
 
 import org.apache.spark.{SparkException, TaskContext}
@@ -30,6 +31,7 @@ import org.apache.spark.sql.internal.SQLConf
 import org.apache.spark.sql.test.SharedSQLContext
 
 
+@Ignore
 class DataFrameRangeSuite extends QueryTest with SharedSQLContext with Eventually {
   import testImplicits._
 
