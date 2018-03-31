@@ -29,6 +29,7 @@ import org.apache.spark.deploy.yarn.YarnSparkHadoopUtil
 import org.apache.spark.deploy.yarn.config._
 import org.apache.spark.internal.Logging
 import org.apache.spark.internal.config._
+import org.apache.spark.ui.UIUtils
 import org.apache.spark.util.ThreadUtils
 
 /**
@@ -94,7 +95,7 @@ private[yarn] class AMCredentialRenewer(
         logInfo("Credentials have expired, creating new ones now.")
         runnable.run()
       } else {
-        logInfo(s"Scheduling login from keytab in $remainingTime millis.")
+        logInfo(s"Scheduling login from keytab in ${UIUtils.formatDuration(remainingTime)}.")
         credentialRenewer.schedule(runnable, remainingTime, TimeUnit.MILLISECONDS)
       }
     }
@@ -108,10 +109,11 @@ private[yarn] class AMCredentialRenewer(
             cleanupOldFiles()
           } catch {
             case e: Exception =>
-              // Log the error and try to write new tokens back in an hour
-              logWarning("Failed to write out new credentials to HDFS, will try again in an " +
-                "hour! If this happens too often tasks will fail.", e)
-              credentialRenewer.schedule(this, 1, TimeUnit.HOURS)
+              // Log the error and try to write new tokens back later.
+              val wait = sparkConf.get(CREDENTIALS_RENEWAL_RETRY_WAIT)
+              logWarning("Failed to write out new credentials to HDFS, will try again in " +
+               s"${UIUtils.formatDuration(wait)}! If this happens too often tasks will fail.", e)
+              credentialRenewer.schedule(this, wait, TimeUnit.SECONDS)
               return
           }
           scheduleRenewal(this)
@@ -193,7 +195,8 @@ private[yarn] class AMCredentialRenewer(
     } else {
       // Next valid renewal time is about 75% of credential renewal time, and update time is
       // slightly later than valid renewal time (80% of renewal time).
-      timeOfNextRenewal = ((nearestNextRenewalTime - currTime) * 0.75 + currTime).toLong
+      val renewalRatio = sparkConf.get(CREDENTIALS_RENEWAL_INTERVAL_RATIO)
+      timeOfNextRenewal = ((nearestNextRenewalTime - currTime) * renewalRatio + currTime).toLong
       ((nearestNextRenewalTime - currTime) * 0.8 + currTime).toLong
     }
 

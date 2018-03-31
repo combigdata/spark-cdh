@@ -29,6 +29,7 @@ import org.apache.spark.SparkConf
 import org.apache.spark.deploy.SparkHadoopUtil
 import org.apache.spark.deploy.yarn.config._
 import org.apache.spark.internal.Logging
+import org.apache.spark.ui.UIUtils
 import org.apache.spark.util.{ThreadUtils, Utils}
 
 private[spark] class CredentialUpdater(
@@ -89,18 +90,27 @@ private[spark] class CredentialUpdater(
             TimeUnit.HOURS.toMillis(1)
           }
       }.getOrElse {
-        // Wait for 1 minute to check again if there's no credential file currently
-        TimeUnit.MINUTES.toMillis(1)
+        // Wait to check again if there's no credential file currently. By default wait for 1
+        // minute, which is different from the default value of CREDENTIALS_RENEWAL_RETRY_WAIT.
+        val wait = if (sparkConf.contains(CREDENTIALS_RENEWAL_RETRY_WAIT)) {
+          TimeUnit.SECONDS.toMillis(sparkConf.get(CREDENTIALS_RENEWAL_RETRY_WAIT))
+        } else {
+          TimeUnit.MINUTES.toMillis(1)
+        }
+        logInfo(s"No new credential file found, trying again later.")
+        wait
       }
     } catch {
       // Since the file may get deleted while we are reading it, catch the Exception and come
       // back in an hour to try again
       case NonFatal(e) =>
-        logWarning("Error while trying to update credentials, will try again in 1 hour", e)
-        TimeUnit.HOURS.toMillis(1)
+        val wait = sparkConf.get(CREDENTIALS_RENEWAL_RETRY_WAIT)
+        logWarning("Error while trying to update credentials, trying again later.")
+        TimeUnit.SECONDS.toMillis(wait)
     }
 
-    logInfo(s"Scheduling credentials refresh from HDFS in $timeToNextUpdate ms.")
+    logInfo(
+      s"Scheduling credentials refresh from HDFS in ${UIUtils.formatDuration(timeToNextUpdate)}.")
     credentialUpdater.schedule(
       credentialUpdaterRunnable, timeToNextUpdate, TimeUnit.MILLISECONDS)
   }
