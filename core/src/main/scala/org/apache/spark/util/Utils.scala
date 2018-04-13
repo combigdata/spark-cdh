@@ -18,11 +18,13 @@
 package org.apache.spark.util
 
 import java.io._
+import java.lang.{Byte => JByte}
 import java.lang.management.ManagementFactory
 import java.net._
 import java.nio.ByteBuffer
 import java.nio.channels.Channels
 import java.nio.charset.StandardCharsets
+import java.security.SecureRandom
 import java.util.concurrent._
 import java.util.{Locale, Properties, Random, UUID}
 import javax.net.ssl.HttpsURLConnection
@@ -36,6 +38,7 @@ import scala.util.Try
 import scala.util.control.{ControlThrowable, NonFatal}
 import scala.util.matching.Regex
 
+import com.google.common.hash.HashCodes
 import com.google.common.io.{ByteStreams, Files}
 import com.google.common.net.InetAddresses
 import org.apache.commons.lang3.SystemUtils
@@ -2345,6 +2348,18 @@ private[spark] object Utils extends Logging {
     val redactionPattern = kvs.getOrElse(SECRET_REDACTION_PROPERTY, SECRET_REDACTION_DEFAULT).r
     redact(redactionPattern, kvs.toArray)
   }
+
+  private[spark] val AUTH_SECRET_BIT_LENGTH_CONF = "spark.authenticate.secretBitLength"
+  private[spark] val AUTH_SECRET_BIT_LENGTH_DFLT = 256
+
+  def createSecret(conf: SparkConf): String = {
+    val bits = conf.getInt(AUTH_SECRET_BIT_LENGTH_CONF, AUTH_SECRET_BIT_LENGTH_DFLT)
+    val rnd = new SecureRandom()
+    val secretBytes = new Array[Byte](bits / JByte.SIZE)
+    rnd.nextBytes(secretBytes)
+    HashCodes.fromBytes(secretBytes).toString()
+  }
+
 }
 
 /**
