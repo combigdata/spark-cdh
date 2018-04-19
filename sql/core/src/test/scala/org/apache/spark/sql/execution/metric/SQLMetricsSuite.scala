@@ -35,6 +35,11 @@ import org.apache.spark.util.{AccumulatorContext, JsonProtocol}
 class SQLMetricsSuite extends SparkFunSuite with SharedSQLContext {
   import testImplicits._
 
+  private def currentExecutionIds(): Set[Long] = {
+    spark.sparkContext.listenerBus.waitUntilEmpty(10000)
+    spark.sharedState.listener.executionIdToData.keySet
+  }
+
   /**
    * Call `df.collect()` and verify if the collected metrics are same as "expectedMetrics".
    *
@@ -47,13 +52,11 @@ class SQLMetricsSuite extends SparkFunSuite with SharedSQLContext {
       df: DataFrame,
       expectedNumOfJobs: Int,
       expectedMetrics: Map[Long, (String, Map[String, Any])]): Unit = {
-    val previousExecutionIds = spark.sharedState.listener.executionIdToData.keySet
+    val previousExecutionIds = currentExecutionIds()
     withSQLConf("spark.sql.codegen.wholeStage" -> "false") {
       df.collect()
     }
-    sparkContext.listenerBus.waitUntilEmpty(10000)
-    val executionIds =
-      spark.sharedState.listener.executionIdToData.keySet.diff(previousExecutionIds)
+    val executionIds = currentExecutionIds().diff(previousExecutionIds)
     assert(executionIds.size === 1)
     val executionId = executionIds.head
     val jobs = spark.sharedState.listener.getExecution(executionId).get.jobs
@@ -305,13 +308,12 @@ class SQLMetricsSuite extends SparkFunSuite with SharedSQLContext {
       // person creates a temporary view. get the DF before listing previous execution IDs
       val data = person.select('name)
       sparkContext.listenerBus.waitUntilEmpty(10000)
-      val previousExecutionIds = spark.sharedState.listener.executionIdToData.keySet
+      val previousExecutionIds = currentExecutionIds()
       // Assume the execution plan is
       // PhysicalRDD(nodeId = 0)
       data.write.format("json").save(file.getAbsolutePath)
       sparkContext.listenerBus.waitUntilEmpty(10000)
-      val executionIds =
-        spark.sharedState.listener.executionIdToData.keySet.diff(previousExecutionIds)
+      val executionIds = currentExecutionIds().diff(previousExecutionIds)
       assert(executionIds.size === 1)
       val executionId = executionIds.head
       val jobs = spark.sharedState.listener.getExecution(executionId).get.jobs
