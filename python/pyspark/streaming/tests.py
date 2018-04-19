@@ -1504,6 +1504,8 @@ def search_jar(dir, name_prefix):
 
 
 def search_kafka_assembly_jar():
+    # Kafka is in the assembly in CDH.
+    if True: return None
     SPARK_HOME = os.environ["SPARK_HOME"]
     kafka_assembly_dir = os.path.join(SPARK_HOME, "external/kafka-assembly")
     jars = search_jar(kafka_assembly_dir, "spark-streaming-kafka-assembly")
@@ -1521,6 +1523,8 @@ def search_kafka_assembly_jar():
 
 
 def search_flume_assembly_jar():
+    # Flume is in the assembly in CDH.
+    if True: return None
     SPARK_HOME = os.environ["SPARK_HOME"]
     flume_assembly_dir = os.path.join(SPARK_HOME, "external/flume-assembly")
     jars = search_jar(flume_assembly_dir, "spark-streaming-flume-assembly")
@@ -1595,21 +1599,17 @@ if __name__ == "__main__":
     mqtt_test_jar = search_mqtt_test_jar()
     kinesis_asl_assembly_jar = search_kinesis_asl_assembly_jar()
 
-    if kinesis_asl_assembly_jar is None:
-        kinesis_jar_present = False
-        jars = "%s,%s,%s,%s" % (kafka_assembly_jar, flume_assembly_jar, mqtt_assembly_jar,
-                                mqtt_test_jar)
-    else:
-        kinesis_jar_present = True
-        jars = "%s,%s,%s,%s,%s" % (kafka_assembly_jar, flume_assembly_jar, mqtt_assembly_jar,
-                                   mqtt_test_jar, kinesis_asl_assembly_jar)
+    all_jars = [kafka_assembly_jar, flume_assembly_jar, mqtt_assembly_jar, mqtt_test_jar,
+                kinesis_asl_assembly_jar]
+    all_jars = filter(lambda x: x, all_jars)
 
+    jars = ",".join(all_jars)
     os.environ["PYSPARK_SUBMIT_ARGS"] = "--jars %s pyspark-shell" % jars
     testcases = [BasicOperationTests, WindowFunctionTests, StreamingContextTests, CheckpointTests,
                  KafkaStreamTests, FlumeStreamTests, FlumePollingStreamTests, MQTTStreamTests,
                  StreamingListenerTests]
 
-    if kinesis_jar_present is True:
+    if kinesis_asl_assembly_jar:
         testcases.append(KinesisStreamTests)
     elif are_kinesis_tests_enabled is False:
         sys.stderr.write("Skipping all Kinesis Python tests as the optional Kinesis project was "

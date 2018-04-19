@@ -222,7 +222,7 @@
                   <classifier>pyspark</classifier>
                 </artifact>
                 <artifact>
-                  <file>${basedir}/../python/lib/py4j-0.9-src.zip</file>
+                  <file>${basedir}/../python/lib/py4j-0.10.7-src.zip</file>
                   <type>zip</type>
                   <classifier>py4j</classifier>
                 </artifact>
