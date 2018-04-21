@@ -31,12 +31,13 @@ import io.netty.channel.ChannelInitializer;
 import io.netty.channel.ChannelOption;
 import io.netty.channel.EventLoopGroup;
 import io.netty.channel.socket.SocketChannel;
-import org.apache.spark.network.util.JavaUtils;
+import org.apache.commons.lang3.SystemUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import org.apache.spark.network.TransportContext;
 import org.apache.spark.network.util.IOMode;
+import org.apache.spark.network.util.JavaUtils;
 import org.apache.spark.network.util.NettyUtils;
 import org.apache.spark.network.util.TransportConf;
 
@@ -99,7 +100,8 @@ public class TransportServer implements Closeable {
       .group(bossGroup, workerGroup)
       .channel(NettyUtils.getServerChannelClass(ioMode))
       .option(ChannelOption.ALLOCATOR, allocator)
-      .childOption(ChannelOption.ALLOCATOR, allocator);
+      .childOption(ChannelOption.ALLOCATOR, allocator)
+      .childOption(ChannelOption.SO_REUSEADDR, !SystemUtils.IS_OS_WINDOWS);
 
     if (conf.backLog() > 0) {
       bootstrap.option(ChannelOption.SO_BACKLOG, conf.backLog());
