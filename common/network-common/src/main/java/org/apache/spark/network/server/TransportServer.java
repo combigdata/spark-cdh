@@ -100,8 +100,8 @@ public class TransportServer implements Closeable {
       .group(bossGroup, workerGroup)
       .channel(NettyUtils.getServerChannelClass(ioMode))
       .option(ChannelOption.ALLOCATOR, allocator)
-      .childOption(ChannelOption.ALLOCATOR, allocator)
-      .childOption(ChannelOption.SO_REUSEADDR, !SystemUtils.IS_OS_WINDOWS);
+      .option(ChannelOption.SO_REUSEADDR, !SystemUtils.IS_OS_WINDOWS)
+      .childOption(ChannelOption.ALLOCATOR, allocator);
 
     if (conf.backLog() > 0) {
       bootstrap.option(ChannelOption.SO_BACKLOG, conf.backLog());
