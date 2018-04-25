@@ -49,7 +49,8 @@ private[spark] object CompressionCodec {
   private val configKey = "spark.io.compression.codec"
 
   private[spark] def supportsConcatenationOfSerializedStreams(codec: CompressionCodec): Boolean = {
-    codec.isInstanceOf[LZFCompressionCodec] || codec.isInstanceOf[LZ4CompressionCodec]
+    (codec.isInstanceOf[SnappyCompressionCodec] || codec.isInstanceOf[LZFCompressionCodec]
+      || codec.isInstanceOf[LZ4CompressionCodec])
   }
 
   private val shortCompressionCodecNames = Map(
