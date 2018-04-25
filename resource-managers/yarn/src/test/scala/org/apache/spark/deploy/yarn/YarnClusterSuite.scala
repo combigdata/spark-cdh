@@ -160,12 +160,11 @@ class YarnClusterSuite extends BaseYarnClusterSuite {
         "PYSPARK_PYTHON" -> "not python"))
   }
 
-
-  ignore("user class path first in client mode") {
+  test("user class path first in client mode") {
     testUseClassPathFirst(true)
   }
 
-  ignore("user class path first in cluster mode") {
+  test("user class path first in cluster mode") {
     testUseClassPathFirst(false)
   }
 
