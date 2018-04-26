@@ -116,7 +116,11 @@ object QueryAnalysis extends Logging {
               if p.parameters.contains(ParquetRelation.METASTORE_TABLE_NAME) =>
                 FieldDetails(Array(p.parameters.get(ParquetRelation.METASTORE_TABLE_NAME).get),
                   a.name, DataSourceType.HIVE) :: acc
-            case LogicalRelation(dfsRel: HadoopFsRelation, _, _) =>
+            // Some API calls create relations with no input path, since the data comes from
+            // in-memory data (such as a JSONRelation loaded from an RDD of strings). Ignore
+            // the relation if there are no input paths, since no inputs are collected for
+            // in-memory data.
+            case LogicalRelation(dfsRel: HadoopFsRelation, _, _) if dfsRel.paths.length > 0 =>
               val paths = dfsRel.paths
               FieldDetails(paths, a.name, getDataSourceType(paths(0))) :: acc
             case m: MetastoreRelation =>
