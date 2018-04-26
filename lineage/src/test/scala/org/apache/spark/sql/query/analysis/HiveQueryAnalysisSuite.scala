@@ -859,6 +859,22 @@ class HiveQueryAnalysisSuite extends BaseLineageSuite {
     }
   }
 
+  test("CDH-67280: lineage with in-memory json input") {
+    val _spark = spark
+    import _spark.implicits._
+
+    val records = Seq(
+      """{ "name" : "Alice", "code" : "A" }""",
+      """{ "name" : "Bob", "code" : "B" }""",
+      """{ "name" : "Charlie", "code" : "C" }"""
+    )
+
+    withOutputName { name =>
+      spark.read.json(spark.createDataset(records)).write.saveAsTable(name)
+      assertLineage(hiveRelation(name, Seq("name", "code")))
+    }
+  }
+
   private def unaryAggregates(col: String): Seq[String] = {
     Seq(
       s"sum($col)",
