@@ -20,6 +20,7 @@ package com.cloudera.spark.lineage
 import java.util.concurrent.TimeUnit
 
 import org.apache.spark.SparkConf
+import org.apache.spark.internal.Logging
 import org.apache.spark.scheduler._
 import org.apache.spark.sql.execution.QueryExecution
 import org.apache.spark.sql.query.analysis.QueryAnalysis
@@ -49,24 +50,29 @@ private class NavigatorAppListener(conf: SparkConf) extends SparkListener {
 
 }
 
-private class NavigatorQueryListener(conf: SparkConf) extends QueryExecutionListener {
+private class NavigatorQueryListener(conf: SparkConf) extends QueryExecutionListener with Logging {
 
   LineageWriter.checkLineageConfig(conf)
 
   override def onSuccess(funcName: String, qe: QueryExecution, durationNs: Long): Unit = {
     val writer = LineageWriter(qe.sparkSession.sparkContext.applicationId)
-    val info = QueryAnalysis.getLineageInfo(qe)
-    if (info.inputs.nonEmpty || info.outputs.nonEmpty) {
-      val details = QueryDetails(
-        writer.lineageId,
-        writer.applicationId,
-        writer.user,
-        System.currentTimeMillis(),
-        info.inputs,
-        info.outputs,
-        TimeUnit.NANOSECONDS.toMillis(durationNs))
+    try {
+      val info = QueryAnalysis.getLineageInfo(qe)
+      if (info.inputs.nonEmpty || info.outputs.nonEmpty) {
+        val details = QueryDetails(
+          writer.lineageId,
+          writer.applicationId,
+          writer.user,
+          System.currentTimeMillis(),
+          info.inputs,
+          info.outputs,
+          TimeUnit.NANOSECONDS.toMillis(durationNs))
 
-      writer.write(details)
+        writer.write(details)
+      }
+    } catch {
+      case e: Exception =>
+        logInfo("Failed to generate lineage for successful query execution.", e)
     }
   }
 
