@@ -602,6 +602,22 @@ class HiveQueryAnalysisSuite
       }
   }
 
+  test("CDH-67280: lineage with in-memory json input") {
+    val records = Seq(
+      """{ "name" : "Alice", "code" : "A" }""",
+      """{ "name" : "Bob", "code" : "B" }""",
+      """{ "name" : "Charlie", "code" : "C" }"""
+    )
+
+    val tableName = "_cdh_67280"
+    hiveContext.read.json(sparkContext.parallelize(records)).write.saveAsTable(tableName)
+
+    val qe = TestQeListener.getAndClear()
+    val inputMetadata = QueryAnalysis.getInputMetadata(qe)
+    assert(inputMetadata.length === 0)
+    assertHiveOutputs(qe, tableName, Seq("name", "code"))
+  }
+
   private def getAggregateClauses(col1: String, col2: String): Seq[String] = {
     // count(*) can't be included in the same category because other functions
     // use one or more columns in lineage, while count(*) uses no columns.

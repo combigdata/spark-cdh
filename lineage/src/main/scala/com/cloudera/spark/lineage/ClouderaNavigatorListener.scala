@@ -51,7 +51,12 @@ private[lineage] class ClouderaNavigatorListener
   override def onFailure( funcName: String, qe: QueryExecution, exception: Exception): Unit = {}
 
   override def onSuccess( funcName: String, qe: QueryExecution, durationNs: Long): Unit = {
-    writeQueryMetadata(qe, durationNs)
+    try {
+      writeQueryMetadata(qe, durationNs)
+    } catch {
+      case e: Exception =>
+        logInfo("Failed to generate lineage for successful query execution.", e)
+    }
   }
 
   override def onApplicationEnd(applicationEnd: SparkListenerApplicationEnd): Unit = {
