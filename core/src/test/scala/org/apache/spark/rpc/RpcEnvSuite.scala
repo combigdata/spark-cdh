@@ -518,10 +518,9 @@ abstract class RpcEnvSuite extends SparkFunSuite with BeforeAndAfterAll {
       // anotherEnv is connected in client mode, so the remote address may be unknown depending on
       // the implementation. Account for that when doing checks.
       if (remoteAddress != null) {
-        assert(events === List(("onConnected", remoteAddress)))
+        assert(events.contains(("onConnected", remoteAddress)))
       } else {
-        assert(events.size === 1)
-        assert(events(0)._1 === "onConnected")
+        assert(events.exists { case (name, _) => name == "onConnected" })
       }
     }
 
@@ -530,17 +529,12 @@ abstract class RpcEnvSuite extends SparkFunSuite with BeforeAndAfterAll {
     eventually(timeout(5 seconds), interval(5 millis)) {
       // Account for anotherEnv not having an address due to running in client mode.
       if (remoteAddress != null) {
-        assert(events === List(
-          ("onConnected", remoteAddress),
-          ("onNetworkError", remoteAddress),
-          ("onDisconnected", remoteAddress)) ||
-          events === List(
-          ("onConnected", remoteAddress),
-          ("onDisconnected", remoteAddress)))
+        assert(events.contains(("onConnected", remoteAddress)))
+        assert(events.contains(("onDisconnected", remoteAddress)))
       } else {
         val eventNames = events.map(_._1)
-        assert(eventNames === List("onConnected", "onNetworkError", "onDisconnected") ||
-          eventNames === List("onConnected", "onDisconnected"))
+        assert(eventNames.contains("onConnected"))
+        assert(eventNames.contains("onDisconnected"))
       }
     }
   }
