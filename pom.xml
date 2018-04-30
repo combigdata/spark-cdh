@@ -170,7 +170,7 @@
     <codehaus.jackson.version>${cdh.jackson.version}</codehaus.jackson.version>
     <fasterxml.jackson.version>2.6.7</fasterxml.jackson.version>
     <fasterxml.jackson.databind.version>2.6.7.1</fasterxml.jackson.databind.version>
-    <snappy.version>${cdh.hadoop-snappy.version}</snappy.version>
+    <snappy.version>1.1.4</snappy.version>
     <netlib.java.version>1.1.2</netlib.java.version>
     <calcite.version>1.0.0-incubating</calcite.version>
     <commons-codec.version>1.10</commons-codec.version>
@@ -568,7 +568,7 @@
         <groupId>org.xerial.snappy</groupId>
         <artifactId>snappy-java</artifactId>
         <version>${snappy.version}</version>
-        <scope>${hadoop.deps.scope}</scope>
+        <scope>compile</scope>
       </dependency>
       <dependency>
         <groupId>org.lz4</groupId>
@@ -2855,14 +2855,9 @@
 
     <profile>
       <!--
-           The CDH version of Snappy doesn't play nice on a mac.  We still want our real builds to use
-           the CDH version, but this way you can at least still run unit tests on your mac.
-           We should be sure to get rid of this if the CDH version gets upgraded.
+       Kept for compatibility reasons with existing build scripts
       -->
       <id>mac</id>
-      <properties>
-        <snappy.version>1.0.5.4</snappy.version>
-      </properties>
     </profile>
 
     <!--
