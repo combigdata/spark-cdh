@@ -68,6 +68,8 @@ private[spark] class TaskSetManager(
   val ser = env.closureSerializer.newInstance()
 
   val tasks = taskSet.tasks
+  private[scheduler] val partitionToIndex = tasks.zipWithIndex
+    .map { case (t, idx) => t.partitionId -> idx }.toMap
   val numTasks = tasks.length
   val copiesRunning = new Array[Int](numTasks)
   val successful = new Array[Boolean](numTasks)
@@ -135,7 +137,7 @@ private[spark] class TaskSetManager(
   val speculatableTasks = new HashSet[Int]
 
   // Task index, start and finish time for each task attempt (indexed by task ID)
-  val taskInfos = new HashMap[Long, TaskInfo]
+  private[scheduler] val taskInfos = new HashMap[Long, TaskInfo]
 
   // How frequently to reprint duplicate exceptions in full, in milliseconds
   val EXCEPTION_PRINT_INTERVAL =
@@ -710,7 +712,23 @@ private[spark] class TaskSetManager(
       logInfo("Ignoring task-finished event for " + info.id + " in stage " + taskSet.id +
         " because task " + index + " has already completed successfully")
     }
+    // There may be multiple tasksets for this stage -- we let all of them know that the partition
+    // was completed.  This may result in some of the tasksets getting completed.
+    sched.markPartitionCompletedInAllTaskSets(stageId, tasks(index).partitionId)
     maybeFinishTaskSet()
+  }
+
+  private[scheduler] def markPartitionCompleted(partitionId: Int): Unit = {
+    partitionToIndex.get(partitionId).foreach { index =>
+      if (!successful(index)) {
+        tasksSuccessful += 1
+        successful(index) = true
+        if (tasksSuccessful == numTasks) {
+          isZombie = true
+        }
+        maybeFinishTaskSet()
+      }
+    }
   }
 
   /**
