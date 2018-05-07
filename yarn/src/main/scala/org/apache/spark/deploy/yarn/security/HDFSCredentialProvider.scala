@@ -29,6 +29,7 @@ import org.apache.hadoop.security.Credentials
 
 import org.apache.spark.{SparkConf, SparkException}
 import org.apache.spark.deploy.yarn.config._
+import org.apache.spark.deploy.SparkHadoopUtil
 import org.apache.spark.internal.Logging
 import org.apache.spark.internal.config._
 
@@ -44,10 +45,9 @@ private[security] class HDFSCredentialProvider extends ServiceCredentialProvider
       sparkConf: SparkConf,
       creds: Credentials): Option[Long] = {
     // NameNode to access, used to get tokens from different FileSystems
+    val tokenRenewer = getTokenRenewer(hadoopConf)
     nnsToAccess(hadoopConf, sparkConf).foreach { dst =>
-      val dstFs = dst.getFileSystem(hadoopConf)
-      logInfo("getting token for namenode: " + dst)
-      dstFs.addDelegationTokens(getTokenRenewer(hadoopConf), creds)
+      getAllTokens(dst, tokenRenewer, hadoopConf, sparkConf, creds)
     }
 
     // Get the token renewal interval if it is not set. It will only be called once.
@@ -64,6 +64,51 @@ private[security] class HDFSCredentialProvider extends ServiceCredentialProvider
           identifier.readFields(new DataInputStream(new ByteArrayInputStream(t.getIdentifier)))
           identifier.getIssueDate + interval
       }.foldLeft(0L)(math.max)
+    }
+  }
+
+  /**
+   * CDH-68051: try a few times to get delegation tokens until the number of stored tokens
+   * stabilizes. This is needed to try to fetch tokens for all available KMS servers until
+   * HADOOP-14445 is properly fixed on supported releases.
+   *
+   * This relies on the fact that the KMS client libraries acquire tokens from the different
+   * servers by going through the list in round-robin order.
+   */
+  private def getAllTokens(
+      dst: Path,
+      tokenRenewer: String,
+      hadoopConf: Configuration,
+      sparkConf: SparkConf,
+      creds: Credentials): Unit = {
+    logInfo("getting token for: " + dst)
+    val dstFs = dst.getFileSystem(hadoopConf)
+
+    def credentialCount(_creds: Credentials): Int = {
+      _creds.numberOfTokens() + _creds.numberOfSecretKeys()
+    }
+
+    val maxAttempts = sparkConf.get(FS_CREDENTIALS_MAX_FETCH_ATTEMPTS)
+    var lastCount = -1
+    var remainingAttempts = maxAttempts
+    while (remainingAttempts > 0 && (lastCount == -1 || lastCount != credentialCount(creds))) {
+      remainingAttempts -= 1
+      lastCount = credentialCount(creds)
+      dstFs.addDelegationTokens(tokenRenewer, creds)
+      logDebug(s"Last count: $lastCount; new count: ${credentialCount(creds)}")
+    }
+
+    if (remainingAttempts == 0) {
+      logWarning(
+        s"Reached maximum number of attempts ($maxAttempts) while waiting for tokens to " +
+        "stabilize. Some tokens may be missing from user credentials.")
+    }
+
+    if (log.isDebugEnabled) {
+      logDebug(s"Tokens for path $dst:")
+      SparkHadoopUtil.get.dumpTokens(creds).foreach { t =>
+        logDebug(s"  $t")
+      }
     }
   }
 

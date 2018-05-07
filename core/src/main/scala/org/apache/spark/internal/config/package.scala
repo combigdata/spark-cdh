@@ -249,4 +249,11 @@ package object config {
         "and event logs.")
       .stringConf
       .createWithDefault("(?i)secret|password")
+
+  private[spark] val FS_CREDENTIALS_MAX_FETCH_ATTEMPTS =
+    ConfigBuilder("spark.security.credentials.fsMaxFetchAttempts")
+      .doc("Max attempts to fetch FS credentials waiting for the token count to stabilize.")
+      .intConf
+      .createWithDefault(10)
+
 }
