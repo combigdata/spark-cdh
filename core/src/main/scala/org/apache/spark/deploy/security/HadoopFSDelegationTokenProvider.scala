@@ -27,6 +27,7 @@ import org.apache.hadoop.security.{Credentials, UserGroupInformation}
 import org.apache.hadoop.security.token.delegation.AbstractDelegationTokenIdentifier
 
 import org.apache.spark.{SparkConf, SparkException}
+import org.apache.spark.deploy.SparkHadoopUtil
 import org.apache.spark.internal.Logging
 import org.apache.spark.internal.config._
 
@@ -46,7 +47,39 @@ private[deploy] class HadoopFSDelegationTokenProvider(fileSystems: Configuration
       creds: Credentials): Option[Long] = {
 
     val fsToGetTokens = fileSystems(hadoopConf)
-    val fetchCreds = fetchDelegationTokens(getTokenRenewer(hadoopConf), fsToGetTokens, creds)
+
+    def credentialCount(_creds: Credentials): Int = {
+      _creds.numberOfTokens() + _creds.numberOfSecretKeys()
+    }
+
+    // CDH-68051: try a few times to get delegation tokens until the number of stored tokens
+    // stabilizes. This is needed to try to fetch tokens for all available KMS servers until
+    // HADOOP-14445 is properly fixed on supported releases.
+    //
+    // This relies on the fact that the KMS client libraries acquire tokens from the different
+    // servers by going through the list in round-robin order.
+    val maxAttempts = sparkConf.get(FS_CREDENTIALS_MAX_FETCH_ATTEMPTS)
+    var lastCount = -1
+    var fetchCreds = creds
+    var remainingAttempts = maxAttempts
+    while (remainingAttempts > 0 && (lastCount == -1 || lastCount != credentialCount(fetchCreds))) {
+      remainingAttempts -= 1
+      lastCount = credentialCount(fetchCreds)
+      fetchCreds = fetchDelegationTokens(getTokenRenewer(hadoopConf), fsToGetTokens, fetchCreds)
+      logDebug(s"Last count: $lastCount; new count: ${credentialCount(fetchCreds)}")
+    }
+
+    if (remainingAttempts == 0) {
+      logWarning(
+        s"Reached maximum number of attempts ($maxAttempts) while waiting for tokens to " +
+        "stabilize. Some tokens may be missing from user credentials.")
+    }
+
+    if (log.isDebugEnabled) {
+      SparkHadoopUtil.get.dumpTokens(fetchCreds).foreach { t =>
+        logDebug(s"Created fs token: $t")
+      }
+    }
 
     // Get the token renewal interval if it is not set. It will only be called once.
     if (tokenRenewalInterval == null) {
