@@ -122,6 +122,7 @@ class YarnSparkHadoopUtil extends SparkHadoopUtil {
    */
   def obtainTokensForNamenodes(
     paths: Set[Path],
+    sparkConf: SparkConf,
     conf: Configuration,
     creds: Credentials,
     renewer: Option[String] = None
@@ -129,10 +130,48 @@ class YarnSparkHadoopUtil extends SparkHadoopUtil {
     if (UserGroupInformation.isSecurityEnabled()) {
       val delegTokenRenewer = renewer.getOrElse(getTokenRenewer(conf))
       paths.foreach { dst =>
-        val dstFs = dst.getFileSystem(conf)
-        logInfo("getting token for namenode: " + dst)
-        dstFs.addDelegationTokens(delegTokenRenewer, creds)
+        getAllTokens(dst, delegTokenRenewer, conf, sparkConf, creds)
       }
+    }
+  }
+
+  /**
+   * CDH-68051: try a few times to get delegation tokens until the number of stored tokens
+   * stabilizes. This is needed to try to fetch tokens for all available KMS servers until
+   * HADOOP-14445 is properly fixed on supported releases.
+   *
+   * This relies on the fact that the KMS client libraries acquire tokens from the different
+   * servers by going through the list in round-robin order.
+   */
+  private def getAllTokens(
+      dst: Path,
+      tokenRenewer: String,
+      hadoopConf: Configuration,
+      sparkConf: SparkConf,
+      creds: Credentials): Unit = {
+    logInfo("getting token for: " + dst)
+    val dstFs = dst.getFileSystem(hadoopConf)
+
+    def credentialCount(_creds: Credentials): Int = {
+      _creds.numberOfTokens() + _creds.numberOfSecretKeys()
+    }
+
+    val maxAttempts = sparkConf.getInt(
+      YarnSparkHadoopUtil.FS_CREDENTIALS_MAX_FETCH_ATTEMPTS_CONF,
+      YarnSparkHadoopUtil.FS_CREDENTIALS_MAX_FETCH_ATTEMPTS_DFLT)
+    var lastCount = -1
+    var remainingAttempts = maxAttempts
+    while (remainingAttempts > 0 && (lastCount == -1 || lastCount != credentialCount(creds))) {
+      remainingAttempts -= 1
+      lastCount = credentialCount(creds)
+      dstFs.addDelegationTokens(tokenRenewer, creds)
+      logDebug(s"Last count: $lastCount; new count: ${credentialCount(creds)}")
+    }
+
+    if (remainingAttempts == 0) {
+      logWarning(
+        s"Reached maximum number of attempts ($maxAttempts) while waiting for tokens to " +
+        "stabilize. Some tokens may be missing from user credentials.")
     }
   }
 
@@ -345,6 +384,9 @@ object YarnSparkHadoopUtil {
   // All RM requests are issued with same priority : we do not (yet) have any distinction between
   // request types (like map/reduce in hadoop for example)
   val RM_REQUEST_PRIORITY = Priority.newInstance(1)
+
+  val FS_CREDENTIALS_MAX_FETCH_ATTEMPTS_CONF = "spark.security.credentials.fsMaxFetchAttempts"
+  val FS_CREDENTIALS_MAX_FETCH_ATTEMPTS_DFLT = 10
 
   def get: YarnSparkHadoopUtil = {
     val yarnMode = java.lang.Boolean.valueOf(
