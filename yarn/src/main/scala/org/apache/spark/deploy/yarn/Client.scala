@@ -340,7 +340,7 @@ private[spark] class Client(
     val fs = FileSystem.get(hadoopConf)
     val dst = new Path(fs.getHomeDirectory(), appStagingDir)
     val nns = YarnSparkHadoopUtil.get.getNameNodesToAccess(sparkConf) + dst
-    YarnSparkHadoopUtil.get.obtainTokensForNamenodes(nns, hadoopConf, credentials)
+    YarnSparkHadoopUtil.get.obtainTokensForNamenodes(nns, sparkConf, hadoopConf, credentials)
     // Used to keep track of URIs added to the distributed cache. If the same URI is added
     // multiple times, YARN will fail to launch containers for the app with an internal
     // error.
@@ -584,8 +584,14 @@ private[spark] class Client(
     // user as renewer.
     val creds = new Credentials()
     val nns = YarnSparkHadoopUtil.get.getNameNodesToAccess(sparkConf) + stagingDirPath
+
+    // CDH-68051: disable multiple fetch attempts for this call since we're only interested in
+    // the HDFS token (and not the KMS ones), and we don't need retries for that.
+    val tempConf = sparkConf.clone()
+    tempConf.set(YarnSparkHadoopUtil.FS_CREDENTIALS_MAX_FETCH_ATTEMPTS_CONF, "1")
+
     YarnSparkHadoopUtil.get.obtainTokensForNamenodes(
-      nns, hadoopConf, creds, Some(sparkConf.get("spark.yarn.principal")))
+      nns, tempConf, hadoopConf, creds, Some(sparkConf.get("spark.yarn.principal")))
     val t = creds.getAllTokens.asScala
       .filter(_.getKind == DelegationTokenIdentifier.HDFS_DELEGATION_KIND)
       .head
