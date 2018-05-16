@@ -322,10 +322,11 @@ function start_history_server {
     echo "$FILTER_CONF_KEY.kerberos.principal=$SPNEGO_PRINCIPAL" >> "$CONF_FILE"
     echo "$FILTER_CONF_KEY.kerberos.keytab=spark2_on_yarn.keytab" >> "$CONF_FILE"
 
-    # This config may contain new line characters, so it needs to be handled in a special way.
-    # To preserve new lines in Java properties files, they have to be replaced with the unicode
-    # escape sequence.
-    local AUTH_TO_LOCAL=$(get_hadoop_conf "$HADOOP_CONF_DIR" "hadoop.security.auth_to_local" | \
+    # This config may contain new lines and backslashes, so it needs to be handled in a special way.
+    # To preserve those characters in Java properties files, replace them with the respective
+    # unicode escape sequence.
+    local AUTH_TO_LOCAL=$(get_hadoop_conf "$HADOOP_CONF_DIR" "hadoop.security.auth_to_local" |
+      sed 's,\\,\\u005C,g' |
       awk '{printf "%s\\u000A", $0}')
     echo "$FILTER_CONF_KEY.kerberos.name.rules=$AUTH_TO_LOCAL" >> "$CONF_FILE"
 
