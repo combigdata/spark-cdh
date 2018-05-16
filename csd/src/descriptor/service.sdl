@@ -326,6 +326,7 @@
               "history_server_web_port",
               "history_server_retained_apps",
               "history_server_fs_poll_interval",
+              "history_server_admin_users",
               "event_log_cleaner_enabled",
               "event_log_cleaner_interval",
               "event_log_cleaner_max_age",
