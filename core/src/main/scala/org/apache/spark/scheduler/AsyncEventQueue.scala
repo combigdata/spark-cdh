@@ -32,7 +32,10 @@ import org.apache.spark.util.Utils
  * Delivery will only begin when the `start()` method is called. The `stop()` method should be
  * called when no more events need to be delivered.
  */
-private class AsyncEventQueue(val name: String, conf: SparkConf)
+private class AsyncEventQueue(
+    val name: String,
+    conf: SparkConf,
+    bus: LiveListenerBus)
   extends SparkListenerBus
   with Logging {
 
@@ -77,18 +80,13 @@ private class AsyncEventQueue(val name: String, conf: SparkConf)
   }
 
   private def dispatch(): Unit = LiveListenerBus.withinListenerThread.withValue(true) {
-    try {
-      var next: SparkListenerEvent = eventQueue.take()
-      while (next != POISON_PILL) {
-        super.postToAll(next)
-        eventCount.decrementAndGet()
-        next = eventQueue.take()
-      }
+    var next: SparkListenerEvent = eventQueue.take()
+    while (next != POISON_PILL) {
+      super.postToAll(next)
       eventCount.decrementAndGet()
-    } catch {
-      case ie: InterruptedException =>
-        logInfo(s"Stopping listener queue $name.", ie)
+      next = eventQueue.take()
     }
+    eventCount.decrementAndGet()
   }
 
   /**
@@ -117,7 +115,11 @@ private class AsyncEventQueue(val name: String, conf: SparkConf)
       eventQueue.put(POISON_PILL)
       eventCount.incrementAndGet()
     }
-    dispatchThread.join()
+    // this thread might be trying to stop itself as part of error handling -- we can't join
+    // in that case.
+    if (Thread.currentThread() != dispatchThread) {
+      dispatchThread.join()
+    }
   }
 
   def post(event: SparkListenerEvent): Unit = {
@@ -171,6 +173,12 @@ private class AsyncEventQueue(val name: String, conf: SparkConf)
       Thread.sleep(10)
     }
     true
+  }
+
+  override def removeListenerOnError(listener: SparkListenerInterface): Unit = {
+    // the listener failed in an unrecoverably way, we want to remove it from the entire
+    // LiveListenerBus (potentially stopping a queue if it is empty)
+    bus.removeListener(listener)
   }
 
 }
