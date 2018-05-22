@@ -95,15 +95,14 @@ class ClouderaNavigatorListenerSuite extends ClouderaFunSuite with BeforeAndAfte
     assert(tmpDir.listFiles().length === 0)
   }
 
-  test("listener throws error if lineage directory does not exist") {
+  test("listener does not write lineage if lineage directory does not exist") {
     val doesNotExist = new File(tmpDir, "doesNotExist")
-    val ex = intercept[SparkException] {
-      withSession(true, doesNotExist) { _ =>
-        fail("Should have failed.")
-      }
+    withSession(true, doesNotExist) { spark =>
+      spark.range(10).write.saveAsTable(tableName())
     }
 
-    assert(ex.getCause().isInstanceOf[FileNotFoundException])
+    assert(!doesNotExist.exists())
+    assert(tmpDir.listFiles().length === 0)
   }
 
   private def withSession(lineage: Boolean, dir: File)(fn: SparkSession => Unit): Unit = {

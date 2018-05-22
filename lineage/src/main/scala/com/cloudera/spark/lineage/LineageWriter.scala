@@ -119,7 +119,7 @@ private class LineageWriter private (
 
 }
 
-private object LineageWriter {
+private object LineageWriter extends Logging {
 
   private val POISON_PILL = new LineageElementV1() { }
   private val NEW_LINE = System.lineSeparator().getBytes(UTF_8)
@@ -155,8 +155,10 @@ private object LineageWriter {
 
     val dir = new File(conf.get(SPARK_LINEAGE_DIR_PROPERTY, DEFAULT_SPARK_LINEAGE_DIR))
     if (!dir.isDirectory() || !dir.canWrite()) {
-      throw new FileNotFoundException(
-        s"Lineage directory $dir doesn't exist or is not writable.")
+      val msg = s"Lineage directory $dir doesn't exist or is not writable. " +
+       "Lineage for this application will be disabled."
+      logWarning(msg)
+      throw new UnsupportedOperationException(msg)
     }
   }
 
