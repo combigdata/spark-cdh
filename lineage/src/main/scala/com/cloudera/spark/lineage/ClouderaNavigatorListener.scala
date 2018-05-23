@@ -20,6 +20,7 @@ package com.cloudera.spark.lineage
 import java.io.FileNotFoundException
 import java.nio.charset.StandardCharsets.UTF_8
 import java.nio.file.{Files, Path, Paths, StandardOpenOption}
+import java.util.concurrent.atomic.AtomicBoolean
 
 import scala.collection.mutable.HashMap
 
@@ -122,16 +123,16 @@ private[lineage] class ClouderaNavigatorListener
   private def checkLineageEnabled(sc: SparkContext): Boolean = {
     val dir = sc.getConf.get(SPARK_LINEAGE_DIR_PROPERTY, DEFAULT_SPARK_LINEAGE_DIR)
     val enabled = sc.getConf.getBoolean("spark.lineage.enabled", false)
-    if (enabled && !Files.exists(Paths.get(dir))) {
-      throw new FileNotFoundException(
-          s"Lineage is enabled but lineage directory $dir doesn't exist")
+    if (enabled && !Files.isWritable(Paths.get(dir))) {
+      logNoLineageWarning(dir)
+      return false
     }
     enabled
   }
 
 }
 
-private object ClouderaNavigatorListener {
+private object ClouderaNavigatorListener extends Logging {
 
   val SPARK_LINEAGE_DIR_PROPERTY = "spark.lineage.log.dir"
   val DEFAULT_SPARK_LINEAGE_DIR = "/var/log/spark/lineage"
@@ -144,6 +145,14 @@ private object ClouderaNavigatorListener {
     .configure(JsonGenerator.Feature.AUTO_CLOSE_TARGET, false)
 
   private val outputFiles = new HashMap[String, Path]()
+  private val loggedNoLineageWarning = new AtomicBoolean(false)
+
+  def logNoLineageWarning(dir: String): Unit = {
+    if (loggedNoLineageWarning.compareAndSet(false, true)) {
+      logWarning(s"Lineage directory $dir doesn't exist or is not writable. " +
+        "Lineage for this application will be disabled.")
+    }
+  }
 
   /**
    * Write the lineage element to the file, flush and close it so that navigator can see the data
