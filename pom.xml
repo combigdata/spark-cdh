@@ -1204,7 +1204,7 @@
       <dependency>
         <groupId>org.codehaus.jackson</groupId>
         <artifactId>jackson-mapper-asl</artifactId>
-        <version>${codehaus.jackson.version}</version>
+        <version>${cdh.jackson-mapper-asl.version}</version>
         <scope>${hadoop.deps.scope}</scope>
       </dependency>
       <dependency>
