@@ -880,6 +880,20 @@ class ParquetQuerySuite extends QueryTest with ParquetTest with SharedSQLContext
       }
     }
   }
+
+  // This testcase should work with and without PARQUET-384
+  test("SPARK-24230: filter row group using dictionary") {
+    withSQLConf(("parquet.filter.dictionary.enabled", "true")) {
+      // create a table with values from 0, 2, ..., 18 that will be dictionary-encoded
+      withParquetTable((0 until 100).map(i => ((i * 2) % 20, s"data-$i")), "t") {
+        // search for a key that is not present so the dictionary filter eliminates all row groups
+        // Fails without SPARK-24230:
+        //   java.io.IOException: expecting more rows but reached last block. Read 0 out of 50
+        //   In case of failure cherry pick the rest of the changes in SPARK-24230
+        checkAnswer(sql("SELECT _2 FROM t WHERE t._1 = 5"), Seq.empty)
+      }
+    }
+  }
 }
 
 object TestingUDT {
