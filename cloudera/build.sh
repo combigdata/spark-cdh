@@ -287,6 +287,10 @@ function build_parcel {
 
   mkdir -p ${OUTPUT_DIR}/csd
   cp ${CSD_WILDCARD} ${OUTPUT_DIR}/csd
+
+  if [[ $PATCH_NUMBER -ne 0 ]] && [[ $ARCHIVE_SOURCE = true ]]; then
+    mv $SPARK_HOME/../${SOURCE_ARCHIVE_NAME} ${OUTPUT_DIR}/parcels
+  fi
 }
 
 function populate_manifest {
@@ -365,6 +369,9 @@ while [[ $# -ge 1 ]]; do
     PATCH_NUMBER="$2"
     shift
     ;;
+    --source)
+    ARCHIVE_SOURCE=true
+    ;;
     --os)
     OS_ARGS=$OS_ARGS" --os $2"
     OS_ARGS_PARCELS=$OS_ARGS_PARCELS" --distro $2"
@@ -391,8 +398,20 @@ while [[ $# -ge 1 ]]; do
   shift
 done
 
+SOURCE_ARCHIVE_NAME=""
 if [[ $PATCH_NUMBER -ne 0 ]]; then
    VERSION_FOR_BUILD=${VERSION/-SNAPSHOT/}_p${PATCH_NUMBER}
+   if [[ $ARCHIVE_SOURCE = true ]]; then
+     SOURCE_ARCHIVE_NAME="spark-$VERSION_FOR_BUILD-src.tar.gz"
+     tar -czf $SPARK_HOME/../$SOURCE_ARCHIVE_NAME -C $SPARK_HOME \
+       --exclude='./.github' \
+       --exclude='./.git' \
+       --exclude='.gitignore' \
+       --exclude='.gitattributes' \
+       --exclude='./build/scala*' \
+       --exclude='./build/zinc*' \
+       --exclude='./build/apache-maven*' .
+   fi
 fi
 
 # Tag the build with either "snapshot" or "rc", based on the pom version. This allows us to better
