@@ -180,7 +180,7 @@ function add_to_classpath {
   for pattern in "${CLASSPATH_ENTRIES[@]}"; do
     for entry in $pattern; do
       entry=$(readlink -m "$entry")
-      name=$(basename $entry)
+      name=$(basename "$entry")
       if [ -f "$entry" ] && ! is_blacklisted "$name" && ! grep -q "/$name\$" "$CLASSPATH_FILE"
       then
         echo "$entry" >> "$CLASSPATH_FILE"
