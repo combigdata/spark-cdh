@@ -167,54 +167,55 @@ object QueryAnalysis extends Logging {
       plan: LogicalPlan,
       inputs: LineageInputs,
       spark: SparkSession): Unit = {
-    logDebug(s"collecting lineage input from:\n$plan")
+    logDebug(s"collecting lineage input from:\n${plan.simpleString}")
 
     // Verify whether the plan creates a mapping between input and output names, and update the
-    // mappings in the partial info.
+    // mappings in the partial info. Check whether leaf nodes are a relation, and record them
+    // in the lineage if they provide any of the fields in the output.
     plan match {
-      case Generate(gen, _, _, _, output, child) =>
+      case Generate(gen, _, _, _, output, _) =>
         val sources = flattenReferences(gen)
-        output.foreach {
-          case e: NamedExpression =>
-            inputs.replace(e, sources)
-
-          case _ =>
+        output.foreach { e =>
+          inputs.replace(e, sources)
         }
 
       case Project(exprs, _) =>
-        processAliases(exprs, inputs)
+        exprs.foreach { e =>
+          inputs.replace(e, flattenReferences(e))
+        }
 
       case Aggregate(_, exprs, _) =>
-        processAliases(exprs, inputs)
+        exprs.foreach { e =>
+          inputs.replace(e, flattenReferences(e))
+        }
+
+      case _: ObjectConsumer | _: ObjectProducer =>
+        // Object transformations map all of the inputs to the producer to an object, and then
+        // serialize that object into a row. So all of the original inputs are considered to
+        // be sources for each of the output expressions.
+        val sources = plan.children.flatMap(_.output.flatMap(flattenReferences))
+        plan.output.foreach { e =>
+          inputs.replace(e, sources)
+        }
+
+      case _: LeafNode =>
+        findRelations(plan, spark).foreach { r =>
+          logDebug(s"found relation: $r")
+          val hasInput = r.fields.exists(inputs.isSourceField)
+          if (hasInput) {
+            inputs.relations(r.source) = r
+          }
+        }
 
       case _ =>
-    }
-
-    // Check whether plan is a relation, and whether that relation contains any of the fields
-    // used to generate the query output. If so, record it as one of the inputs.
-    findRelations(plan, spark).foreach { r =>
-      logDebug(s"found relation: $r")
-      val hasInput = r.fields.exists(inputs.isSourceField)
-      if (hasInput) {
-        inputs.relations(r.source) = r
-      }
+        // No special handling needed for this plan.
     }
 
     logDebug(s"""current lineage info:
       |  relations: ${inputs.relations}
-      |  mappings: ${inputs.fieldMappings}""".stripMargin)
-
+      |  mappings: ${inputs.fieldMappings}
+      |""".stripMargin)
     plan.children.foreach { c => collectLineageInfo(c, inputs, spark) }
-  }
-
-  private def processAliases(exprs: Seq[NamedExpression], inputs: LineageInputs): Unit = {
-    exprs.foreach {
-      case a: Alias =>
-        val sources = flattenReferences(a)
-        inputs.replace(a, flattenReferences(a))
-
-      case _ =>
-    }
   }
 
   /**
@@ -232,7 +233,7 @@ object QueryAnalysis extends Logging {
   /**
    * Returns [[SQLRelationInfo]] instances for the relation in the input plan. Normally there will
    * be a single relation, but data sources can generate multiple inputs by using multiple input
-   * paths
+   * paths.
    */
   private def findRelations(plan: LogicalPlan, spark: SparkSession): Seq[SQLRelationInfo] = {
     plan match {
@@ -251,10 +252,6 @@ object QueryAnalysis extends Logging {
             logDebug(s"Unrecognized cached relation: ${child.getClass().getName()}\n$child")
             Nil
         }
-
-      case Project(exprs, child) =>
-        val childInfo = findRelations(child, spark)
-        childInfo.map(_.copy(fields = exprs))
 
       case _ =>
         logDebug(s"Unmatched relation:\n$plan")
@@ -392,7 +389,7 @@ object QueryAnalysis extends Logging {
           (out, sources)
 
         case (out, old) if old.exists { f => f.exprId == e.exprId } =>
-          val newSources = sources.filterNot { f => f.exprId == e.exprId } ++ sources
+          val newSources = old.filterNot { f => f.exprId == e.exprId } ++ sources
           (out, newSources)
       }.toMap
       fieldMappings ++= updated
