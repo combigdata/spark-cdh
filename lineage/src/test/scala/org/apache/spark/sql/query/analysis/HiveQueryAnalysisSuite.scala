@@ -875,6 +875,61 @@ class HiveQueryAnalysisSuite extends BaseLineageSuite {
     }
   }
 
+  test("views are resolved when generating lineage") {
+    withOutputName { view =>
+      spark.sql(s"""
+        CREATE VIEW $view AS SELECT
+          a.code,
+          b.description
+        FROM
+          test_table_1 a
+        INNER JOIN
+          test_table_2 b
+        ON
+          a.code = b.code
+        """)
+
+      withOutputName { name =>
+        spark.table(view).write.saveAsTable(name)
+        assertLineage(
+          hiveRelation(name, Seq("code", "description")),
+          hiveRelation("test_table_1", Seq("code")),
+          hiveRelation("test_table_2", Seq("description")))
+      }
+    }
+  }
+
+  test("CDH-69375: lineage is preserved through object transformations") {
+    val _spark = spark
+    import _spark.implicits._
+
+    withOutputName { name =>
+      spark.sql("select description from test_table_1")
+        .select($"description".as("dalias"))
+        .map { d => d.getString(0).toLowerCase() }
+        .select($"value".as("lcdesc"))
+        .write
+        .saveAsTable(name)
+
+      assertLineage(
+        hiveRelation(name, Seq("lcdesc")),
+        hiveRelation("test_table_1", Seq("description")))
+    }
+
+    withOutputName { name =>
+      spark.sql("select code, description from test_table_1")
+        .select($"code", $"description".as("desc"))
+        .as[CodeDescBean]
+        .map { cd => CodeDescBean(cd.code, cd.desc.toLowerCase()) }
+        .write
+        .saveAsTable(name)
+
+      assertLineage(
+        hiveRelation(name, Seq("code", "desc")),
+        hiveRelation("test_table_1", Seq("code", "description")))
+    }
+  }
+
   private def unaryAggregates(col: String): Seq[String] = {
     Seq(
       s"sum($col)",
@@ -908,3 +963,5 @@ class HiveQueryAnalysisSuite extends BaseLineageSuite {
 }
 
 case class Person(name: String, age: Long)
+
+case class CodeDescBean(code: String, desc: String)
