@@ -172,7 +172,7 @@ public class UnsafeRowWriter {
   public void write(int ordinal, Decimal input, int precision, int scale) {
     if (precision <= Decimal.MAX_LONG_DIGITS()) {
       // make sure Decimal object has the same scale as DecimalType
-      if (input.changePrecision(precision, scale)) {
+      if (input != null && input.changePrecision(precision, scale)) {
         Platform.putLong(holder.buffer, getFieldOffset(ordinal), input.toUnscaledLong());
       } else {
         setNullAt(ordinal);
