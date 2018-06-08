@@ -82,7 +82,8 @@ Options:
  -h or --help:  print usage
  -s or --skip-build:  skip the build. The bits built from last time used to build the parcel.
  -p <patch number> or --patch-num <patch number>:  when building a patch
- --publish: for publishing to S3
+ --publish: for publishing to S3 with standard tags based on the version in the pom
+ --adhoc-publish <tag>: for publishing to S3 with a custom tag
  --build-only: for only doing the build (i.e. only building distribution tar.gz, no parcel etc.)
  -t or --with-tests: run unit tests after the build (and optional publishing) is complete.
  --os <osname>: choose the os that the parcel should be built for. The OS name should be the long
@@ -342,9 +343,14 @@ function publish {
   $PYTHON_VE/bin/python ${CDH_CLONE_DIR}/lib/python/cauldron/src/cauldron/tools/upload.py s3 ${REPO_OUTPUT_DIR}:${GBN}
   curl http://${BUILDDB_HOST}/save?gbn=${GBN}
   if [[ $PATCH_NUMBER -eq 0 ]]; then
-    curl "http://${BUILDDB_HOST}/addtag?gbn=${GBN}&value=${SHORT_VERSION}-latest"
-    if [[ "$BUILD_CAUSE" != "TIMERTRIGGER" ]]; then
-      curl "http://${BUILDDB_HOST}/addtag?gbn=${GBN}&value=${BUILD_TYPE_TAG}"
+    if [ -z "${AD_HOC_TAG}" ]; then
+      curl "http://${BUILDDB_HOST}/addtag?gbn=${GBN}&value=${SHORT_VERSION}-latest"
+      if [[ "$BUILD_CAUSE" != "TIMERTRIGGER" ]]; then
+        curl "http://${BUILDDB_HOST}/addtag?gbn=${GBN}&value=${BUILD_TYPE_TAG}"
+      fi
+    else
+      echo "publishing with adhoc tag ${AD_HOC_TAG} *only*"
+      curl "http://${BUILDDB_HOST}/addtag?gbn=${GBN}&value=${AD_HOC_TAG}"
     fi
   else
     curl "http://${BUILDDB_HOST}/addtag?gbn=${GBN}&value=released"
@@ -381,6 +387,9 @@ while [[ $# -ge 1 ]]; do
     ;;
     --publish)
     PUBLISH=true
+    ;;
+    --adhoc-publish)
+    AD_HOC_TAG="$2"
     ;;
     --build-only)
     BUILD_ONLY=true
@@ -442,6 +451,11 @@ if [[ "$PUBLISH" = true ]] && [[ "$BUILD_ONLY" = true ]]; then
   exit 1
 fi
 
+if [[ "$PUBLISH" = true ]] && [[ -n "$AD_HOC_TAG" ]]; then
+  my_echo "Can not set --publish and --ad-hoc-publish at the same time"
+  exit 1
+fi
+
 if [[ "$RUN_TESTS" = true ]] && [[ "$BUILD_ONLY" = true ]]; then
   my_echo "Can not set --with-tests and --build-only at the same time"
   exit 1
@@ -465,7 +479,7 @@ if [[ "$BUILD_ONLY" != true ]]; then
   my_echo "Build output: $REPO_OUTPUT_DIR"
 fi
 
-if [[ "$PUBLISH" = true ]]; then
+if [[ "$PUBLISH" = true ]] || [[ -n "$AD_HOC_TAG" ]]; then
   publish
   my_echo "Build published, GBN=$GBN."
   my_echo "Parcels available at the following location:"
