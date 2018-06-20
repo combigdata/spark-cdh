@@ -36,7 +36,7 @@ export AMPLAB_JENKINS=1
 # If not set, then default to $HOME
 MVN_REPO_LOCAL=${WORKSPACE:-$HOME}/.m2/repository
 
-export MAVEN_OPTS="-XX:PermSize=1024m -XX:MaxPermSize=1024m -XX:ReservedCodeCacheSize=512m"
+export MAVEN_OPTS="-XX:PermSize=1024m -XX:MaxPermSize=1024m -XX:ReservedCodeCacheSize=512m -Dhttps.protocols=TLSv1.1,TLSv1.2 ${MAVEN_OPTS}"
 
 # Build is done by the packaging job before this gets called anyways, so we simply run tests
 export APACHE_MIRROR=http://mirror.infra.cloudera.com/apache

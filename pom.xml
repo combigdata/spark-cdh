@@ -2089,6 +2089,7 @@
               <spark.unsafe.exceptionOnMemoryLeak>true</spark.unsafe.exceptionOnMemoryLeak>
               <!-- Needed by sql/hive tests. -->
               <test.src.tables>src</test.src.tables>
+              <https.protocols>TLSv1.1,TLSv1.2</https.protocols>
             </systemProperties>
             <failIfNoTests>false</failIfNoTests>
             <excludedGroups>${test.exclude.tags}</excludedGroups>
@@ -2127,6 +2128,7 @@
               <spark.unsafe.exceptionOnMemoryLeak>true</spark.unsafe.exceptionOnMemoryLeak>
               <!-- Needed by sql/hive tests. -->
               <test.src.tables>__not_used__</test.src.tables>
+              <https.protocols>TLSv1.1,TLSv1.2</https.protocols>
             </systemProperties>
             <tagsToExclude>${test.exclude.tags}</tagsToExclude>
           </configuration>
