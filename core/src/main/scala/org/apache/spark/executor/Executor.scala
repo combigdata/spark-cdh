@@ -35,6 +35,7 @@ import com.google.common.util.concurrent.ThreadFactoryBuilder
 import org.apache.spark._
 import org.apache.spark.deploy.SparkHadoopUtil
 import org.apache.spark.internal.Logging
+import org.apache.spark.internal.config._
 import org.apache.spark.memory.TaskMemoryManager
 import org.apache.spark.rpc.RpcTimeout
 import org.apache.spark.scheduler.{DirectTaskResult, IndirectTaskResult, Task, TaskDescription}
@@ -127,6 +128,11 @@ private[spark] class Executor(
   // do this after SparkEnv creation so can access the SecurityManager
   private val urlClassLoader = createClassLoader()
   private val replClassLoader = addReplClassLoaderIfNeeded(urlClassLoader)
+
+  Thread.currentThread().setContextClassLoader(replClassLoader)
+  val plugins = conf.get(EXECUTOR_PLUGINS).foreach { classes =>
+    Utils.loadExtensions(classOf[Object], classes, conf)
+  }
 
   // Set the classloader for serializer
   env.serializer.setDefaultClassLoader(replClassLoader)
