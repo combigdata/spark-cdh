@@ -256,4 +256,12 @@ package object config {
       .intConf
       .createWithDefault(10)
 
+  private[spark] val EXECUTOR_PLUGINS =
+    ConfigBuilder("spark.executor.plugins")
+      .internal()
+      .doc("Comma-separated list of class names for \"plugins\" to run on executor startup." +
+        "Plugins are instantiated at executor startup, but receive no other updates. ")
+      .stringConf
+      .toSequence
+      .createOptional
 }
