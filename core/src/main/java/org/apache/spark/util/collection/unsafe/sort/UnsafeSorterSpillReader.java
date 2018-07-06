@@ -22,6 +22,7 @@ import java.io.*;
 import com.google.common.io.ByteStreams;
 import com.google.common.io.Closeables;
 
+import org.apache.spark.crypto.CryptoStreamUtils;
 import org.apache.spark.storage.BlockId;
 import org.apache.spark.storage.BlockManager;
 import org.apache.spark.unsafe.Platform;
@@ -51,7 +52,8 @@ public final class UnsafeSorterSpillReader extends UnsafeSorterIterator implemen
     assert (file.length() > 0);
     final BufferedInputStream bs = new BufferedInputStream(new FileInputStream(file));
     try {
-      this.in = blockManager.wrapForCompression(blockId, bs);
+      this.in = blockManager.wrapForCompression(blockId,
+        CryptoStreamUtils.wrapForEncryption(bs, blockManager.conf()));
       this.din = new DataInputStream(this.in);
       numRecordsRemaining = din.readInt();
     } catch (IOException e) {
