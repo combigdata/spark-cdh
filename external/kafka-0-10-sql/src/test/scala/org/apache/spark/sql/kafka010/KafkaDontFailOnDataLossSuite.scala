@@ -23,6 +23,7 @@ import java.util.concurrent.atomic.AtomicInteger
 import scala.collection.mutable
 import scala.util.{Random, Try}
 
+import org.scalatest.Ignore
 import org.scalatest.time.SpanSugar._
 
 import org.apache.spark.SparkContext
@@ -183,6 +184,7 @@ class KafkaDontFailOnDataLossSuite extends StreamTest with KafkaMissingOffsetsTe
   }
 }
 
+@Ignore // Disabled because it is flaky and structured streaming is not supported, see CDH-67341
 class KafkaSourceStressForDontFailOnDataLossSuite extends StreamTest with KafkaMissingOffsetsTest {
 
   import testImplicits._
