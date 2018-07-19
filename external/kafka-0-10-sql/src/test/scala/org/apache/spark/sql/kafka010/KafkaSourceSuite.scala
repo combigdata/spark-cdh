@@ -936,6 +936,7 @@ class KafkaSourceStressSuite extends KafkaSourceTest {
   }
 }
 
+@Ignore // Disabled because it is flaky and structured streaming is not supported, see CDH-67341
 class KafkaSourceStressForDontFailOnDataLossSuite extends StreamTest with SharedSQLContext {
 
   import testImplicits._
