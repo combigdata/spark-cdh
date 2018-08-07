@@ -19,6 +19,7 @@ package org.apache.spark.metrics
 
 import java.io.{File, FileWriter, PrintWriter}
 
+import scala.collection.JavaConverters._
 import scala.collection.mutable.ArrayBuffer
 
 import org.apache.commons.lang3.RandomUtils
@@ -33,6 +34,7 @@ import org.apache.hadoop.mapreduce.lib.output.{TextOutputFormat => NewTextOutput
 import org.scalatest.BeforeAndAfter
 
 import org.apache.spark.{SharedSparkContext, SparkFunSuite}
+import org.apache.spark.deploy.SparkHadoopUtil
 import org.apache.spark.scheduler.{SparkListener, SparkListenerTaskEnd}
 import org.apache.spark.util.{ThreadUtils, Utils}
 
@@ -347,6 +349,14 @@ class InputOutputMetricsSuite extends SparkFunSuite with SharedSparkContext
       }.count()
     }
     assert(bytesRead >= tmpFile.length())
+  }
+
+  test("get number of erasure coded bytes read from filesystem statistics") {
+    val readStatsCallback = SparkHadoopUtil.get.getFSReadStatsAggregatorCallback()
+    val baselineBytesReadEC = readStatsCallback().bytesReadEC
+    FileSystem.getAllStatistics.asScala.foreach(_.incrementBytesReadErasureCoded(1))
+    val finalBytesReadEC = readStatsCallback().bytesReadEC
+    assert(finalBytesReadEC == baselineBytesReadEC + FileSystem.getAllStatistics.size())
   }
 }
 

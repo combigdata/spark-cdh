@@ -147,14 +147,18 @@ class TaskMetricsSuite extends SparkFunSuite {
     val in = tm.inputMetrics
     // initial values
     assert(in.bytesRead == 0L)
+    assert(in.bytesReadEC == 0L)
     assert(in.recordsRead == 0L)
     // set and increment values
     in.setBytesRead(1L)
     in.setBytesRead(2L)
+    in.setBytesReadEC(3L)
+    in.setBytesReadEC(4L)
     in.incRecordsRead(1L)
     in.incRecordsRead(2L)
     // assert new values exist
     assert(in.bytesRead == 2L)
+    assert(in.bytesReadEC == 4L)
     assert(in.recordsRead == 3L)
   }
 

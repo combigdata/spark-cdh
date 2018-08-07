@@ -33,6 +33,7 @@ import org.apache.hadoop.mapreduce.task.{JobContextImpl, TaskAttemptContextImpl}
 
 import org.apache.spark._
 import org.apache.spark.annotation.DeveloperApi
+import org.apache.spark.deploy.FileSystemReadStats
 import org.apache.spark.deploy.SparkHadoopUtil
 import org.apache.spark.internal.Logging
 import org.apache.spark.internal.config._
@@ -155,6 +156,7 @@ class NewHadoopRDD[K, V](
 
       private val inputMetrics = context.taskMetrics().inputMetrics
       private val existingBytesRead = inputMetrics.bytesRead
+      private val existingBytesReadEC = inputMetrics.bytesReadEC
 
       // Sets InputFileBlockHolder for the file block's information
       split.serializableHadoopSplit.value match {
@@ -164,12 +166,12 @@ class NewHadoopRDD[K, V](
           InputFileBlockHolder.unset()
       }
 
-      // Find a function that will return the FileSystem bytes read by this thread. Do this before
+      // Find a function that will return the FileSystem read stats for this thread. Do this before
       // creating RecordReader, because RecordReader's constructor might read some bytes
-      private val getBytesReadCallback: Option[() => Long] =
+      private val getReadStatsCallback: Option[() => FileSystemReadStats] =
         split.serializableHadoopSplit.value match {
           case _: FileSplit | _: CombineFileSplit =>
-            Some(SparkHadoopUtil.get.getFSBytesReadOnThreadCallback())
+            Some(SparkHadoopUtil.get.getFSReadStatsAggregatorCallback())
           case _ => None
         }
 
@@ -177,9 +179,11 @@ class NewHadoopRDD[K, V](
       // If we do a coalesce, however, we are likely to compute multiple partitions in the same
       // task and in the same thread, in which case we need to avoid override values written by
       // previous partitions (SPARK-13071).
-      private def updateBytesRead(): Unit = {
-        getBytesReadCallback.foreach { getBytesRead =>
-          inputMetrics.setBytesRead(existingBytesRead + getBytesRead())
+      private def updateReadStats(): Unit = {
+        getReadStatsCallback.foreach { readStatsFunc =>
+          val readStats = readStatsFunc()
+          inputMetrics.setBytesRead(existingBytesRead + readStats.bytesRead)
+          inputMetrics.setBytesReadEC(existingBytesReadEC + readStats.bytesReadEC)
         }
       }
 
@@ -217,7 +221,7 @@ class NewHadoopRDD[K, V](
       context.addTaskCompletionListener[Unit] { context =>
         // Update the bytesRead before closing is to make sure lingering bytesRead statistics in
         // this thread get correctly added.
-        updateBytesRead()
+        updateReadStats()
         close()
       }
 
@@ -260,7 +264,7 @@ class NewHadoopRDD[K, V](
           inputMetrics.incRecordsRead(1)
         }
         if (inputMetrics.recordsRead % SparkHadoopUtil.UPDATE_INPUT_METRICS_INTERVAL_RECORDS == 0) {
-          updateBytesRead()
+          updateReadStats()
         }
         (reader.getCurrentKey, reader.getCurrentValue)
       }
@@ -278,8 +282,8 @@ class NewHadoopRDD[K, V](
           } finally {
             reader = null
           }
-          if (getBytesReadCallback.isDefined) {
-            updateBytesRead()
+          if (getReadStatsCallback.isDefined) {
+            updateReadStats()
           } else if (split.serializableHadoopSplit.value.isInstanceOf[FileSplit] ||
                      split.serializableHadoopSplit.value.isInstanceOf[CombineFileSplit]) {
             // If we can't get the bytes read from the FS stats, fall back to the split size,

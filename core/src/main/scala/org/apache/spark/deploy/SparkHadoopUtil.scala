@@ -43,6 +43,11 @@ import org.apache.spark.internal.config._
 import org.apache.spark.util.Utils
 
 /**
+ * Case class storing information about statistics tracked by Hadoop FileSystem class
+ */
+private[spark] case class FileSystemReadStats(bytesRead: Long, bytesReadEC: Long)
+
+/**
  * :: DeveloperApi ::
  * Contains util methods to interact with Hadoop from Spark.
  */
@@ -152,13 +157,22 @@ class SparkHadoopUtil extends Logging {
   }
 
   /**
-   * Returns a function that can be called to find Hadoop FileSystem bytes read. If
-   * getFSBytesReadOnThreadCallback is called from thread r at time t, the returned callback will
-   * return the bytes read on r since t.
+   * Read operations on HDFS can be done both in parent task threads and spawned child threads.
+   * Statistics for these operations are stored per-thread, but it is often more useful to
+   * aggregate the statistics across all threads in the task. This function returns a callback
+   * that can be called to both update the current thread's counter for the read statistics and
+   * return the aggregated values.
    */
-  private[spark] def getFSBytesReadOnThreadCallback(): () => Long = {
-    val f = () => FileSystem.getAllStatistics.asScala.map(_.getThreadStatistics.getBytesRead).sum
-    val baseline = (Thread.currentThread().getId, f())
+  private[spark] def getFSReadStatsAggregatorCallback(): () => FileSystemReadStats = {
+    val getReadStats = () => {
+      val threadStats = FileSystem.getAllStatistics.asScala.map(_.getThreadStatistics)
+      FileSystemReadStats(
+        threadStats.map(_.getBytesRead).sum,
+        threadStats.map(_.getBytesReadErasureCoded).sum
+      )
+    }
+
+    val baseline = (Thread.currentThread.getId, getReadStats())
 
     /**
      * This function may be called in both spawned child threads and parent task thread (in
@@ -166,15 +180,23 @@ class SparkHadoopUtil extends Logging {
      * So we need a map to track the bytes read from the child threads and parent thread,
      * summing them together to get the bytes read of this task.
      */
-    new Function0[Long] {
-      private val bytesReadMap = new mutable.HashMap[Long, Long]()
+    new Function0[FileSystemReadStats] {
+      private val bytesReadMap = new mutable.HashMap[Long, FileSystemReadStats]()
 
-      override def apply(): Long = {
+      override def apply(): FileSystemReadStats = {
         bytesReadMap.synchronized {
-          bytesReadMap.put(Thread.currentThread().getId, f())
-          bytesReadMap.map { case (k, v) =>
-            v - (if (k == baseline._1) baseline._2 else 0)
-          }.sum
+          bytesReadMap.put(Thread.currentThread().getId, getReadStats())
+          var bytesRead = 0L
+          var bytesReadEC = 0L
+          bytesReadMap.foreach { case (k, v) =>
+            bytesRead += v.bytesRead
+            bytesReadEC += v.bytesReadEC
+            if (k == baseline._1) {
+              bytesRead -= baseline._2.bytesRead
+              bytesReadEC -= baseline._2.bytesReadEC
+            }
+          }
+          FileSystemReadStats(bytesRead, bytesReadEC)
         }
       }
     }

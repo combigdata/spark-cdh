@@ -75,18 +75,20 @@ class FileScanRDD(
     val iterator = new Iterator[Object] with AutoCloseable {
       private val inputMetrics = context.taskMetrics().inputMetrics
       private val existingBytesRead = inputMetrics.bytesRead
+      private val existingBytesReadEC = inputMetrics.bytesReadEC
 
       // Find a function that will return the FileSystem bytes read by this thread. Do this before
       // apply readFunction, because it might read some bytes.
-      private val getBytesReadCallback =
-        SparkHadoopUtil.get.getFSBytesReadOnThreadCallback()
+      private val getReadStatsCallback = SparkHadoopUtil.get.getFSReadStatsAggregatorCallback()
 
       // We get our input bytes from thread-local Hadoop FileSystem statistics.
       // If we do a coalesce, however, we are likely to compute multiple partitions in the same
       // task and in the same thread, in which case we need to avoid override values written by
       // previous partitions (SPARK-13071).
-      private def incTaskInputMetricsBytesRead(): Unit = {
-        inputMetrics.setBytesRead(existingBytesRead + getBytesReadCallback())
+      private def incTaskInputMetricsReadStats(): Unit = {
+        val updatedStats = getReadStatsCallback()
+        inputMetrics.setBytesRead(existingBytesRead + updatedStats.bytesRead)
+        inputMetrics.setBytesReadEC(existingBytesReadEC + updatedStats.bytesReadEC)
       }
 
       private[this] val files = split.asInstanceOf[FilePartition].files.toIterator
@@ -106,13 +108,13 @@ class FileScanRDD(
         // don't need to run this `if` for every record.
         val preNumRecordsRead = inputMetrics.recordsRead
         if (nextElement.isInstanceOf[ColumnarBatch]) {
-          incTaskInputMetricsBytesRead()
+          incTaskInputMetricsReadStats()
           inputMetrics.incRecordsRead(nextElement.asInstanceOf[ColumnarBatch].numRows())
         } else {
           // too costly to update every record
           if (inputMetrics.recordsRead %
               SparkHadoopUtil.UPDATE_INPUT_METRICS_INTERVAL_RECORDS == 0) {
-            incTaskInputMetricsBytesRead()
+            incTaskInputMetricsReadStats()
           }
           inputMetrics.incRecordsRead(1)
         }
@@ -202,7 +204,7 @@ class FileScanRDD(
       }
 
       override def close(): Unit = {
-        incTaskInputMetricsBytesRead()
+        incTaskInputMetricsReadStats()
         InputFileBlockHolder.unset()
       }
     }

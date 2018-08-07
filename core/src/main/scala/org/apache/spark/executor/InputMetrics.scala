@@ -41,6 +41,7 @@ object DataReadMethod extends Enumeration with Serializable {
 @DeveloperApi
 class InputMetrics private[spark] () extends Serializable {
   private[executor] val _bytesRead = new LongAccumulator
+  private[executor] val _bytesReadEC = new LongAccumulator
   private[executor] val _recordsRead = new LongAccumulator
 
   /**
@@ -49,11 +50,18 @@ class InputMetrics private[spark] () extends Serializable {
   def bytesRead: Long = _bytesRead.sum
 
   /**
+   * Total number of erasure coded bytes read
+   */
+  def bytesReadEC: Long = _bytesReadEC.sum
+
+  /**
    * Total number of records read.
    */
   def recordsRead: Long = _recordsRead.sum
 
   private[spark] def incBytesRead(v: Long): Unit = _bytesRead.add(v)
+  private[spark] def incBytesReadEC(v: Long): Unit = _bytesReadEC.add(v)
   private[spark] def incRecordsRead(v: Long): Unit = _recordsRead.add(v)
   private[spark] def setBytesRead(v: Long): Unit = _bytesRead.setValue(v)
+  private[spark] def setBytesReadEC(v: Long): Unit = _bytesReadEC.setValue(v)
 }

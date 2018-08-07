@@ -72,6 +72,7 @@ private[spark] object InternalAccumulator {
   // Names of input metrics
   object input {
     val BYTES_READ = INPUT_METRICS_PREFIX + "bytesRead"
+    val BYTES_READ_EC = INPUT_METRICS_PREFIX + "bytesReadEC"
     val RECORDS_READ = INPUT_METRICS_PREFIX + "recordsRead"
   }
 
