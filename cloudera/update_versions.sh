@@ -56,7 +56,7 @@ if [[ $UPDATE_CSD = 1 ]]; then
   mv "$TMP" "$CSD_DESCRIPTOR"
 fi
 
-mvn -B -q versions:set -DnewVersion="$NEW_VERSION" -DgenerateBackupPoms=false 1>/dev/null 2>&1
+build/mvn -B -q versions:set -DnewVersion="$NEW_VERSION" -DgenerateBackupPoms=false 1>/dev/null 2>&1
 
 git commit -a -m "$COMMIT_MESSAGE"
 git show
