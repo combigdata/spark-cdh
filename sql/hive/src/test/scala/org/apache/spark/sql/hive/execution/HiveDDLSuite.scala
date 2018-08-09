@@ -113,6 +113,7 @@ class HiveCatalogedDDLSuite extends DDLSuite with TestHiveSingleton with BeforeA
       "COLUMN_STATS_ACCURATE",
       // The following are hive specific schema parameters which we do not need to match exactly.
       "numFiles",
+      "numFilesErasureCoded",
       "numRows",
       "rawDataSize",
       "totalSize",
@@ -1367,6 +1368,7 @@ class HiveDDLSuite
       "last_modified_by",
       "last_modified_time",
       "Owner:",
+      "numFilesErasureCoded",
       "totalNumberFiles",
       "maxFileSize",
       "minFileSize"
