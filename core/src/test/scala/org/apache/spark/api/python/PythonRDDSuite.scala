@@ -18,8 +18,12 @@
 package org.apache.spark.api.python
 
 import java.io.{ByteArrayOutputStream, DataOutputStream}
+import java.net.{InetAddress, Socket}
 
-import org.apache.spark.SparkFunSuite
+import scala.concurrent.duration.Duration
+
+import org.apache.spark.{SparkConf, SparkFunSuite}
+import org.apache.spark.security.SocketAuthHelper
 
 class PythonRDDSuite extends SparkFunSuite {
 
@@ -40,5 +44,22 @@ class PythonRDDSuite extends SparkFunSuite {
     PythonRDD.writeIteratorToStream(Iterator((null, null), ("a", null), (null, "b")), buffer)
     PythonRDD.writeIteratorToStream(
       Iterator((null, null), ("a".getBytes, null), (null, "b".getBytes)), buffer)
+  }
+
+  test("python server error handling") {
+    val authHelper = new SocketAuthHelper(new SparkConf())
+    val errorServer = new ExceptionPythonServer(authHelper)
+    val client = new Socket(InetAddress.getLoopbackAddress(), errorServer.port)
+    authHelper.authToServer(client)
+    val ex = intercept[Exception] { errorServer.getResult(Duration(1, "second")) }
+    assert(ex.getCause().getMessage().contains("exception within handleConnection"))
+  }
+
+  class ExceptionPythonServer(authHelper: SocketAuthHelper)
+      extends PythonServer[Unit](authHelper, "error-server") {
+
+    override def handleConnection(sock: Socket): Unit = {
+      throw new Exception("exception within handleConnection")
+    }
   }
 }

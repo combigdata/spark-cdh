@@ -30,9 +30,9 @@ from pyspark.accumulators import Accumulator
 from pyspark.broadcast import Broadcast
 from pyspark.conf import SparkConf
 from pyspark.files import SparkFiles
-from pyspark.java_gateway import launch_gateway
+from pyspark.java_gateway import launch_gateway, local_connect_and_auth
 from pyspark.serializers import PickleSerializer, BatchedSerializer, UTF8Deserializer, \
-    PairDeserializer, AutoBatchedSerializer, NoOpSerializer
+    PairDeserializer, AutoBatchedSerializer, NoOpSerializer, ChunkedStream
 from pyspark.storagelevel import StorageLevel
 from pyspark.rdd import RDD, _load_from_socket, ignore_unicode_prefix
 from pyspark.traceback_utils import CallSite, first_spark_call
@@ -179,6 +179,11 @@ class SparkContext(object):
         self._javaAccumulator = self._jsc.accumulator(
             self._jvm.java.util.ArrayList(),
             self._jvm.PythonAccumulatorParam(host, port, auth_token))
+
+        # If encryption is enabled, we need to setup a server in the jvm to read broadcast
+        # data via a socket.
+        self._encryption_enabled = self._jsc.sc().conf()\
+            .getBoolean("spark.shuffle.encryption.enabled", False)
 
         self.pythonExec = os.environ.get("PYSPARK_PYTHON", 'python')
         self.pythonVer = "%d.%d" % sys.version_info[:2]
@@ -425,20 +430,42 @@ class SparkContext(object):
                 return xrange(getStart(split), getStart(split + 1), step)
 
             return self.parallelize([], numSlices).mapPartitionsWithIndex(f)
-        # Calling the Java parallelize() method with an ArrayList is too slow,
-        # because it sends O(n) Py4J commands.  As an alternative, serialized
-        # objects are written to a file and loaded through textFile().
-        tempFile = NamedTemporaryFile(delete=False, dir=self._temp_dir)
+
         # Make sure we distribute data evenly if it's smaller than self.batchSize
         if "__len__" not in dir(c):
             c = list(c)    # Make it a list so we can compute its length
         batchSize = max(1, min(len(c) // numSlices, self._batchSize or 1024))
         serializer = BatchedSerializer(self._unbatched_serializer, batchSize)
-        serializer.dump_stream(c, tempFile)
-        tempFile.close()
-        readRDDFromFile = self._jvm.PythonRDD.readRDDFromFile
-        jrdd = readRDDFromFile(self._jsc, tempFile.name, numSlices)
+        jrdd = self._serialize_to_jvm(c, numSlices, serializer)
         return RDD(jrdd, self, serializer)
+
+    def _serialize_to_jvm(self, data, parallelism, serializer):
+        """
+        Using py4j to send a large dataset to the jvm is really slow, so we use either a file
+        or a socket if we have encryption enabled.
+        """
+        if self._encryption_enabled:
+            # with encryption, we open a server in java and send the data directly
+            server = self._jvm.PythonParallelizeServer(self._jsc.sc(), parallelism)
+            (sock_file, _) = local_connect_and_auth(server.port(), server.secret())
+            chunked_out = ChunkedStream(sock_file, 8192)
+            serializer.dump_stream(data, chunked_out)
+            chunked_out.close()
+            # this call will block until the server has read all the data and processed it (or
+            # throws an exception)
+            return server.getResult()
+        else:
+            # without encryption, we serialize to a file, and we read the file in java and
+            # parallelize from there.
+            tempFile = NamedTemporaryFile(delete=False, dir=self._temp_dir)
+            try:
+                serializer.dump_stream(data, tempFile)
+                tempFile.close()
+                readRDDFromFile = self._jvm.PythonRDD.readRDDFromFile
+                return readRDDFromFile(self._jsc, tempFile.name, parallelism)
+            finally:
+                # we eagerly read the file so we can delete right after.
+                os.unlink(tempFile.name)
 
     def pickleFile(self, name, minPartitions=None):
         """
