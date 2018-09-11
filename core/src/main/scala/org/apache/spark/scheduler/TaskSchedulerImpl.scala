@@ -121,7 +121,7 @@ private[spark] class TaskSchedulerImpl(
 
   var backend: SchedulerBackend = null
 
-  val mapOutputTracker = SparkEnv.get.mapOutputTracker
+  val mapOutputTracker = SparkEnv.get.mapOutputTracker.asInstanceOf[MapOutputTrackerMaster]
 
   var schedulableBuilder: SchedulableBuilder = null
   var rootPool: Pool = null
