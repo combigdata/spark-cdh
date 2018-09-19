@@ -168,6 +168,7 @@
     <jline.groupid>org.scala-lang</jline.groupid>
     <codehaus.jackson.version>${cdh.jackson.version}</codehaus.jackson.version>
     <fasterxml.jackson.version>2.6.5</fasterxml.jackson.version>
+    <jackson-databind.version>2.6.5-cloudera.1</jackson-databind.version>
     <snappy.version>${cdh.hadoop-snappy.version}</snappy.version>
     <netlib.java.version>1.1.2</netlib.java.version>
     <calcite.version>1.0.0-incubating</calcite.version>
@@ -633,7 +634,7 @@
       <dependency>
         <groupId>com.fasterxml.jackson.core</groupId>
         <artifactId>jackson-databind</artifactId>
-        <version>${fasterxml.jackson.version}</version>
+        <version>${jackson-databind.version}</version>
       </dependency>
       <dependency>
         <groupId>com.fasterxml.jackson.core</groupId>
