@@ -336,10 +336,11 @@ package object config {
 
   private[spark] val EXECUTOR_PLUGINS =
     ConfigBuilder("spark.executor.plugins")
-      .internal()
-      .doc("Comma-separated list of class names for \"plugins\" to run on executor startup." +
-        "Plugins are instantiated at executor startup, but receive no other updates. ")
+      .doc("Comma-separated list of class names for \"plugins\" implementing " +
+        "org.apache.spark.ExecutorPlugin.  Plugins have the same privileges as any task " +
+        "in a Spark executor.  They can also interfere with task execution and fail in " +
+        "unexpected ways.  So be sure to only use this for trusted plugins.")
       .stringConf
       .toSequence
-      .createOptional
+      .createWithDefault(Nil)
 }
