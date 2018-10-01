@@ -18,6 +18,7 @@
 
 package org.apache.spark.sql.execution.datasources.parquet;
 
+import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.IOException;
 import java.lang.reflect.InvocationTargetException;
@@ -294,7 +295,7 @@ public abstract class SpecificParquetRecordReaderBase<T> extends RecordReader<Vo
       return new RLEIntIterator(
           new RunLengthBitPackingHybridDecoder(
               BytesUtils.getWidthFromMaxInt(maxLevel),
-              bytes.toInputStream()));
+              new ByteArrayInputStream(bytes.toByteArray())));
     } catch (IOException e) {
       throw new IOException("could not read levels in page for col " + descriptor, e);
     }
