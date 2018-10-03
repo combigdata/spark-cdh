@@ -238,7 +238,21 @@ object QueryAnalysis extends Logging {
   private def findRelations(plan: LogicalPlan, spark: SparkSession): Seq[SQLRelationInfo] = {
     plan match {
       case LogicalRelation(base, fields, maybeTable, _) =>
-        getHadoopRelationInfo(maybeTable, maybeTable.map(_.identifier), base, fields, spark)
+        maybeTable.map { table =>
+          getRelationInfo(table.identifier, spark, fields).toSeq
+        }.getOrElse {
+          base match {
+            case HadoopFsRelation(location, _, _, _, format, _) if location.rootPaths.nonEmpty =>
+              val dsFormat = maybeTable.map(getDataSourceFormat).getOrElse(
+                getDataSourceFormat(format))
+              location.rootPaths.map { path =>
+                val dsType = getDataSourceType(path.toUri())
+                SQLRelationInfo(path.toString(), fields, dsType, dsFormat)
+              }.toSeq
+
+            case _ => Nil
+          }
+        }
 
       case HiveTableRelation(table, cols, parts) =>
         getRelationInfo(table.identifier, spark, cols ++ parts).toSeq
@@ -275,7 +289,7 @@ object QueryAnalysis extends Logging {
           location.rootPaths.map { path =>
             val dsType = getDataSourceType(path.toUri())
             SQLRelationInfo(path.toString(), fields, dsType, dsFormat)
-          }.toSeq
+          }
 
         case _ => Nil
       }
