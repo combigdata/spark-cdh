@@ -387,26 +387,33 @@
      placed in the "provided" scope, rather than the "compile" scope, and NoClassDefFoundError exceptions are handled
      when the user has not explicitly compiled with the Hive module.
     -->
+    <!--
+    CDH-73607 Further complicates the above b/c cauldron does not like the circular dependency between spark and
+    hive that results from that, even just at the "provided" or "test"  level.  We sidestep that in cauldron by using
+    reflection in spark, so we remove these dependencies entirely here.
+    -->
+    <!--
     <dependency>
       <groupId>${hive.group}</groupId>
       <artifactId>hive-exec</artifactId>
-      <scope>provided</scope>
+      <scope>test</scope>
     </dependency>
     <dependency>
       <groupId>${hive.group}</groupId>
       <artifactId>hive-metastore</artifactId>
-      <scope>provided</scope>
+      <scope>test</scope>
     </dependency>
     <dependency>
       <groupId>org.apache.thrift</groupId>
       <artifactId>libthrift</artifactId>
-      <scope>provided</scope>
+      <scope>test</scope>
     </dependency>
     <dependency>
       <groupId>org.apache.thrift</groupId>
       <artifactId>libfb303</artifactId>
-      <scope>provided</scope>
+      <scope>test</scope>
     </dependency>
+    -->
 
   </dependencies>
   <build>

@@ -24,8 +24,6 @@ import scala.util.control.NonFatal
 
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.hdfs.security.token.delegation.DelegationTokenIdentifier
-import org.apache.hadoop.hive.conf.HiveConf
-import org.apache.hadoop.hive.ql.metadata.Hive
 import org.apache.hadoop.io.Text
 import org.apache.hadoop.security.{Credentials, UserGroupInformation}
 import org.apache.hadoop.security.token.Token
@@ -43,10 +41,13 @@ private[spark] class HiveDelegationTokenProvider
 
   private val classNotFoundErrorStr = s"You are attempting to use the " +
     s"${getClass.getCanonicalName}, but your Spark distribution is not built with Hive libraries."
+  val hiveConfClass = Utils.classForName("org.apache.hadoop.hive.conf.HiveConf")
+  val hiveClass = Utils.classForName("org.apache.hadoop.hive.ql.metadata.Hive")
 
   private def hiveConf(hadoopConf: Configuration): Configuration = {
     try {
-      new HiveConf(hadoopConf, classOf[HiveConf])
+      val ctor = hiveConfClass.getConstructor(classOf[Configuration], classOf[Class[_]])
+      ctor.newInstance(hadoopConf, hiveConfClass).asInstanceOf[Configuration]
     } catch {
       case NonFatal(e) =>
         logDebug("Fail to create Hive Configuration", e)
@@ -92,8 +93,10 @@ private[spark] class HiveDelegationTokenProvider
         s"$principal at $metastoreUri")
 
       doAsRealUser {
-        val hive = Hive.get(conf, classOf[HiveConf])
-        val tokenStr = hive.getDelegationToken(currentUser.getUserName(), principal)
+        val hive = hiveClass.getMethod("get", classOf[Configuration], classOf[Class[_]])
+          .invoke(null, conf, hiveConfClass)
+        val tokenStr = hiveClass.getMethod("getDelegationToken", classOf[String], classOf[String])
+          .invoke(hive, currentUser.getUserName, principal).asInstanceOf[String]
 
         val hive2Token = new Token[DelegationTokenIdentifier]()
         hive2Token.decodeFromUrlString(tokenStr)
@@ -111,7 +114,7 @@ private[spark] class HiveDelegationTokenProvider
         None
     } finally {
       Utils.tryLogNonFatalError {
-        Hive.closeCurrent()
+        hiveClass.getMethod("closeCurrent").invoke(null)
       }
     }
   }

@@ -37,7 +37,7 @@ class HadoopDelegationTokenManagerSuite extends SparkFunSuite with Matchers {
     hadoopConf = new Configuration()
   }
 
-  test("Correctly load default credential providers") {
+  ignore("Correctly load default credential providers") {
     delegationTokenManager = new HadoopDelegationTokenManager(
       sparkConf,
       hadoopConf,
@@ -87,7 +87,7 @@ class HadoopDelegationTokenManagerSuite extends SparkFunSuite with Matchers {
     tokens.size() should be (0)
   }
 
-  test("obtain tokens For HiveMetastore") {
+  ignore("obtain tokens For HiveMetastore") {
     val hadoopConf = new Configuration()
     hadoopConf.set("hive.metastore.kerberos.principal", "bob")
     // thrift picks up on port 0 and bails out, without trying to talk to endpoint
@@ -100,7 +100,7 @@ class HadoopDelegationTokenManagerSuite extends SparkFunSuite with Matchers {
     credentials.getAllTokens.size() should be (0)
   }
 
-  test("Obtain tokens For HBase") {
+  ignore("Obtain tokens For HBase") {
     val hadoopConf = new Configuration()
     hadoopConf.set("hbase.security.authentication", "kerberos")
 
