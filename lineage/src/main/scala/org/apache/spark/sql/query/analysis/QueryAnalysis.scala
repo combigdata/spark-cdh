@@ -31,7 +31,8 @@ import org.apache.spark.sql.catalyst.TableIdentifier
 import org.apache.spark.sql.catalyst.catalog._
 import org.apache.spark.sql.catalyst.expressions._
 import org.apache.spark.sql.catalyst.plans.logical._
-import org.apache.spark.sql.execution.QueryExecution
+import org.apache.spark.sql.execution.{FileSourceScanExec, QueryExecution, WholeStageCodegenExec}
+import org.apache.spark.sql.execution.columnar.{CachedRDDBuilder, InMemoryRelation}
 import org.apache.spark.sql.execution.command._
 import org.apache.spark.sql.execution.datasources._
 import org.apache.spark.sql.execution.datasources.csv.CSVFileFormat
@@ -40,6 +41,7 @@ import org.apache.spark.sql.execution.datasources.parquet.ParquetFileFormat
 import org.apache.spark.sql.hive.HiveExternalCatalog
 import org.apache.spark.sql.hive.execution._
 import org.apache.spark.sql.internal.HiveSerDe
+import org.apache.spark.sql.sources.BaseRelation
 
 /**
  * This class is responsible for analyzing the {@link QueryExecution} and extracting the input
@@ -123,10 +125,11 @@ object QueryAnalysis extends Logging {
   private def findOutputInfo(
       plan: LogicalPlan,
       spark: SparkSession): Option[(SQLRelationInfo, Seq[LogicalPlan])] = plan match {
-    case CreateDataSourceTableAsSelectCommand(table, _, query) =>
+    case CreateDataSourceTableAsSelectCommand(table, _, query, _) =>
       getOutputInfo(table, query, spark)
 
-    case InsertIntoHadoopFsRelationCommand(path, _, _, parts, _, format, _, query, _, table, _) =>
+    case InsertIntoHadoopFsRelationCommand(
+        path, _, _, parts, _, format, _, query, _, table, _, _) =>
       val rel = table
         .flatMap { t => getRelationInfo(t.identifier, spark, query.output) }
         .getOrElse {
@@ -136,10 +139,10 @@ object QueryAnalysis extends Logging {
         }
       Some((rel, Seq(query)))
 
-    case CreateHiveTableAsSelectCommand(table, query, _) =>
+    case CreateHiveTableAsSelectCommand(table, query, _, _) =>
       getOutputInfo(table, query, spark)
 
-    case InsertIntoHiveTable(table, _, query, _, _) =>
+    case InsertIntoHiveTable(table, _, query, _, _, _) =>
       getOutputInfo(table, query, spark)
 
     case _ => None
@@ -235,7 +238,7 @@ object QueryAnalysis extends Logging {
    */
   private def findRelations(plan: LogicalPlan, spark: SparkSession): Seq[SQLRelationInfo] = {
     plan match {
-      case LogicalRelation(base, fields, maybeTable) =>
+      case LogicalRelation(base, fields, maybeTable, _) =>
         maybeTable.map { table =>
           getRelationInfo(table.identifier, spark, fields).toSeq
         }.getOrElse {
@@ -252,12 +255,45 @@ object QueryAnalysis extends Logging {
           }
         }
 
-      case CatalogRelation(table, cols, parts) =>
+      case HiveTableRelation(table, cols, parts) =>
         getRelationInfo(table.identifier, spark, cols ++ parts).toSeq
+
+      case InMemoryRelation(cols, CachedRDDBuilder(_, _, _, WholeStageCodegenExec(child), _)) =>
+        child match {
+          case FileSourceScanExec(rel, _, _, _, _, _, tableId) =>
+            getHadoopRelationInfo(None, tableId, rel, cols, spark)
+
+          case _ =>
+            logDebug(s"Unrecognized cached relation: ${child.getClass().getName()}\n$child")
+            Nil
+        }
 
       case _ =>
         logDebug(s"Unmatched relation:\n$plan")
         Nil
+    }
+  }
+
+  private def getHadoopRelationInfo(
+      catalogTable: Option[CatalogTable],
+      table: Option[TableIdentifier],
+      rel: BaseRelation,
+      fields: Seq[NamedExpression],
+      spark: SparkSession): Seq[SQLRelationInfo] = {
+    table.map { t =>
+      getRelationInfo(t, spark, fields).toSeq
+    }.getOrElse {
+      rel match {
+        case HadoopFsRelation(location, _, _, _, format, _) if location.rootPaths.nonEmpty =>
+          val dsFormat = catalogTable.map(getDataSourceFormat).getOrElse(
+            getDataSourceFormat(format))
+          location.rootPaths.map { path =>
+            val dsType = getDataSourceType(path.toUri())
+            SQLRelationInfo(path.toString(), fields, dsType, dsFormat)
+          }
+
+        case _ => Nil
+      }
     }
   }
 
