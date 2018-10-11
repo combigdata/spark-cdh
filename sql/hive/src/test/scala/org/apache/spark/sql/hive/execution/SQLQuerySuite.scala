@@ -2156,7 +2156,8 @@ class SQLQuerySuite extends QueryTest with SQLTestUtils with TestHiveSingleton {
 
   test("SPARK-21912 ORC/Parquet table should not create invalid column names") {
     Seq(" ", ",", ";", "{", "}", "(", ")", "\n", "\t", "=").foreach { name =>
-      Seq("ORC", "PARQUET").foreach { source =>
+      // CDH-74083: native ORC support is disabled in CDH. The column name check was removed too.
+      Seq("PARQUET").foreach { source =>
         withTable("t21912") {
           val m = intercept[AnalysisException] {
             sql(s"CREATE TABLE t21912(`col$name` INT) USING $source")

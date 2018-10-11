@@ -171,11 +171,13 @@ class HiveCatalogedDDLSuite extends DDLSuite with TestHiveSingleton with BeforeA
     testDropTable(isDatasourceTable = false)
   }
 
-  test("alter datasource table add columns - orc") {
+  // CDH-74083: does not work with CDH Hive fork.
+  ignore("alter datasource table add columns - orc") {
     testAddColumn("orc")
   }
 
-  test("alter datasource table add columns - partitioned - orc") {
+  // CDH-74083: does not work with CDH Hive fork.
+  ignore("alter datasource table add columns - partitioned - orc") {
     testAddColumnPartitioned("orc")
   }
 
@@ -2228,7 +2230,8 @@ class HiveDDLSuite
   }
 
   test("SPARK-23355 convertMetastoreOrc should not ignore table properties - STORED AS") {
-    Seq("native", "hive").foreach { orcImpl =>
+    // CDH-74083: native ORC support is disabled in CDH.
+    Seq("hive").foreach { orcImpl =>
       withSQLConf(ORC_IMPLEMENTATION.key -> orcImpl, CONVERT_METASTORE_ORC.key -> "true") {
         withTable("t") {
           withTempPath { path =>

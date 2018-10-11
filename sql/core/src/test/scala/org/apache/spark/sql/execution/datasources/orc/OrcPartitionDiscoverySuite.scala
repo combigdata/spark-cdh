@@ -19,6 +19,8 @@ package org.apache.spark.sql.execution.datasources.orc
 
 import java.io.File
 
+import org.scalatest.Ignore
+
 import org.apache.spark.sql._
 import org.apache.spark.sql.test.SharedSQLContext
 
@@ -226,4 +228,6 @@ abstract class OrcPartitionDiscoveryTest extends OrcTest {
   }
 }
 
+// CDH-74083: native ORC support is disabled in CDH.
+@Ignore
 class OrcPartitionDiscoverySuite extends OrcPartitionDiscoveryTest with SharedSQLContext

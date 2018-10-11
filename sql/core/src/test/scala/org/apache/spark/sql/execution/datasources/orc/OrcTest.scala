@@ -47,16 +47,12 @@ abstract class OrcTest extends QueryTest with SQLTestUtils with BeforeAndAfterAl
 
   val orcImp: String = "native"
 
-  private var originalConfORCImplementation = "native"
-
   protected override def beforeAll(): Unit = {
     super.beforeAll()
-    originalConfORCImplementation = spark.conf.get(ORC_IMPLEMENTATION)
     spark.conf.set(ORC_IMPLEMENTATION.key, orcImp)
   }
 
   protected override def afterAll(): Unit = {
-    spark.conf.set(ORC_IMPLEMENTATION.key, originalConfORCImplementation)
     super.afterAll()
   }
 

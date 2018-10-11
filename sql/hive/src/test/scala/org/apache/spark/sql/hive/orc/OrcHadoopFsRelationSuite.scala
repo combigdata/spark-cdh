@@ -27,12 +27,16 @@ import org.apache.spark.sql.internal.SQLConf
 import org.apache.spark.sql.sources.HadoopFsRelationTest
 import org.apache.spark.sql.types._
 
-class OrcHadoopFsRelationSuite extends HadoopFsRelationTest {
+abstract class OrcHadoopFsRelationSuite extends HadoopFsRelationTest {
   import testImplicits._
 
   override protected val enableAutoThreadAudit = false
+
+  // CDH-74083: native ORC support is disabled in CDH.
+  /*
   override val dataSourceName: String =
     classOf[org.apache.spark.sql.execution.datasources.orc.OrcFileFormat].getCanonicalName
+  */
 
   // ORC does not play well with NullType.
   override protected def supportsDataType(dataType: DataType): Boolean = dataType match {

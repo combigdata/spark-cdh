@@ -23,11 +23,7 @@ import java.util.Locale
 
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.Path
-import org.apache.orc.OrcConf.COMPRESS
-import org.apache.orc.OrcFile
-import org.apache.orc.OrcProto.Stream.Kind
-import org.apache.orc.impl.RecordReaderImpl
-import org.scalatest.BeforeAndAfterAll
+import org.scalatest.{BeforeAndAfterAll, Ignore}
 
 import org.apache.spark.sql.Row
 import org.apache.spark.sql.internal.SQLConf
@@ -55,6 +51,8 @@ abstract class OrcSuite extends OrcTest with BeforeAndAfterAll {
       .createOrReplaceTempView("orc_temp_table")
   }
 
+  // CDH-74083: native ORC support is disabled in CDH.
+  /*
   protected def testBloomFilterCreation(bloomFilterKind: Kind) {
     val tableName = "bloomFilter"
 
@@ -114,6 +112,7 @@ abstract class OrcSuite extends OrcTest with BeforeAndAfterAll {
       }
     }
   }
+  */
 
   test("create temporary orc table") {
     checkAnswer(sql("SELECT COUNT(*) FROM normal_orc_source"), Row(10))
@@ -199,7 +198,7 @@ abstract class OrcSuite extends OrcTest with BeforeAndAfterAll {
 
   test("SPARK-18433: Improve DataSource option keys to be more case-insensitive") {
     val conf = spark.sessionState.conf
-    val option = new OrcOptions(Map(COMPRESS.getAttribute.toUpperCase(Locale.ROOT) -> "NONE"), conf)
+    val option = new OrcOptions(Map("orc.compress".toUpperCase(Locale.ROOT) -> "NONE"), conf)
     assert(option.compressionCodec == "NONE")
   }
 
@@ -212,8 +211,8 @@ abstract class OrcSuite extends OrcTest with BeforeAndAfterAll {
     // `compression` -> `orc.compression` -> `spark.sql.orc.compression.codec`
     withSQLConf(SQLConf.ORC_COMPRESSION.key -> "uncompressed") {
       assert(new OrcOptions(Map.empty[String, String], conf).compressionCodec == "NONE")
-      val map1 = Map(COMPRESS.getAttribute -> "zlib")
-      val map2 = Map(COMPRESS.getAttribute -> "zlib", "compression" -> "lzo")
+      val map1 = Map("orc.compress" -> "zlib")
+      val map2 = Map("orc.compress" -> "zlib", "compression" -> "lzo")
       assert(new OrcOptions(map1, conf).compressionCodec == "ZLIB")
       assert(new OrcOptions(map2, conf).compressionCodec == "LZO")
     }
@@ -227,7 +226,8 @@ abstract class OrcSuite extends OrcTest with BeforeAndAfterAll {
     }
   }
 
-  test("SPARK-23340 Empty float/double array columns raise EOFException") {
+  // CDH-74083: does not work with CDH Hive fork.
+  ignore("SPARK-23340 Empty float/double array columns raise EOFException") {
     Seq(Seq(Array.empty[Float]).toDF(), Seq(Array.empty[Double]).toDF()).foreach { df =>
       withTempPath { path =>
         df.write.format("orc").save(path.getCanonicalPath)
@@ -236,7 +236,8 @@ abstract class OrcSuite extends OrcTest with BeforeAndAfterAll {
     }
   }
 
-  test("SPARK-24322 Fix incorrect workaround for bug in java.sql.Timestamp") {
+  // CDH-74083: does not work with CDH Hive fork.
+  ignore("SPARK-24322 Fix incorrect workaround for bug in java.sql.Timestamp") {
     withTempPath { path =>
       val ts = Timestamp.valueOf("1900-05-05 12:34:56.000789")
       Seq(ts).toDF.write.orc(path.getCanonicalPath)
@@ -245,6 +246,8 @@ abstract class OrcSuite extends OrcTest with BeforeAndAfterAll {
   }
 }
 
+// CDH-74083: native ORC support is disabled in CDH.
+@Ignore
 class OrcSourceSuite extends OrcSuite with SharedSQLContext {
 
   protected override def beforeAll(): Unit = {
@@ -281,7 +284,10 @@ class OrcSourceSuite extends OrcSuite with SharedSQLContext {
        """.stripMargin)
   }
 
+  // CDH-74083: native ORC support is disabled in CDH.
+  /*
   test("Check BloomFilter creation") {
     testBloomFilterCreation(Kind.BLOOM_FILTER_UTF8) // After ORC-101
   }
+  */
 }
