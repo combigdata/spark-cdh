@@ -209,7 +209,8 @@ class FileStreamSourceSuite extends FileStreamSourceTest {
 
   override def beforeAll(): Unit = {
     super.beforeAll()
-    spark.sessionState.conf.setConf(SQLConf.ORC_IMPLEMENTATION, "native")
+    // CDH-74083: native ORC support is disabled in CDH.
+    // spark.sessionState.conf.setConf(SQLConf.ORC_IMPLEMENTATION, "native")
   }
 
   override def afterAll(): Unit = {
@@ -285,7 +286,8 @@ class FileStreamSourceSuite extends FileStreamSourceTest {
 
   // =============== ORC file stream schema tests ================
 
-  test("FileStreamSource schema: orc, existing files, no schema") {
+  // CDH-74083: native ORC support is disabled in CDH.
+  ignore("FileStreamSource schema: orc, existing files, no schema") {
     withTempDir { src =>
       Seq("a", "b", "c").toDS().as("userColumn").toDF().write
         .mode(org.apache.spark.sql.SaveMode.Overwrite)
@@ -308,7 +310,8 @@ class FileStreamSourceSuite extends FileStreamSourceTest {
     }
   }
 
-  test("FileStreamSource schema: orc, existing files, schema") {
+  // CDH-74083: native ORC support is disabled in CDH.
+  ignore("FileStreamSource schema: orc, existing files, schema") {
     withTempPath { src =>
       Seq("a", "b", "c").toDS().as("oldUserColumn").toDF()
         .write.orc(new File(src, "1").getCanonicalPath)
@@ -626,7 +629,8 @@ class FileStreamSourceSuite extends FileStreamSourceTest {
 
   // =============== ORC file stream tests ================
 
-  test("read from orc files") {
+  // CDH-74083: native ORC support is disabled in CDH.
+  ignore("read from orc files") {
     withTempDirs { case (src, tmp) =>
       val fileStream = createFileStream("orc", src.getCanonicalPath, Some(valueSchema))
       val filtered = fileStream.filter($"value" contains "keep")
@@ -644,7 +648,8 @@ class FileStreamSourceSuite extends FileStreamSourceTest {
     }
   }
 
-  test("read from orc files with changing schema") {
+  // CDH-74083: native ORC support is disabled in CDH.
+  ignore("read from orc files with changing schema") {
     withTempDirs { case (src, tmp) =>
       withSQLConf(SQLConf.STREAMING_SCHEMA_INFERENCE.key -> "true") {
 

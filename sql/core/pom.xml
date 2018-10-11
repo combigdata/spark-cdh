@@ -86,6 +86,8 @@
       <scope>test</scope>
     </dependency>
 
+    <!--
+    CDH-74083: native ORC support is disabled in CDH.
     <dependency>
       <groupId>org.apache.orc</groupId>
       <artifactId>orc-core</artifactId>
@@ -96,6 +98,7 @@
       <artifactId>orc-mapreduce</artifactId>
       <classifier>${orc.classifier}</classifier>
     </dependency>
+    -->
     <dependency>
       <groupId>org.apache.parquet</groupId>
       <artifactId>parquet-column</artifactId>

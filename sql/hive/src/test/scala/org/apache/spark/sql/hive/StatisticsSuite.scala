@@ -1002,7 +1002,9 @@ class StatisticsSuite extends StatisticsCollectionTestBase with TestHiveSingleto
 
   test("test statistics of LogicalRelation converted from Hive serde tables") {
     Seq("orc", "parquet").foreach { format =>
-      Seq(true, false).foreach { isConverted =>
+      // CDH-74083: native ORC support is disabled in CDH. So only test the convert path.
+      val tests = if (format == "orc") Seq(true) else Seq(true, false)
+      tests.foreach { isConverted =>
         withSQLConf(
           HiveUtils.CONVERT_METASTORE_ORC.key -> s"$isConverted",
           HiveUtils.CONVERT_METASTORE_PARQUET.key -> s"$isConverted") {

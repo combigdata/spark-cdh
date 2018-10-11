@@ -36,7 +36,8 @@ class FileStreamSinkSuite extends StreamTest {
 
   override def beforeAll(): Unit = {
     super.beforeAll()
-    spark.sessionState.conf.setConf(SQLConf.ORC_IMPLEMENTATION, "native")
+    // CDH-74083: native ORC support is disabled in CDH.
+    // spark.sessionState.conf.setConf(SQLConf.ORC_IMPLEMENTATION, "native")
   }
 
   override def afterAll(): Unit = {
@@ -316,7 +317,8 @@ class FileStreamSinkSuite extends StreamTest {
     testFormat(Some("parquet"))
   }
 
-  test("orc") {
+  // CDH-74083: native ORC support is disabled in CDH.
+  ignore("orc") {
     testFormat(Some("orc"))
   }
 
@@ -405,7 +407,8 @@ class FileStreamSinkSuite extends StreamTest {
   }
 
   test("SPARK-23288 writing and checking output metrics") {
-    Seq("parquet", "orc", "text", "json").foreach { format =>
+    // CDH-74083: native ORC support is disabled in CDH.
+    Seq("parquet", "text", "json").foreach { format =>
       val inputData = MemoryStream[String]
       val df = inputData.toDF()
 

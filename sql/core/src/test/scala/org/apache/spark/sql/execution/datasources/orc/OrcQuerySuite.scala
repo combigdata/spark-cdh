@@ -26,10 +26,7 @@ import org.apache.hadoop.fs.Path
 import org.apache.hadoop.mapreduce.{JobID, TaskAttemptID, TaskID, TaskType}
 import org.apache.hadoop.mapreduce.lib.input.FileSplit
 import org.apache.hadoop.mapreduce.task.TaskAttemptContextImpl
-import org.apache.orc.{OrcConf, OrcFile}
-import org.apache.orc.OrcConf.COMPRESS
-import org.apache.orc.mapred.OrcStruct
-import org.apache.orc.mapreduce.OrcInputFormat
+import org.scalatest.Ignore
 
 import org.apache.spark.SparkException
 import org.apache.spark.sql._
@@ -182,6 +179,8 @@ abstract class OrcQueryTest extends OrcTest {
     }
   }
 
+  // CDH-74083: native ORC support is disabled in CDH.
+  /*
   test("SPARK-16610: Respect orc.compress (i.e., OrcConf.COMPRESS) when compression is unset") {
     // Respect `orc.compress` (i.e., OrcConf.COMPRESS).
     withTempPath { file =>
@@ -254,6 +253,7 @@ abstract class OrcQueryTest extends OrcTest {
       assert("NONE" === OrcFile.createReader(orcFilePath, conf).getCompressionKind.name)
     }
   }
+  */
 
   test("simple select queries") {
     withOrcTable((0 until 10).map(i => (i, i.toString)), "t") {
@@ -499,6 +499,8 @@ abstract class OrcQueryTest extends OrcTest {
     }
   }
 
+  // CDH-74083: native ORC support is disabled in CDH.
+  /*
   test("Empty schema does not read data from ORC file") {
     val data = Seq((1, 1), (2, 2))
     withOrcFile(data) { path =>
@@ -523,6 +525,7 @@ abstract class OrcQueryTest extends OrcTest {
       }
     }
   }
+  */
 
   test("read from multiple orc input paths") {
     val path1 = Utils.createTempDir()
@@ -617,9 +620,13 @@ abstract class OrcQueryTest extends OrcTest {
   }
 }
 
+// CDH-74083: native ORC support is disabled in CDH.
+@Ignore
 class OrcQuerySuite extends OrcQueryTest with SharedSQLContext {
   import testImplicits._
 
+  // CDH-74083: native ORC support is disabled in CDH.
+  /*
   test("LZO compression options for writing to an ORC file") {
     withTempPath { file =>
       spark.range(0, 10).write
@@ -634,6 +641,7 @@ class OrcQuerySuite extends OrcQueryTest with SharedSQLContext {
       assert("LZO" === OrcFile.createReader(orcFilePath, conf).getCompressionKind.name)
     }
   }
+  */
 
   test("Schema discovery on empty ORC files") {
     // SPARK-8501 is fixed.
@@ -674,7 +682,7 @@ class OrcQuerySuite extends OrcQueryTest with SharedSQLContext {
     }
   }
 
-  test("SPARK-20728 Make ORCFileFormat configurable between sql/hive and sql/core") {
+  ignore("SPARK-20728 Make ORCFileFormat configurable between sql/hive and sql/core") {
     withSQLConf(SQLConf.ORC_IMPLEMENTATION.key -> "hive") {
       val e = intercept[AnalysisException] {
         sql("CREATE TABLE spark_20728(a INT) USING ORC")
@@ -688,7 +696,7 @@ class OrcQuerySuite extends OrcQueryTest with SharedSQLContext {
         val fileFormat = sql("SELECT * FROM spark_20728").queryExecution.analyzed.collectFirst {
           case l: LogicalRelation => l.relation.asInstanceOf[HadoopFsRelation].fileFormat.getClass
         }
-        assert(fileFormat == Some(classOf[OrcFileFormat]))
+        // assert(fileFormat == Some(classOf[OrcFileFormat]))
       }
     }
   }

@@ -175,6 +175,8 @@ class HiveOrcSourceSuite extends OrcSuite with TestHiveSingleton {
     }
   }
 
+  // CDH-74083: native ORC support is disabled in CDH.
+  /*
   test("Check BloomFilter creation") {
     Seq(true, false).foreach { convertMetastore =>
       withSQLConf(HiveUtils.CONVERT_METASTORE_ORC.key -> s"$convertMetastore") {
@@ -182,4 +184,5 @@ class HiveOrcSourceSuite extends OrcSuite with TestHiveSingleton {
       }
     }
   }
+  */
 }

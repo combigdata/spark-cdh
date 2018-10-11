@@ -364,9 +364,9 @@ class HiveOrcFilterSuite extends OrcTest with TestHiveSingleton {
         StructField("a", IntegerType, nullable = true),
         StructField("b", StringType, nullable = true)))
     assertResult(
-      """leaf-0 = (LESS_THAN a 10)
-        |expr = leaf-0
-      """.stripMargin.trim
+      Array(
+        "leaf-0 = (LESS_THAN a 10)",
+        "expr = leaf-0").mkString(", ")
     ) {
       OrcFilters.createFilter(schema, Array(
         LessThan("a", 10),
@@ -376,9 +376,9 @@ class HiveOrcFilterSuite extends OrcTest with TestHiveSingleton {
 
     // The `LessThan` should be converted while the whole inner `And` shouldn't
     assertResult(
-      """leaf-0 = (LESS_THAN a 10)
-        |expr = leaf-0
-      """.stripMargin.trim
+      Array(
+        "leaf-0 = (LESS_THAN a 10)",
+        "expr = leaf-0").mkString(", ")
     ) {
       OrcFilters.createFilter(schema, Array(
         LessThan("a", 10),

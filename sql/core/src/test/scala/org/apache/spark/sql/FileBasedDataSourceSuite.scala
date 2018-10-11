@@ -39,7 +39,8 @@ class FileBasedDataSourceSuite extends QueryTest with SharedSQLContext with Befo
 
   override def beforeAll(): Unit = {
     super.beforeAll()
-    spark.sessionState.conf.setConf(SQLConf.ORC_IMPLEMENTATION, "native")
+    // CDH-74083: native ORC support is disabled in CDH.
+    // spark.sessionState.conf.setConf(SQLConf.ORC_IMPLEMENTATION, "native")
   }
 
   override def afterAll(): Unit = {
@@ -50,7 +51,8 @@ class FileBasedDataSourceSuite extends QueryTest with SharedSQLContext with Befo
     }
   }
 
-  private val allFileBasedDataSources = Seq("orc", "parquet", "csv", "json", "text")
+  // CDH-74083: native ORC support is disabled in CDH.
+  private val allFileBasedDataSources = Seq("parquet", "csv", "json", "text")
   private val nameWithSpecialChars = "sp&cial%c hars"
 
   allFileBasedDataSources.foreach { format =>
@@ -82,7 +84,7 @@ class FileBasedDataSourceSuite extends QueryTest with SharedSQLContext with Befo
 
   // Only ORC/Parquet support this. `CSV` and `JSON` returns an empty schema.
   // `TEXT` data source always has a single column whose name is `value`.
-  Seq("orc", "parquet").foreach { format =>
+  Seq("parquet").foreach { format =>
     test(s"SPARK-15474 Write and read back non-empty schema with empty dataframe - $format") {
       withTempPath { file =>
         val path = file.getCanonicalPath
@@ -96,7 +98,7 @@ class FileBasedDataSourceSuite extends QueryTest with SharedSQLContext with Befo
     }
   }
 
-  Seq("orc", "parquet").foreach { format =>
+  Seq("parquet").foreach { format =>
     test(s"SPARK-23271 empty RDD when saved should write a metadata only file - $format") {
       withTempPath { outputPath =>
         val df = spark.emptyDataFrame.select(lit(1).as("i"))
@@ -326,12 +328,12 @@ class FileBasedDataSourceSuite extends QueryTest with SharedSQLContext with Befo
     }
   }
 
-  test("SPARK-24204 error handling for unsupported Interval data types - csv, json, parquet, orc") {
+  test("SPARK-24204 error handling for unsupported Interval data types - csv, json, parquet") {
     withTempDir { dir =>
       val tempDir = new File(dir, "files").getCanonicalPath
 
       // write path
-      Seq("csv", "json", "parquet", "orc").foreach { format =>
+      Seq("csv", "json", "parquet").foreach { format =>
         var msg = intercept[AnalysisException] {
           sql("select interval 1 days").write.format(format).mode("overwrite").save(tempDir)
         }.getMessage
@@ -366,11 +368,12 @@ class FileBasedDataSourceSuite extends QueryTest with SharedSQLContext with Befo
     }
   }
 
-  test("SPARK-24204 error handling for unsupported Null data types - csv, parquet, orc") {
+  test("SPARK-24204 error handling for unsupported Null data types - csv, parquet") {
     withTempDir { dir =>
       val tempDir = new File(dir, "files").getCanonicalPath
 
-      Seq("orc").foreach { format =>
+      // CDH-74083: native ORC support is disabled in CDH.
+      Seq.empty[String].foreach { format =>
         // write path
         var msg = intercept[AnalysisException] {
           sql("select null").write.format(format).mode("overwrite").save(tempDir)
@@ -434,7 +437,7 @@ class FileBasedDataSourceSuite extends QueryTest with SharedSQLContext with Befo
     }
   }
 
-  Seq("parquet", "orc").foreach { format =>
+  Seq("parquet").foreach { format =>
     test(s"Spark native readers should respect spark.sql.caseSensitive - ${format}") {
       withTempDir { dir =>
         val tableName = s"spark_25132_${format}_native"
