@@ -1331,4 +1331,33 @@ class AvroSuite extends QueryTest with SharedSQLContext with SQLTestUtils {
       |}
     """.stripMargin)
   }
+
+  test("CDH-73997: CDH 6.0.x backwards compatibility - implicit imports") {
+    import com.databricks.spark.avro._
+    withTempPath { dir =>
+      spark.read.avro(episodesAvro).write.avro(dir.getAbsolutePath())
+    }
+  }
+
+  test("CDH-73997: CDH 6.0.x backwards compatibility - SchemaConverters") {
+    import com.databricks.spark.avro._
+    withTempDir { dir =>
+      val fields = Seq(new Field("null", Schema.create(Type.NULL), "doc", null))
+      val schema = Schema.createRecord("name", "docs", "namespace", false)
+      schema.setFields(fields.asJava)
+      val datumWriter = new GenericDatumWriter[GenericRecord](schema)
+      val dataFileWriter = new DataFileWriter[GenericRecord](datumWriter)
+      dataFileWriter.create(schema, new File(s"$dir.avro"))
+      val avroRec = new GenericData.Record(schema)
+      avroRec.put("null", null)
+      dataFileWriter.append(avroRec)
+      dataFileWriter.flush()
+      dataFileWriter.close()
+
+      intercept[com.databricks.spark.avro.SchemaConverters.IncompatibleSchemaException] {
+        spark.read.avro(s"$dir.avro")
+      }
+    }
+  }
+
 }
