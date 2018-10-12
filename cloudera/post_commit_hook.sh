@@ -19,4 +19,5 @@ MVN_REPO_LOCAL=$HOME/.m2/repository${M2_REPO_SUFFIX}
 export MAVEN_OPTS="-XX:ReservedCodeCacheSize=512m"
 
 export APACHE_MIRROR=http://mirror.infra.cloudera.com/apache
+export SPARK_TESTING=1
 ./build/mvn -B -Dcdh.build=true package -fae -Dmaven.repo.local="$MVN_REPO_LOCAL" $EXTRA_MAVEN_ARGS
