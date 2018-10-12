@@ -17,6 +17,7 @@
 
 package org.apache.spark.sql.hive
 
+import java.io.File
 import java.net.URI
 
 import org.apache.hadoop.conf.Configuration
@@ -35,6 +36,10 @@ import org.apache.spark.util.Utils
  */
 class HiveExternalCatalogSuite extends ExternalCatalogSuite {
 
+  // CDH-74147: build the list of jars from the test's classpath, so that the isolated class loader
+  // can find needed classes.
+  private val allJars = sys.props("java.class.path").split(":").map(new File(_).toURI().toURL())
+
   private val client: HiveClient = {
     val metaVersion = IsolatedClientLoader.hiveVersion(
       HiveUtils.HIVE_METASTORE_VERSION.defaultValue.get)
@@ -42,8 +47,9 @@ class HiveExternalCatalogSuite extends ExternalCatalogSuite {
       version = metaVersion,
       sparkConf = new SparkConf(),
       hadoopConf = new Configuration(),
+      execJars = allJars,
       config = HiveUtils.newTemporaryConfiguration(useInMemoryDerby = true),
-      isolationOn = false,
+      isolationOn = true,
       baseClassLoader = Utils.getContextOrSparkClassLoader
     ).createClient()
   }

@@ -84,6 +84,10 @@ class VersionsSuite extends SparkFunSuite with Logging {
       Some(new File(sys.props("java.io.tmpdir"), "hive-ivy-cache").getAbsolutePath))
   }
 
+  // CDH-74147: build the list of jars from the test's classpath, so that the isolated class loader
+  // can find needed classes.
+  private val allJars = sys.props("java.class.path").split(":").map(new File(_).toURI().toURL())
+
   private def buildConf() = {
     lazy val warehousePath = Utils.createTempDir()
     lazy val metastorePath = Utils.createTempDir()
@@ -112,8 +116,9 @@ class VersionsSuite extends SparkFunSuite with Logging {
       version = IsolatedClientLoader.hiveVersion(HiveUtils.builtinHiveVersion),
       sparkConf = sparkConf,
       hadoopConf = hadoopConf,
+      execJars = allJars,
       config = buildConf(),
-      isolationOn = false,
+      isolationOn = true,
       baseClassLoader = Utils.getContextOrSparkClassLoader
     ).createClient()
     assert("success" === client.getConf("test", null))
@@ -169,8 +174,9 @@ class VersionsSuite extends SparkFunSuite with Logging {
           version = IsolatedClientLoader.hiveVersion(version),
           sparkConf = sparkConf,
           hadoopConf = hadoopConf,
+          execJars = allJars,
           config = buildConf(),
-          isolationOn = false,
+          isolationOn = true,
           baseClassLoader = Utils.getContextOrSparkClassLoader
         ).createClient()
       if (versionSpark != null) versionSpark.reset()
