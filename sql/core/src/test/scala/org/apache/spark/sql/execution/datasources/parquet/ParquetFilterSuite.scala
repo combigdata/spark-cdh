@@ -565,39 +565,42 @@ class ParquetFilterSuite extends QueryTest with ParquetTest with SharedSQLContex
   }
 
   test("Ensure that filter value matched the parquet file schema") {
-    val scale = 2
-    val schema = StructType(Seq(
-      StructField("cint", IntegerType),
-      StructField("cdecimal1", DecimalType(Decimal.MAX_INT_DIGITS, scale)),
-      StructField("cdecimal2", DecimalType(Decimal.MAX_LONG_DIGITS, scale)),
-      StructField("cdecimal3", DecimalType(DecimalType.MAX_PRECISION, scale))
-    ))
+    // CDH-67626: for this test, restore the default config which if flipped in CDH.
+    withSQLConf(SQLConf.PARQUET_WRITE_LEGACY_FORMAT.key -> "false") {
+      val scale = 2
+      val schema = StructType(Seq(
+        StructField("cint", IntegerType),
+        StructField("cdecimal1", DecimalType(Decimal.MAX_INT_DIGITS, scale)),
+        StructField("cdecimal2", DecimalType(Decimal.MAX_LONG_DIGITS, scale)),
+        StructField("cdecimal3", DecimalType(DecimalType.MAX_PRECISION, scale))
+      ))
 
-    val parquetSchema = new SparkToParquetSchemaConverter(conf).convert(schema)
+      val parquetSchema = new SparkToParquetSchemaConverter(conf).convert(schema)
 
-    val decimal = new JBigDecimal(10).setScale(scale)
-    val decimal1 = new JBigDecimal(10).setScale(scale + 1)
-    assert(decimal.scale() === scale)
-    assert(decimal1.scale() === scale + 1)
+      val decimal = new JBigDecimal(10).setScale(scale)
+      val decimal1 = new JBigDecimal(10).setScale(scale + 1)
+      assert(decimal.scale() === scale)
+      assert(decimal1.scale() === scale + 1)
 
-    assertResult(Some(lt(intColumn("cdecimal1"), 1000: Integer))) {
-      parquetFilters.createFilter(parquetSchema, sources.LessThan("cdecimal1", decimal))
-    }
-    assertResult(None) {
-      parquetFilters.createFilter(parquetSchema, sources.LessThan("cdecimal1", decimal1))
-    }
+      assertResult(Some(lt(intColumn("cdecimal1"), 1000: Integer))) {
+        parquetFilters.createFilter(parquetSchema, sources.LessThan("cdecimal1", decimal))
+      }
+      assertResult(None) {
+        parquetFilters.createFilter(parquetSchema, sources.LessThan("cdecimal1", decimal1))
+      }
 
-    assertResult(Some(lt(longColumn("cdecimal2"), 1000L: java.lang.Long))) {
-      parquetFilters.createFilter(parquetSchema, sources.LessThan("cdecimal2", decimal))
-    }
-    assertResult(None) {
-      parquetFilters.createFilter(parquetSchema, sources.LessThan("cdecimal2", decimal1))
-    }
+      assertResult(Some(lt(longColumn("cdecimal2"), 1000L: java.lang.Long))) {
+        parquetFilters.createFilter(parquetSchema, sources.LessThan("cdecimal2", decimal))
+      }
+      assertResult(None) {
+        parquetFilters.createFilter(parquetSchema, sources.LessThan("cdecimal2", decimal1))
+      }
 
-    assert(parquetFilters.createFilter(
-      parquetSchema, sources.LessThan("cdecimal3", decimal)).isDefined)
-    assertResult(None) {
-      parquetFilters.createFilter(parquetSchema, sources.LessThan("cdecimal3", decimal1))
+      assert(parquetFilters.createFilter(
+        parquetSchema, sources.LessThan("cdecimal3", decimal)).isDefined)
+      assertResult(None) {
+        parquetFilters.createFilter(parquetSchema, sources.LessThan("cdecimal3", decimal1))
+      }
     }
   }
 
