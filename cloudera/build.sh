@@ -119,7 +119,8 @@ function setup {
   source $PYTHON_VE/bin/activate
   REQUIREMENTS=$CDH_CLONE_DIR/lib/python/cauldron/requirements.txt
   SETUP_PY=$CDH_CLONE_DIR/lib/python/cauldron/setup.py
-  $PYTHON_VE/bin/pip install -r $REQUIREMENTS
+  $PYTHON_VE/bin/pip install --index-url https://pypi.infra.cloudera.com/artifactory/api/pypi/pypi-public/simple/ jsonschema==2.6.0
+  (cd $(dirname $REQUIREMENTS) && $PYTHON_VE/bin/pip install -r requirements.txt)
   (cd $(dirname $SETUP_PY) && $PYTHON_VE/bin/python $SETUP_PY install)
 }
 
