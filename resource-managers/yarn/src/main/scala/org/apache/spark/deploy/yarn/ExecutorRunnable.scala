@@ -141,6 +141,10 @@ private[yarn] class ExecutorRunnable(
       javaOpts ++= Utils.splitCommandString(subsOpt).map(YarnSparkHadoopUtil.escapeForShell)
     }
 
+    if (Utils.isTesting) {
+      javaOpts += "-Dspark.testing=1"
+    }
+
     // Set the library path through a command prefix to append to the existing value of the
     // env variable.
     val prefixEnv = sparkConf.get(EXECUTOR_LIBRARY_PATH).map { libPath =>
