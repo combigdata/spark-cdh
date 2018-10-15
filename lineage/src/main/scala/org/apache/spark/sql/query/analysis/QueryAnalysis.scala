@@ -57,6 +57,24 @@ object QueryAnalysis extends Logging {
     HiveSerDe.serdeMap("avro") -> DataSourceFormat.AVRO)
 
   /**
+   * Find the Hive catalog if one is configured.
+   */
+  def hiveCatalog(session: SparkSession): Option[HiveExternalCatalog] = {
+    val unwrapped = session.sessionState.catalog.externalCatalog match {
+      case wrapper: ExternalCatalogWithListener => wrapper.unwrapped
+      case other => other
+    }
+
+    unwrapped match {
+      case h: HiveExternalCatalog =>
+        Some(h)
+
+      case _ =>
+        None
+    }
+  }
+
+  /**
    * Computes the lineage information from a query execution.
    *
    * @param qe QueryExecution object.
@@ -67,17 +85,13 @@ object QueryAnalysis extends Logging {
 
     // Stash the location of the Hive metastore so that it can be saved with any Hive relations
     // that are referenced in the query.
-    val metastore = qe.sparkSession.sessionState.catalog.externalCatalog match {
-      case h: HiveExternalCatalog =>
-        val uris = h.client.getConf(HiveConf.ConfVars.METASTOREURIS.varname, null)
-        if (uris != null && uris.nonEmpty) {
-          Some(uris)
-        } else {
-          None
-        }
-
-      case _ =>
+    val metastore = hiveCatalog(qe.sparkSession).flatMap { catalog =>
+      val uris = catalog.client.getConf(HiveConf.ConfVars.METASTOREURIS.varname, null)
+      if (uris != null && uris.nonEmpty) {
+        Some(uris)
+      } else {
         None
+      }
     }
 
     val inputs = new LineageInputs()

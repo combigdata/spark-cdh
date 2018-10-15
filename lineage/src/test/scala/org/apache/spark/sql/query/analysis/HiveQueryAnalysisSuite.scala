@@ -86,6 +86,10 @@ class HiveQueryAnalysisSuite extends BaseLineageSuite {
         s"jdbc:derby:memory:;create=true")
   }
 
+  test("hive catalog is configured") {
+    assert(QueryAnalysis.hiveCatalog(spark).isDefined)
+  }
+
   test("simple queries") {
     val df = spark.sql("select code, description, salary from test_table_1")
     val input = hiveRelation("default.test_table_1", Seq("code", "description", "salary"))
