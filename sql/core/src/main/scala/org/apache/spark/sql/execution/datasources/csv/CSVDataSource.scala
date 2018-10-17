@@ -34,6 +34,7 @@ import org.apache.spark.internal.Logging
 import org.apache.spark.rdd.{BinaryFileRDD, RDD}
 import org.apache.spark.sql.{Dataset, Encoders, SparkSession}
 import org.apache.spark.sql.catalyst.InternalRow
+import org.apache.spark.sql.catalyst.csv.{CSVExprUtils, CSVOptions, UnivocityParser}
 import org.apache.spark.sql.execution.datasources._
 import org.apache.spark.sql.execution.datasources.text.TextFileFormat
 import org.apache.spark.sql.types.StructType
@@ -209,7 +210,7 @@ object TextInputCSVDataSource extends CSVDataSource {
       // The header will be removed from lines.
       // Note: if there are only comments in the first block, the header would probably
       // be not extracted.
-      CSVUtils.extractHeader(lines, parser.options).foreach { header =>
+      CSVExprUtils.extractHeader(lines, parser.options).foreach { header =>
         val schema = if (columnPruning) requiredSchema else dataSchema
         val columnNames = parser.tokenizer.parseLine(header)
         CSVDataSource.checkHeaderColumnNames(
