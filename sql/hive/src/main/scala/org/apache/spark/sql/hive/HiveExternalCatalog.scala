@@ -502,11 +502,13 @@ private[spark] class HiveExternalCatalog(conf: SparkConf, hadoopConf: Configurat
     properties
   }
 
+  override def databaseLocation(dbName: String, catalogDatabase: CatalogDatabase): URI = {
+    convertNamenodeToNameservice(namenodeToNameservice, catalogDatabase.locationUri, dbName)
+  }
+
   private def defaultTablePath(tableIdent: TableIdentifier): String = {
     val dbName = tableIdent.database.get
-    val dbLocation = convertNamenodeToNameservice(
-      namenodeToNameservice, getDatabase(dbName).locationUri, dbName)
-    new Path(new Path(dbLocation), tableIdent.table).toString
+    new Path(new Path(databaseLocation(dbName, getDatabase(dbName))), tableIdent.table).toString
   }
 
   private def saveTableIntoHive(tableDefinition: CatalogTable, ignoreIfExists: Boolean): Unit = {

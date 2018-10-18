@@ -17,6 +17,8 @@
 
 package org.apache.spark.sql.catalyst.catalog
 
+import java.net.URI
+
 import org.apache.spark.sql.catalyst.expressions.Expression
 import org.apache.spark.sql.types.StructType
 import org.apache.spark.util.ListenerBus
@@ -79,6 +81,12 @@ class ExternalCatalogWithListener(delegate: ExternalCatalog)
 
   override def setCurrentDatabase(db: String): Unit = {
     delegate.setCurrentDatabase(db)
+  }
+
+  override private[spark] def databaseLocation(
+      dbName: String,
+      catalogDatabase: CatalogDatabase): URI = {
+    delegate.databaseLocation(dbName, catalogDatabase)
   }
 
   // --------------------------------------------------------------------------

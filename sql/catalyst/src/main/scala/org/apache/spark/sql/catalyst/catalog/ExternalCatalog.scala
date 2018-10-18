@@ -17,6 +17,8 @@
 
 package org.apache.spark.sql.catalyst.catalog
 
+import java.net.URI
+
 import org.apache.spark.sql.catalyst.analysis.{FunctionAlreadyExistsException, NoSuchDatabaseException, NoSuchFunctionException, NoSuchPartitionException, NoSuchTableException}
 import org.apache.spark.sql.catalyst.expressions.Expression
 import org.apache.spark.sql.types.StructType
@@ -169,6 +171,8 @@ trait ExternalCatalog {
       partition: TablePartitionSpec,
       replace: Boolean,
       numDP: Int): Unit
+
+  private[spark] def databaseLocation(dbName: String, catalogDatabase: CatalogDatabase): URI
 
   // --------------------------------------------------------------------------
   // Partitions

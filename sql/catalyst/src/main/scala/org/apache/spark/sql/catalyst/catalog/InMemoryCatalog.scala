@@ -18,6 +18,7 @@
 package org.apache.spark.sql.catalyst.catalog
 
 import java.io.IOException
+import java.net.URI
 
 import scala.collection.mutable
 
@@ -175,6 +176,12 @@ class InMemoryCatalog(
   }
 
   override def setCurrentDatabase(db: String): Unit = { /* no-op */ }
+
+  override private[spark] def databaseLocation(
+      dbName: String,
+      catalogDatabase: CatalogDatabase): URI = {
+    catalogDatabase.locationUri
+  }
 
   // --------------------------------------------------------------------------
   // Tables

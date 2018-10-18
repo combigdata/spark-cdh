@@ -469,7 +469,7 @@ class SessionCatalog(
 
   def defaultTablePath(tableIdent: TableIdentifier): URI = {
     val dbName = formatDatabaseName(tableIdent.database.getOrElse(getCurrentDatabase))
-    val dbLocation = getDatabaseMetadata(dbName).locationUri
+    val dbLocation = externalCatalog.databaseLocation(dbName, getDatabaseMetadata(dbName))
 
     new Path(new Path(dbLocation), formatTableName(tableIdent.table)).toUri
   }
