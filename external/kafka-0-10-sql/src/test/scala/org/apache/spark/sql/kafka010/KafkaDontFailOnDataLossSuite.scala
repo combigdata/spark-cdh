@@ -21,7 +21,7 @@ import java.util.Properties
 import java.util.concurrent.atomic.AtomicInteger
 
 import scala.collection.mutable
-import scala.util.{Random, Try}
+import scala.util.Random
 
 import org.scalatest.Ignore
 import org.scalatest.time.SpanSugar._
@@ -267,11 +267,6 @@ class KafkaSourceStressForDontFailOnDataLossSuite extends StreamTest with KafkaM
         throw query.exception.get
       }
     }
-
-    // KAFKA-3727 / KAFKA-3177: the consumer may get stuck if a topic is deleted
-    // during the test and not recreated, so let's not leave deleted topics before stopping.
-    // We enclose it in Try() as we don't care about failures at this point.
-    deletedTopics.foreach { topic => Try(testUtils.createTopic(topic)) }
 
     query.stop()
     // `failOnDataLoss` is `false`, we should not fail the query
