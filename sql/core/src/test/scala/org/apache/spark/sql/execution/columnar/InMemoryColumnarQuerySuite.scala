@@ -20,6 +20,8 @@ package org.apache.spark.sql.execution.columnar
 import java.nio.charset.StandardCharsets
 import java.sql.{Date, Timestamp}
 
+import org.apache.hadoop.fs.{FileSystem, Path}
+
 import org.apache.spark.sql.{DataFrame, QueryTest, Row}
 import org.apache.spark.sql.catalyst.expressions.{AttributeReference, AttributeSet, In}
 import org.apache.spark.sql.catalyst.plans.logical.LocalRelation
@@ -508,8 +510,14 @@ class InMemoryColumnarQuerySuite extends QueryTest with SharedSQLContext {
           val inMemoryRelation = dfFromFile.queryExecution.optimizedPlan.collect {
             case plan: InMemoryRelation => plan
           }.head
+
+          // Save the size of the generated files for later checks.
+          val path = new Path(workDirPath)
+          val fs = path.getFileSystem(spark.sparkContext.hadoopConfiguration)
+          val expectedSize = fs.listStatus(path).map(_.getLen()).sum
+
           // InMemoryRelation's stats is file size before the underlying RDD is materialized
-          assert(inMemoryRelation.computeStats().sizeInBytes === 778)
+          assert(inMemoryRelation.computeStats().sizeInBytes === expectedSize)
 
           // InMemoryRelation's stats is updated after materializing RDD
           dfFromFile.collect()
@@ -522,7 +530,7 @@ class InMemoryColumnarQuerySuite extends QueryTest with SharedSQLContext {
 
           // Even CBO enabled, InMemoryRelation's stats keeps as the file size before table's stats
           // is calculated
-          assert(inMemoryRelation2.computeStats().sizeInBytes === 778)
+          assert(inMemoryRelation2.computeStats().sizeInBytes === expectedSize)
 
           // InMemoryRelation's stats should be updated after calculating stats of the table
           // clear cache to simulate a fresh environment
