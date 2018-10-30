@@ -73,7 +73,7 @@ class BarrierTaskContextSuite extends SparkFunSuite with LocalSparkContext {
     assert(times2.max - times2.min <= 1000)
   }
 
-  test("throw exception on barrier() call timeout") {
+  ignore("throw exception on barrier() call timeout") {
     val conf = new SparkConf()
       .set("spark.barrier.sync.timeout", "1")
       .set("spark.test.noStageRetry", "true")
