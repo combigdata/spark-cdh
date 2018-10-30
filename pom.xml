@@ -2791,6 +2791,11 @@
 
     <profile>
       <id>kubernetes</id>
+      <activation>
+        <property>
+          <name>cdh.build</name>
+        </property>
+      </activation>
       <modules>
         <module>resource-managers/kubernetes/core</module>
         <module>resource-managers/kubernetes/integration-tests</module>
