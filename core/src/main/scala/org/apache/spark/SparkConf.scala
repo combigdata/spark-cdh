@@ -735,7 +735,13 @@ private[spark] object SparkConf extends Logging {
     IO_ENCRYPTION_KEYGEN_ALGORITHM.key -> Seq(
       AlternateConfig("spark.shuffle.encryption.keygen.algorithm", "2.0")),
     IO_CRYPTO_CIPHER_TRANSFORMATION.key -> Seq(
-      AlternateConfig("spark.shuffle.crypto.cipher.transformation", "2.0"))
+      AlternateConfig("spark.shuffle.crypto.cipher.transformation", "2.0")),
+    KEYTAB.key -> Seq(
+      AlternateConfig("spark.yarn.keytab", "3.0")),
+    PRINCIPAL.key -> Seq(
+      AlternateConfig("spark.yarn.principal", "3.0")),
+    KERBEROS_RELOGIN_PERIOD.key -> Seq(
+      AlternateConfig("spark.yarn.kerberos.relogin.period", "3.0"))
   )
 
   /**
