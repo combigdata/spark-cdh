@@ -1043,16 +1043,6 @@ private[spark] class AppStatusListener(
         kvstore.delete(e.getClass(), e.id)
       }
 
-      val tasks = kvstore.view(classOf[TaskDataWrapper])
-        .index("stage")
-        .first(key)
-        .last(key)
-        .asScala
-
-      tasks.foreach { t =>
-        kvstore.delete(t.getClass(), t.taskId)
-      }
-
       // Check whether there are remaining attempts for the same stage. If there aren't, then
       // also delete the RDD graph data.
       val remainingAttempts = kvstore.view(classOf[StageDataWrapper])
@@ -1074,6 +1064,15 @@ private[spark] class AppStatusListener(
       }
 
       cleanupCachedQuantiles(key)
+    }
+
+    // Delete tasks for all stages in one pass, as deleting them for each stage individually is slow
+    val tasks = kvstore.view(classOf[TaskDataWrapper]).asScala
+    val keys = stages.map { s => (s.info.stageId, s.info.attemptId) }.toSet
+    tasks.foreach { t =>
+      if (keys.contains((t.stageId, t.stageAttemptId))) {
+        kvstore.delete(t.getClass(), t.taskId)
+      }
     }
   }
 
