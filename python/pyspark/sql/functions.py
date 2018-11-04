@@ -25,9 +25,12 @@ import warnings
 if sys.version < "3":
     from itertools import imap as map
 
+if sys.version >= '3':
+    basestring = str
+
 from pyspark import since, SparkContext
 from pyspark.rdd import ignore_unicode_prefix, PythonEvalType
-from pyspark.sql.column import Column, _to_java_column, _to_seq
+from pyspark.sql.column import Column, _to_java_column, _to_seq, _create_column_from_literal
 from pyspark.sql.dataframe import DataFrame
 from pyspark.sql.types import StringType, DataType
 # Keep UserDefinedFunction import for backwards compatible import; moved in SPARK-22409
@@ -853,36 +856,6 @@ def ntile(n):
     """
     sc = SparkContext._active_spark_context
     return Column(sc._jvm.functions.ntile(int(n)))
-
-
-@since(2.4)
-def unboundedPreceding():
-    """
-    Window function: returns the special frame boundary that represents the first row
-    in the window partition.
-    """
-    sc = SparkContext._active_spark_context
-    return Column(sc._jvm.functions.unboundedPreceding())
-
-
-@since(2.4)
-def unboundedFollowing():
-    """
-    Window function: returns the special frame boundary that represents the last row
-    in the window partition.
-    """
-    sc = SparkContext._active_spark_context
-    return Column(sc._jvm.functions.unboundedFollowing())
-
-
-@since(2.4)
-def currentRow():
-    """
-    Window function: returns the special frame boundary that represents the current row
-    in the window partition.
-    """
-    sc = SparkContext._active_spark_context
-    return Column(sc._jvm.functions.currentRow())
 
 
 # ---------------------- Date/Timestamp functions ------------------------------
@@ -2346,23 +2319,25 @@ def to_json(col, options={}):
 
 @ignore_unicode_prefix
 @since(2.4)
-def schema_of_json(col):
+def schema_of_json(json):
     """
-    Parses a column containing a JSON string and infers its schema in DDL format.
+    Parses a JSON string and infers its schema in DDL format.
 
-    :param col: string column in json format
+    :param json: a JSON string or a string literal containing a JSON string.
 
-    >>> from pyspark.sql.types import *
-    >>> data = [(1, '{"a": 1}')]
-    >>> df = spark.createDataFrame(data, ("key", "value"))
-    >>> df.select(schema_of_json(df.value).alias("json")).collect()
-    [Row(json=u'struct<a:bigint>')]
-    >>> df.select(schema_of_json(lit('{"a": 0}')).alias("json")).collect()
+    >>> df = spark.range(1)
+    >>> df.select(schema_of_json('{"a": 0}').alias("json")).collect()
     [Row(json=u'struct<a:bigint>')]
     """
+    if isinstance(json, basestring):
+        col = _create_column_from_literal(json)
+    elif isinstance(json, Column):
+        col = _to_java_column(json)
+    else:
+        raise TypeError("schema argument should be a column or string")
 
     sc = SparkContext._active_spark_context
-    jc = sc._jvm.functions.schema_of_json(_to_java_column(col))
+    jc = sc._jvm.functions.schema_of_json(col)
     return Column(jc)
 
 
@@ -2538,26 +2513,6 @@ def map_values(col):
     """
     sc = SparkContext._active_spark_context
     return Column(sc._jvm.functions.map_values(_to_java_column(col)))
-
-
-@since(2.4)
-def map_entries(col):
-    """
-    Collection function: Returns an unordered array of all entries in the given map.
-
-    :param col: name of column or expression
-
-    >>> from pyspark.sql.functions import map_entries
-    >>> df = spark.sql("SELECT map(1, 'a', 2, 'b') as data")
-    >>> df.select(map_entries("data").alias("entries")).show()
-    +----------------+
-    |         entries|
-    +----------------+
-    |[[1, a], [2, b]]|
-    +----------------+
-    """
-    sc = SparkContext._active_spark_context
-    return Column(sc._jvm.functions.map_entries(_to_java_column(col)))
 
 
 @since(2.4)
