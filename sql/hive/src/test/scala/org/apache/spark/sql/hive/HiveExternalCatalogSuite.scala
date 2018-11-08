@@ -138,12 +138,6 @@ class HiveExternalCatalogSuite extends ExternalCatalogSuite {
     assert(catalog.getDatabase("dbWithNullDesc").description == "")
   }
 
-  test("SPARK-23831: Add org.apache.derby to IsolatedClientLoader") {
-    val client1 = HiveUtils.newClientForMetadata(new SparkConf, new Configuration)
-    val client2 = HiveUtils.newClientForMetadata(new SparkConf, new Configuration)
-    assert(!client1.equals(client2))
-  }
-
   test("CDH-58542: auto-correct table location for namenode HA") {
     // set up a configuration with two nameservices (eg. two clusters, both with HA)
     val conf = new Configuration()
