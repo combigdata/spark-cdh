@@ -166,7 +166,7 @@ package object config {
     .doc("Name of the Kerberos principal.")
     .stringConf.createOptional
 
-  private[spark] val KERBEROS_RELOGIN_PERIOD = ConfigBuilder("spark.kerberos.relogin.period")
+  private[spark] val KERBEROS_RELOGIN_PERIOD = ConfigBuilder("spark.yarn.kerberos.relogin.period")
     .timeConf(TimeUnit.SECONDS)
     .createWithDefaultString("1m")
 
