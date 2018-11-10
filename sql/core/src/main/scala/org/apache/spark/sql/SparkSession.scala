@@ -1143,7 +1143,7 @@ object SparkSession extends Logging {
     extensionConfClassNames.foreach { extensionConfClassName =>
       try {
         val extensionConfClass = Utils.classForName(extensionConfClassName)
-        val extensionConf = extensionConfClass.newInstance()
+        val extensionConf = extensionConfClass.getConstructor().newInstance()
           .asInstanceOf[SparkSessionExtensions => Unit]
         extensionConf(extensions)
       } catch {
