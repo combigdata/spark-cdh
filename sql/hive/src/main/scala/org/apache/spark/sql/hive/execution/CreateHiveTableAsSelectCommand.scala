@@ -98,7 +98,7 @@ case class CreateHiveTableAsSelectCommand(
   }
 
   override def argString: String = {
-    s"[Database:${tableDesc.database}}, " +
+    s"[Database:${tableDesc.database}, " +
     s"TableName: ${tableDesc.identifier.table}, " +
     s"InsertIntoHiveTable]"
   }
