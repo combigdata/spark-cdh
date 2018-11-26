@@ -445,6 +445,7 @@ private[spark] class AppStatusListener(
       val locality = event.taskInfo.taskLocality.toString()
       val count = stage.localitySummary.getOrElse(locality, 0L) + 1L
       stage.localitySummary = stage.localitySummary ++ Map(locality -> count)
+      stage.activeTasksPerExecutor(event.taskInfo.executorId) += 1
       maybeUpdate(stage, now)
 
       stage.jobs.foreach { job =>
@@ -530,6 +531,7 @@ private[spark] class AppStatusListener(
       if (killedDelta > 0) {
         stage.killedSummary = killedTasksSummary(event.reason, stage.killedSummary)
       }
+      stage.activeTasksPerExecutor(event.taskInfo.executorId) -= 1
       // [SPARK-24415] Wait for all tasks to finish before removing stage from live list
       val removeStage =
         stage.activeTasks == 0 &&
@@ -554,7 +556,11 @@ private[spark] class AppStatusListener(
         if (killedDelta > 0) {
           job.killedSummary = killedTasksSummary(event.reason, job.killedSummary)
         }
-        conditionalLiveUpdate(job, now, removeStage)
+        if (removeStage) {
+          update(job, now)
+        } else {
+          maybeUpdate(job, now)
+        }
       }
 
       val esummary = stage.executorSummary(event.taskInfo.executorId)
@@ -565,7 +571,16 @@ private[spark] class AppStatusListener(
       if (metricsDelta != null) {
         esummary.metrics = LiveEntityHelpers.addMetrics(esummary.metrics, metricsDelta)
       }
-      conditionalLiveUpdate(esummary, now, removeStage)
+
+      val isLastTask = stage.activeTasksPerExecutor(event.taskInfo.executorId) == 0
+
+      // If the last task of the executor finished, then update the esummary
+      // for both live and history events.
+      if (isLastTask) {
+        update(esummary, now)
+      } else {
+        maybeUpdate(esummary, now)
+      }
 
       if (!stage.cleaning && stage.savedTasks.get() > maxTasksPerStage) {
         stage.cleaning = true
