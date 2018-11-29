@@ -100,6 +100,13 @@
       <version>${project.version}</version>
     </dependency>
 
+    <!-- CDH-70432: package Cloudera's log redactor. -->
+    <dependency>
+      <groupId>org.cloudera.logredactor</groupId>
+      <artifactId>logredactor</artifactId>
+      <version>${cdh.logredactor.version}</version>
+    </dependency>
+
     <!--
       Because we don't shade dependencies anymore, we need to restore Guava to compile scope so
       that the libraries Spark depend on have it available. We'll package the version that Spark
