@@ -280,14 +280,21 @@ private[spark] class ExecutorAllocationManager(
     val now = clock.getTimeMillis
 
     updateAndSyncNumExecutorsTarget(now)
+    var anyRemoved = false
 
     removeTimes.retain { case (executorId, expireTime) =>
       val expired = now >= expireTime
       if (expired) {
         initializing = false
         removeExecutor(executorId)
+        anyRemoved = true
       }
       !expired
+    }
+    if (anyRemoved) {
+      // [SPARK-21834] killExecutors api reduces the target number of executors.
+      // So we need to update the target with desired value.
+      client.requestTotalExecutors(numExecutorsTarget, localityAwareTasks, hostToLocalTaskCount)
     }
   }
 
