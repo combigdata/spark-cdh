@@ -30,6 +30,7 @@ import org.apache.kafka.common.serialization.{ByteArrayDeserializer, ByteArraySe
 import org.apache.spark.SparkEnv
 import org.apache.spark.deploy.security.KafkaTokenUtil
 import org.apache.spark.internal.Logging
+import org.apache.spark.internal.config._
 import org.apache.spark.sql.{AnalysisException, DataFrame, SaveMode, SQLContext}
 import org.apache.spark.sql.execution.streaming.{Sink, Source}
 import org.apache.spark.sql.sources._
@@ -504,7 +505,7 @@ private[kafka010] object KafkaSourceProvider extends Logging {
       // If buffer config is not set, set it to reasonable value to work around
       // buffer issues (see KAFKA-3135)
       .setIfUnset(ConsumerConfig.RECEIVE_BUFFER_CONFIG, 65536: java.lang.Integer)
-      .setTokenJaasConfigIfNeeded()
+      .setAuthenticationConfigIfNeeded()
       .build()
 
   def kafkaParamsForExecutors(
@@ -526,7 +527,7 @@ private[kafka010] object KafkaSourceProvider extends Logging {
       // If buffer config is not set, set it to reasonable value to work around
       // buffer issues (see KAFKA-3135)
       .setIfUnset(ConsumerConfig.RECEIVE_BUFFER_CONFIG, 65536: java.lang.Integer)
-      .setTokenJaasConfigIfNeeded()
+      .setAuthenticationConfigIfNeeded()
       .build()
 
   /** Class to conveniently update Kafka config params, while logging the changes */
@@ -547,7 +548,7 @@ private[kafka010] object KafkaSourceProvider extends Logging {
       this
     }
 
-    def setTokenJaasConfigIfNeeded(): ConfigUpdater = {
+    def setAuthenticationConfigIfNeeded(): ConfigUpdater = {
       // There are multiple possibilities to log in and applied in the following order:
       // - JVM global security provided -> try to log in with JVM global security configuration
       //   which can be configured for example with 'java.security.auth.login.config'.
@@ -559,11 +560,11 @@ private[kafka010] object KafkaSourceProvider extends Logging {
       } else if (KafkaSecurityHelper.isTokenAvailable()) {
         logDebug("Delegation token detected, using it for login.")
         val jaasParams = KafkaSecurityHelper.getTokenJaasParams(SparkEnv.get.conf)
-        val mechanism = kafkaParams
-          .getOrElse(SaslConfigs.SASL_MECHANISM, SaslConfigs.DEFAULT_SASL_MECHANISM)
+        set(SaslConfigs.SASL_JAAS_CONFIG, jaasParams)
+        val mechanism = SparkEnv.get.conf.get(Kafka.TOKEN_SASL_MECHANISM)
         require(mechanism.startsWith("SCRAM"),
           "Delegation token works only with SCRAM mechanism.")
-        set(SaslConfigs.SASL_JAAS_CONFIG, jaasParams)
+        set(SaslConfigs.SASL_MECHANISM, mechanism)
       }
       this
     }
@@ -591,7 +592,7 @@ private[kafka010] object KafkaSourceProvider extends Logging {
     ConfigUpdater("executor", specifiedKafkaParams)
       .set(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, serClassName)
       .set(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, serClassName)
-      .setTokenJaasConfigIfNeeded()
+      .setAuthenticationConfigIfNeeded()
       .build()
   }
 
