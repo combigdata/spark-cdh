@@ -156,9 +156,10 @@ abstract class BaseSessionStateBuilder(
    */
   protected def analyzer: Analyzer = new Analyzer(catalog, conf) {
     override val extendedResolutionRules: Seq[Rule[LogicalPlan]] =
-      new FindDataSourceTable(session) +:
-        new ResolveSQLOnFile(session) +:
-        customResolutionRules
+      customEarlyResolutionRules ++ (
+        new FindDataSourceTable(session) +:
+          new ResolveSQLOnFile(session) +:
+          customResolutionRules)
 
     override val postHocResolutionRules: Seq[Rule[LogicalPlan]] =
       PreprocessTableCreation(session) +:
@@ -171,6 +172,16 @@ abstract class BaseSessionStateBuilder(
         PreReadCheck +:
         HiveOnlyCheck +:
         customCheckRules
+  }
+
+  /**
+   * Custom early resolution rules to add to the Analyzer. Prefer overriding this instead of
+   * creating your own Analyzer.
+   *
+   * Note that this may NOT depend on the `analyzer` function.
+   */
+  protected def customEarlyResolutionRules: Seq[Rule[LogicalPlan]] = {
+    extensions.buildEarlyResolutionRules(session)
   }
 
   /**

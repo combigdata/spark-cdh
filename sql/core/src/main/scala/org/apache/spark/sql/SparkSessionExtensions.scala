@@ -69,6 +69,23 @@ class SparkSessionExtensions {
   type StrategyBuilder = SparkSession => Strategy
   type ParserBuilder = (SparkSession, ParserInterface) => ParserInterface
 
+  private[this] val earlyResolutionRuleBuilders = mutable.Buffer.empty[RuleBuilder]
+
+  /**
+   * Build the analyzer early resolution `Rule`s using the given [[SparkSession]].
+   */
+  private[sql] def buildEarlyResolutionRules(session: SparkSession): Seq[Rule[LogicalPlan]] = {
+    earlyResolutionRuleBuilders.map(_.apply(session))
+  }
+
+  /**
+   * Inject an analyzer early resolution `Rule` builder into the [[SparkSession]]. These analyzer
+   * rules will be executed as part of the resolution phase of analysis.
+   */
+  private[sql] def injectEarlyResolutionRule(builder: RuleBuilder): Unit = {
+    earlyResolutionRuleBuilders += builder
+  }
+
   private[this] val resolutionRuleBuilders = mutable.Buffer.empty[RuleBuilder]
 
   /**

@@ -45,6 +45,12 @@ class SparkSessionExtensionSuite extends SparkFunSuite {
     }
   }
 
+  test("inject early resolution analyzer rule before built-in extended resolution rules") {
+    withSession(_.injectEarlyResolutionRule(MyRule)) { session =>
+      assert(session.sessionState.analyzer.extendedResolutionRules.take(1) == Seq(MyRule(session)))
+    }
+  }
+
   test("inject analyzer rule") {
     withSession(_.injectResolutionRule(MyRule)) { session =>
       assert(session.sessionState.analyzer.extendedResolutionRules.contains(MyRule(session)))
