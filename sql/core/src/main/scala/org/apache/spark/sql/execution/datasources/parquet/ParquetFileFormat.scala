@@ -33,7 +33,6 @@ import parquet.filter2.compat.FilterCompat
 import parquet.filter2.predicate.FilterApi
 import parquet.format.converter.ParquetMetadataConverter.SKIP_ROW_GROUPS
 import parquet.hadoop._
-import parquet.hadoop.ParquetOutputFormat.JobSummaryLevel
 import parquet.hadoop.codec.CodecConfig
 import parquet.hadoop.util.ContextUtil
 import parquet.schema.MessageType
@@ -125,17 +124,16 @@ class ParquetFileFormat
     conf.set(ParquetOutputFormat.COMPRESSION, parquetOptions.compressionCodecClassName)
 
     // SPARK-15719: Disables writing Parquet summary files by default.
-    if (conf.get(ParquetOutputFormat.JOB_SUMMARY_LEVEL) == null
-      && conf.get(ParquetOutputFormat.ENABLE_JOB_SUMMARY) == null) {
-      conf.setEnum(ParquetOutputFormat.JOB_SUMMARY_LEVEL, JobSummaryLevel.NONE)
+    if (conf.get(ParquetOutputFormat.ENABLE_JOB_SUMMARY) == null) {
+      conf.setBoolean(ParquetOutputFormat.ENABLE_JOB_SUMMARY, false)
     }
 
-    if (ParquetOutputFormat.getJobSummaryLevel(conf) == JobSummaryLevel.NONE
+    if (conf.getBoolean(ParquetOutputFormat.ENABLE_JOB_SUMMARY, false)
       && !classOf[ParquetOutputCommitter].isAssignableFrom(committerClass)) {
       // output summary is requested, but the class is not a Parquet Committer
       logWarning(s"Committer $committerClass is not a ParquetOutputCommitter and cannot" +
         s" create job summaries. " +
-        s"Set Parquet option ${ParquetOutputFormat.JOB_SUMMARY_LEVEL} to NONE.")
+        s"Set Parquet option ${ParquetOutputFormat.ENABLE_JOB_SUMMARY} to false.")
     }
 
     new OutputWriterFactory {
@@ -358,13 +356,8 @@ class ParquetFileFormat
       val filePath = fileSplit.getPath
 
       val split =
-<<<<<<< HEAD
-        new org.apache.parquet.hadoop.ParquetInputSplit(
-          filePath,
-=======
         new _root_.parquet.hadoop.ParquetInputSplit(
-          fileSplit.getPath,
->>>>>>> 1a38a772d2... CLOUDERA-BUILD. Revert "[SPARK-7743] [SQL] Parquet 1.7. Cherry-pick + fix additional issues"
+          filePath,
           fileSplit.getStart,
           fileSplit.getStart + fileSplit.getLength,
           fileSplit.getLength,
