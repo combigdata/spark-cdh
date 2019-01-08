@@ -27,7 +27,7 @@ import scala.collection.JavaConverters.asScalaBufferConverter
 import parquet.filter2.predicate._
 import parquet.filter2.predicate.FilterApi._
 import parquet.io.api.Binary
-import parquet.schema.{DecimalMetadata, MessageType, OriginalType, PrimitiveComparator}
+import parquet.schema.{DecimalMetadata, MessageType, OriginalType}
 import parquet.schema.OriginalType._
 import parquet.schema.PrimitiveType.PrimitiveTypeName
 import parquet.schema.PrimitiveType.PrimitiveTypeName._
@@ -523,6 +523,7 @@ private[parquet] class ParquetFilters(
             .map(_(nameToParquetField(name).fieldName, v))
         }.reduceLeftOption(FilterApi.or)
 
+      /*
       case sources.StringStartsWith(name, prefix)
           if pushDownStartWith && canMakeFilterOn(name, prefix) =>
         Option(prefix).map { v =>
@@ -554,6 +555,7 @@ private[parquet] class ParquetFilters(
             }
           )
         }
+      */
 
       case _ => None
     }
