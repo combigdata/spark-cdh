@@ -243,9 +243,9 @@ object QueryAnalysis extends Logging {
       case HiveTableRelation(table, cols, parts) =>
         getRelationInfo(table.identifier, spark, cols ++ parts).toSeq
 
-      case InMemoryRelation(cols, _, _, _, WholeStageCodegenExec(child), _) =>
+      case InMemoryRelation(cols, CachedRDDBuilder(_, _, _, WholeStageCodegenExec(child), _)) =>
         child match {
-          case FileSourceScanExec(rel, _, _, _, _, tableId) =>
+          case FileSourceScanExec(rel, _, _, _, _, _, tableId) =>
             getHadoopRelationInfo(None, tableId, rel, cols, spark)
 
           case _ =>

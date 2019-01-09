@@ -18,6 +18,7 @@
 
 package org.apache.spark.sql.execution.datasources.parquet;
 
+import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.IOException;
 import java.lang.reflect.InvocationTargetException;
@@ -30,6 +31,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import parquet.column.page.PageReadStore;
 import scala.Option;
 
 import static parquet.filter2.compat.RowGroupFilter.filterRowGroups;
@@ -147,8 +149,9 @@ public abstract class SpecificParquetRecordReaderBase<T> extends RecordReader<Vo
     this.reader = new ParquetFileReader(
         configuration, footer.getFileMetaData(), file, blocks, requestedSchema.getColumns());
     // use the blocks from the reader in case some do not match filters and will not be read
-    for (BlockMetaData block : reader.getRowGroups()) {
-      this.totalRowCount += block.getRowCount();
+    PageReadStore rg;
+    while((rg = reader.readNextRowGroup()) != null) {
+      this.totalRowCount += rg.getRowCount();
     }
 
     // For test purpose.
@@ -226,8 +229,9 @@ public abstract class SpecificParquetRecordReaderBase<T> extends RecordReader<Vo
     this.reader = new ParquetFileReader(
         config, footer.getFileMetaData(), file, blocks, requestedSchema.getColumns());
     // use the blocks from the reader in case some do not match filters and will not be read
-    for (BlockMetaData block : reader.getRowGroups()) {
-      this.totalRowCount += block.getRowCount();
+    PageReadStore rg;
+    while((rg = reader.readNextRowGroup()) != null) {
+      this.totalRowCount += rg.getRowCount();
     }
   }
 
@@ -294,7 +298,7 @@ public abstract class SpecificParquetRecordReaderBase<T> extends RecordReader<Vo
       return new RLEIntIterator(
           new RunLengthBitPackingHybridDecoder(
               BytesUtils.getWidthFromMaxInt(maxLevel),
-              bytes.toInputStream()));
+              new ByteArrayInputStream(bytes.toByteArray())));
     } catch (IOException e) {
       throw new IOException("could not read levels in page for col " + descriptor, e);
     }

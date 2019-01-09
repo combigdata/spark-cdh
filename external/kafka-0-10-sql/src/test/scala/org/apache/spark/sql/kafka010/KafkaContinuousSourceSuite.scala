@@ -18,6 +18,7 @@
 package org.apache.spark.sql.kafka010
 
 import org.apache.kafka.clients.producer.ProducerRecord
+import org.scalatest.Ignore
 
 import org.apache.spark.sql.Dataset
 import org.apache.spark.sql.execution.datasources.v2.StreamingDataSourceV2Relation
