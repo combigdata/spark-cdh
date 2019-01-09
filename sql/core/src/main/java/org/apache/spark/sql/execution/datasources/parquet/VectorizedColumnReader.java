@@ -21,8 +21,6 @@ import java.io.IOException;
 import java.util.Arrays;
 import java.util.TimeZone;
 
-import parquet.bytes.ByteBufferInputStream;
-import parquet.bytes.BytesInput;
 import parquet.bytes.BytesUtils;
 import parquet.column.ColumnDescriptor;
 import parquet.column.Dictionary;
@@ -168,7 +166,7 @@ public class VectorizedColumnReader {
       }
       int num = Math.min(total, leftInPage);
       PrimitiveType.PrimitiveTypeName typeName =
-        descriptor.getPrimitiveType().getPrimitiveTypeName();
+        descriptor.getType();
       if (isCurrentPageDictionaryEncoded) {
         // Read and decode dictionary ids.
         defColumn.readIntegers(
@@ -221,7 +219,7 @@ public class VectorizedColumnReader {
             break;
           case FIXED_LEN_BYTE_ARRAY:
             readFixedLenByteArrayBatch(
-              rowId, num, column, descriptor.getPrimitiveType().getTypeLength());
+              rowId, num, column, descriptor.getTypeLength());
             break;
           default:
             throw new IOException("Unsupported type: " + typeName);
@@ -246,7 +244,7 @@ public class VectorizedColumnReader {
       WritableColumnVector column) {
     return new SchemaColumnConvertNotSupportedException(
       Arrays.toString(descriptor.getPath()),
-      descriptor.getPrimitiveType().getPrimitiveTypeName().toString(),
+      descriptor.getType().toString(),
       column.dataType().catalogString());
   }
 
@@ -258,7 +256,7 @@ public class VectorizedColumnReader {
       int num,
       WritableColumnVector column,
       WritableColumnVector dictionaryIds) {
-    switch (descriptor.getPrimitiveType().getPrimitiveTypeName()) {
+    switch (descriptor.getType()) {
       case INT32:
         if (column.dataType() == DataTypes.IntegerType ||
             DecimalType.is32BitDecimalType(column.dataType())) {
@@ -385,7 +383,7 @@ public class VectorizedColumnReader {
 
       default:
         throw new UnsupportedOperationException(
-          "Unsupported type: " + descriptor.getPrimitiveType().getPrimitiveTypeName());
+          "Unsupported type: " + descriptor.getType());
     }
   }
 
@@ -563,7 +561,7 @@ public class VectorizedColumnReader {
     });
   }
 
-  private void initDataReader(Encoding dataEncoding, ByteBufferInputStream in) throws IOException {
+  private void initDataReader(Encoding dataEncoding, byte[] in, int offset) throws IOException {
     this.endOfPageValueCount = valuesRead + pageValueCount;
     if (dataEncoding.usesDictionary()) {
       this.dataColumn = null;
@@ -588,7 +586,7 @@ public class VectorizedColumnReader {
     }
 
     try {
-      dataColumn.initFromPage(pageValueCount, in);
+      dataColumn.initFromPage(pageValueCount, in, offset);
     } catch (IOException e) {
       throw new IOException("could not read page in col " + descriptor, e);
     }
@@ -609,11 +607,12 @@ public class VectorizedColumnReader {
     this.repetitionLevelColumn = new ValuesReaderIntIterator(rlReader);
     this.definitionLevelColumn = new ValuesReaderIntIterator(dlReader);
     try {
-      BytesInput bytes = page.getBytes();
-      ByteBufferInputStream in = bytes.toInputStream();
-      rlReader.initFromPage(pageValueCount, in);
-      dlReader.initFromPage(pageValueCount, in);
-      initDataReader(page.getValueEncoding(), in);
+      byte[] bytes = page.getBytes().toByteArray();
+      rlReader.initFromPage(pageValueCount, bytes, 0);
+      int next = rlReader.getNextOffset();
+      dlReader.initFromPage(pageValueCount, bytes, next);
+      next = dlReader.getNextOffset();
+      initDataReader(page.getValueEncoding(), bytes, next);
     } catch (IOException e) {
       throw new IOException("could not read page " + page + " in col " + descriptor, e);
     }
@@ -629,9 +628,9 @@ public class VectorizedColumnReader {
     this.defColumn = new VectorizedRleValuesReader(bitWidth, false);
     this.definitionLevelColumn = new ValuesReaderIntIterator(this.defColumn);
     this.defColumn.initFromPage(
-        this.pageValueCount, page.getDefinitionLevels().toInputStream());
+        this.pageValueCount, page.getDefinitionLevels().toByteArray(), 0);
     try {
-      initDataReader(page.getDataEncoding(), page.getData().toInputStream());
+      initDataReader(page.getDataEncoding(), page.getData().toByteArray(), 0);
     } catch (IOException e) {
       throw new IOException("could not read page " + page + " in col " + descriptor, e);
     }
