@@ -148,10 +148,11 @@ public abstract class SpecificParquetRecordReaderBase<T> extends RecordReader<Vo
     this.sparkSchema = StructType$.MODULE$.fromString(sparkRequestedSchemaString);
     this.reader = new ParquetFileReader(
         configuration, footer.getFileMetaData(), file, blocks, requestedSchema.getColumns());
-    // use the blocks from the reader in case some do not match filters and will not be read
-    PageReadStore rg;
-    while((rg = reader.readNextRowGroup()) != null) {
-      this.totalRowCount += rg.getRowCount();
+    // disabled usage of blocks from reader that was introduced in SPARK-24230
+    // reader does not have a getRowGroups function to be used but it is not needed because
+    // currently used reader does not do additional filtering on `blocks`
+    for (BlockMetaData block : blocks) {
+      this.totalRowCount += block.getRowCount();
     }
 
     // For test purpose.
