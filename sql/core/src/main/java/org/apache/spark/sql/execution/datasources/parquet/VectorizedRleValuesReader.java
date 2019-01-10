@@ -126,6 +126,11 @@ public final class VectorizedRleValuesReader extends ValuesReader
   }
 
   @Override
+  public int getNextOffset() {
+    return this.end;
+  }
+
+  @Override
   public boolean readBoolean() {
     return this.readInteger() != 0;
   }
