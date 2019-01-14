@@ -483,8 +483,14 @@ function deploy_client_config {
   fi
 
   if [ -n "$CDH_PYTHON" ]; then
-    echo "spark.yarn.appMasterEnv.PYSPARK_PYTHON=$CDH_PYTHON" >> "$SPARK_DEFAULTS"
-    echo "spark.yarn.appMasterEnv.PYSPARK_DRIVER_PYTHON=$CDH_PYTHON" >> "$SPARK_DEFAULTS"
+    key="spark.yarn.appMasterEnv.PYSPARK_PYTHON"
+    if ! has_config "$key" "$SPARK_DEFAULTS"; then
+      echo "spark.yarn.appMasterEnv.PYSPARK_PYTHON=$CDH_PYTHON" >> "$SPARK_DEFAULTS"
+    fi
+    key="spark.yarn.appMasterEnv.PYSPARK_DRIVER_PYTHON"
+    if ! has_config "$key" "$SPARK_DEFAULTS"; then
+      echo "spark.yarn.appMasterEnv.PYSPARK_DRIVER_PYTHON=$CDH_PYTHON" >> "$SPARK_DEFAULTS"
+    fi
   fi
 
   # These values cannot be declared in the descriptor, since the CSD framework will
