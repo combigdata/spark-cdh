@@ -55,7 +55,7 @@ VERSION_FOR_BUILD=${VERSION/-SNAPSHOT/}
 # TODO: Fix this if CDH_GIT_HASH contains a slash.
 CDH_CLONE_DIR=${SPARK_HOME}/build/cdh-${CDH_GIT_HASH}
 
-MAKE_MANIFEST_LOCATION=http://github.mtv.cloudera.com/raw/Starship/cmf/${CMF_GIT_HASH}/cli/make_manifest/make_manifest.py
+MAKE_MANIFEST_LOCATION=https://github.infra.cloudera.com/raw/Starship/cmf/${CMF_GIT_HASH}/cli/make_manifest/make_manifest.py
 
 # We are building a non-patch build by default
 PATCH_NUMBER=0
