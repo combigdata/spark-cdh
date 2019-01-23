@@ -502,6 +502,8 @@ class ParquetFilterSuite extends QueryTest with ParquetTest with SharedSQLContex
     }
 
     // spark.sql.parquet.outputTimestampType = TIMESTAMP_MICROS
+    // TIMESTAMP_MICROS is not supported
+    /*
     val microsData = Seq(Timestamp.valueOf("2018-06-14 08:28:53.123456"),
       Timestamp.valueOf("2018-06-15 08:28:53.123456"),
       Timestamp.valueOf("2018-06-16 08:28:53.123456"),
@@ -510,6 +512,7 @@ class ParquetFilterSuite extends QueryTest with ParquetTest with SharedSQLContex
       ParquetOutputTimestampType.TIMESTAMP_MICROS.toString) {
       testTimestampPushdown(microsData)
     }
+    */
 
     // spark.sql.parquet.outputTimestampType = INT96 doesn't support pushdown
     withSQLConf(SQLConf.PARQUET_OUTPUT_TIMESTAMP_TYPE.key ->
@@ -523,7 +526,7 @@ class ParquetFilterSuite extends QueryTest with ParquetTest with SharedSQLContex
     }
   }
 
-  test("filter pushdown - decimal") {
+  ignore("filter pushdown - decimal") {
     Seq(true, false).foreach { legacyFormat =>
       withSQLConf(SQLConf.PARQUET_WRITE_LEGACY_FORMAT.key -> legacyFormat.toString) {
         Seq(
@@ -564,7 +567,8 @@ class ParquetFilterSuite extends QueryTest with ParquetTest with SharedSQLContex
     }
   }
 
-  test("Ensure that filter value matched the parquet file schema") {
+  // decimal pushdown is not supported: CDH-77210
+  ignore("Ensure that filter value matched the parquet file schema") {
     val scale = 2
     val schema = StructType(Seq(
       StructField("cint", IntegerType),
@@ -908,7 +912,8 @@ class ParquetFilterSuite extends QueryTest with ParquetTest with SharedSQLContex
     }
   }
 
-  test("filter pushdown - StringStartsWith") {
+  // StringStartsWith pushdown not supported
+  ignore("filter pushdown - StringStartsWith") {
     withParquetDataFrame((1 to 4).map(i => Tuple1(i + "str" + i))) { implicit df =>
       checkFilterPredicate(
         '_1.startsWith("").asInstanceOf[Predicate],

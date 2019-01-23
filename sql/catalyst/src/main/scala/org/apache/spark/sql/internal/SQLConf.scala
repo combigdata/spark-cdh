@@ -1661,7 +1661,14 @@ class SQLConf extends Serializable with Logging {
 
   def parquetFilterPushDownTimestamp: Boolean = getConf(PARQUET_FILTER_PUSHDOWN_TIMESTAMP_ENABLED)
 
-  def parquetFilterPushDownDecimal: Boolean = getConf(PARQUET_FILTER_PUSHDOWN_DECIMAL_ENABLED)
+  // push down of decimal filters are disabled: CDH-77210
+  def parquetFilterPushDownDecimal: Boolean = {
+    if (getConf(PARQUET_FILTER_PUSHDOWN_DECIMAL_ENABLED, false)) {
+      logWarning(s"${PARQUET_FILTER_PUSHDOWN_DECIMAL_ENABLED.key} is set to true, but it will be " +
+        s"ineffective because of problems found in it. see: CDH-77210")
+    }
+    false
+  }
 
   def parquetFilterPushDownStringStartWith: Boolean =
     getConf(PARQUET_FILTER_PUSHDOWN_STRING_STARTSWITH_ENABLED)
