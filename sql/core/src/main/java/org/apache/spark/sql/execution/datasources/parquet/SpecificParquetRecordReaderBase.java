@@ -231,8 +231,8 @@ public abstract class SpecificParquetRecordReaderBase<T> extends RecordReader<Vo
         config, footer.getFileMetaData(), file, blocks, requestedSchema.getColumns());
     // use the blocks from the reader in case some do not match filters and will not be read
     PageReadStore rg;
-    while((rg = reader.readNextRowGroup()) != null) {
-      this.totalRowCount += rg.getRowCount();
+    for (BlockMetaData block: blocks) {
+      this.totalRowCount += block.getRowCount();
     }
   }
 
