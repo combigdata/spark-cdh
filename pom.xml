@@ -121,7 +121,7 @@
     <sbt.project.name>spark</sbt.project.name>
     <mesos.version>0.21.1</mesos.version>
     <mesos.classifier>shaded-protobuf</mesos.classifier>
-    <slf4j.version>${cdh.slf4j.version}</slf4j.version>
+    <slf4j.version>1.7.25</slf4j.version>
     <log4j.version>1.2.17</log4j.version>
     <hadoop.version>${cdh.hadoop.version}</hadoop.version>
     <protobuf.version>${cdh.protobuf.version}</protobuf.version>
