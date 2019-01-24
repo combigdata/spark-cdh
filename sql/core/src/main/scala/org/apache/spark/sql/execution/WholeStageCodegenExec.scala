@@ -146,10 +146,7 @@ trait CodegenSupport extends SparkPlan {
       if (outputVars != null) {
         assert(outputVars.length == output.length)
         // outputVars will be used to generate the code for UnsafeRow, so we should copy them
-        outputVars.map(_.copy()) match {
-          case stream: Stream[ExprCode] => stream.force
-          case other => other
-        }
+        outputVars.map(_.copy())
       } else {
         assert(row != null, "outputVars and row cannot both be null.")
         ctx.currentVars = null
