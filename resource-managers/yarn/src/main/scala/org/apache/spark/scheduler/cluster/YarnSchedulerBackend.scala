@@ -85,11 +85,10 @@ private[spark] abstract class YarnSchedulerBackend(
     this.attemptId = attemptId
   }
 
-  override def start() {
+  protected def startBindings(): Unit = {
     require(appId.isDefined, "application ID unset")
     val binding = SchedulerExtensionServiceBinding(sc, appId.get, attemptId)
     services.start(binding)
-    super.start()
   }
 
   override def stop(): Unit = {
@@ -175,8 +174,8 @@ private[spark] abstract class YarnSchedulerBackend(
     }
   }
 
-  override def createDriverEndpoint(properties: Seq[(String, String)]): DriverEndpoint = {
-    new YarnDriverEndpoint(rpcEnv, properties)
+  override def createDriverEndpoint(): DriverEndpoint = {
+    new YarnDriverEndpoint()
   }
 
   /**
@@ -189,9 +188,8 @@ private[spark] abstract class YarnSchedulerBackend(
     sc.executorAllocationManager.foreach(_.reset())
   }
 
-  override protected def createTokenManager(
-      schedulerRef: RpcEndpointRef): Option[HadoopDelegationTokenManager] = {
-    Some(new YARNHadoopDelegationTokenManager(sc.conf, sc.hadoopConfiguration, schedulerRef))
+  override protected def createTokenManager(): Option[HadoopDelegationTokenManager] = {
+    Some(new YARNHadoopDelegationTokenManager(sc.conf, sc.hadoopConfiguration, driverEndpoint))
   }
 
   /**
@@ -199,8 +197,7 @@ private[spark] abstract class YarnSchedulerBackend(
    * This endpoint communicates with the executors and queries the AM for an executor's exit
    * status when the executor is disconnected.
    */
-  private class YarnDriverEndpoint(rpcEnv: RpcEnv, sparkProperties: Seq[(String, String)])
-      extends DriverEndpoint(rpcEnv, sparkProperties) {
+  private class YarnDriverEndpoint extends DriverEndpoint {
 
     /**
      * When onDisconnected is received at the driver endpoint, the superclass DriverEndpoint
