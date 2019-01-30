@@ -20,6 +20,7 @@ import java.io.File
 import java.nio.charset.StandardCharsets
 
 import scala.collection.JavaConverters._
+import scala.collection.mutable.HashMap
 
 import com.google.common.io.Files
 import io.fabric8.kubernetes.api.model._
@@ -45,12 +46,18 @@ private[spark] class HadoopConfDriverFeatureStep(conf: KubernetesConf)
     "as the creation of an additional ConfigMap, when one is already specified is extraneous")
 
   private lazy val confFiles: Seq[File] = {
-    val dir = new File(confDir.get)
-    if (dir.isDirectory) {
-      dir.listFiles.filter(_.isFile).toSeq
-    } else {
-      Nil
+    val confFiles = new HashMap[String, File]()
+    confDir.toSeq.flatMap(_.split(File.pathSeparator)).foreach { path =>
+      val dir = new File(path)
+      if (dir.isDirectory) {
+        dir.listFiles().foreach { file =>
+          if (file.isFile && !confFiles.contains(file.getName())) {
+            confFiles(file.getName()) = file
+          }
+        }
+      }
     }
+    confFiles.values.toList
   }
 
   private def newConfigMapName: String = s"${conf.resourceNamePrefix}-hadoop-config"
