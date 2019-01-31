@@ -1782,8 +1782,6 @@
           </exclusion>
         </exclusions>
       </dependency>
-      <!--
-      CDH-74083: native ORC support is disabled in CDH.
       <dependency>
         <groupId>org.apache.orc</groupId>
         <artifactId>orc-core</artifactId>
@@ -1834,7 +1832,6 @@
           </exclusion>
         </exclusions>
       </dependency>
-      -->
       <dependency>
         <groupId>com.twitter</groupId>
         <artifactId>parquet-column</artifactId>
