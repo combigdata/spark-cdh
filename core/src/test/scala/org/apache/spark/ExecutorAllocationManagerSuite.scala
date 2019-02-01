@@ -21,15 +21,18 @@ import scala.collection.mutable
 
 import org.mockito.Matchers.{any, eq => meq}
 import org.mockito.Mockito.{mock, never, verify, when}
+import org.mockito.invocation.InvocationOnMock
+import org.mockito.stubbing.Answer
 import org.scalatest.{BeforeAndAfter, PrivateMethodTester}
 
 import org.apache.spark.executor.TaskMetrics
 import org.apache.spark.internal.config
+import org.apache.spark.metrics.MetricsSystem
 import org.apache.spark.scheduler._
 import org.apache.spark.scheduler.ExternalClusterManager
 import org.apache.spark.scheduler.cluster.ExecutorInfo
 import org.apache.spark.scheduler.local.LocalSchedulerBackend
-import org.apache.spark.storage.BlockManagerMaster
+import org.apache.spark.storage._
 import org.apache.spark.util.ManualClock
 
 /**
@@ -1103,7 +1106,7 @@ class ExecutorAllocationManagerSuite
     val mockAllocationClient = mock(classOf[ExecutorAllocationClient])
     val mockBMM = mock(classOf[BlockManagerMaster])
     val manager = new ExecutorAllocationManager(
-      mockAllocationClient, mock(classOf[LiveListenerBus]), conf, mockBMM)
+      mockAllocationClient, mock(classOf[LiveListenerBus]), conf, mockBMM, null)
     val clock = new ManualClock()
     manager.setClock(clock)
 
@@ -1145,6 +1148,164 @@ class ExecutorAllocationManagerSuite
     assert(numExecutorsTarget(manager) === 1)
     // here's the important verify -- we did kill the executors, but did not adjust the target count
     verify(mockAllocationClient).killExecutors(Seq("executor-1"), false, false, false)
+  }
+
+  test("CDH-77502: executor block tracker") {
+    val conf = new SparkConf(false)
+      .set("spark.dynamicAllocation.enabled", "true")
+      .set(config.SHUFFLE_SERVICE_ENABLED, false)
+      .set(config.Cloudera.DYN_ALLOCATION_FORCE_ENABLE, true)
+      .set("spark.dynamicAllocation.executorIdleTimeout", "3s")
+      .set("spark.dynamicAllocation.cachedExecutorIdleTimeout", "5s")
+      .set(config.Cloudera.DYN_ALLOCATION_SHUFFLE_TIMEOUT, 10L)
+    val manager = new ExecutorAllocationManager(
+      mock(classOf[ExecutorAllocationClient]),
+      mock(classOf[LiveListenerBus]),
+      conf,
+      mock(classOf[BlockManagerMaster]),
+      null)
+
+    val tracker = new manager.ExecutorTracker()
+    assert(!tracker.isTimedOut(1000))
+
+    tracker.idleStart = 0L
+    assert(!tracker.isTimedOut(1000))
+    assert(tracker.isTimedOut(4000))
+
+    tracker.cachedBlocks = 1
+    assert(!tracker.isTimedOut(4000))
+    assert(tracker.isTimedOut(6000))
+
+    tracker.shuffleBlocks = 1
+    assert(!tracker.isTimedOut(6000))
+    assert(tracker.isTimedOut(11000))
+  }
+
+  test("CDH-77502: track executor storage to decide when to time out") {
+    val conf = new SparkConf(false)
+      .set("spark.dynamicAllocation.enabled", "true")
+      .set("spark.dynamicAllocation.testing", "true")
+      .set(config.SHUFFLE_SERVICE_ENABLED, false)
+      .set(config.Cloudera.DYN_ALLOCATION_FORCE_ENABLE, true)
+      .set("spark.dynamicAllocation.executorIdleTimeout", "1s")
+      .set("spark.dynamicAllocation.cachedExecutorIdleTimeout", "2s")
+      .set(config.Cloudera.DYN_ALLOCATION_SHUFFLE_TIMEOUT, 5L)
+      // Disable the automatic task to figure things out. The test drives the manager manually.
+      .set(TESTING_SCHEDULE_INTERVAL_KEY, Long.MaxValue.toString)
+    val bus = new LiveListenerBus(conf)
+    val clock = new ManualClock()
+
+    var mapOutputListener: MapOutputTrackerListener = null
+    val mapOutputTracker = mock(classOf[MapOutputTrackerMaster])
+    when(mapOutputTracker.addListener(any())).thenAnswer(
+      new Answer[Unit] {
+        override def answer(invocation: InvocationOnMock): Unit = {
+          mapOutputListener = invocation.getArguments()(0).asInstanceOf[MapOutputTrackerListener]
+        }
+      }
+    )
+
+    val manager = new ExecutorAllocationManager(mock(classOf[ExecutorAllocationClient]), bus, conf,
+      mock(classOf[BlockManagerMaster]), mapOutputTracker)
+    manager.setClock(clock)
+
+    bus.start(mock(classOf[SparkContext]), mock(classOf[MetricsSystem]))
+    try {
+      manager.start()
+      assert(mapOutputListener !== null)
+
+      def advanceAndVerify(ms: Long, expectedPending: Set[String]): Unit = {
+        clock.advance(ms)
+        schedule(manager)
+        assert(executorsPendingToRemove(manager) === expectedPending)
+        expectedPending.foreach(onExecutorRemoved(manager, _))
+      }
+
+      def postExecutorStart(execId: String): Unit = {
+        post(bus, SparkListenerExecutorAdded(clock.getTimeMillis(), execId,
+          new ExecutorInfo(s"$execId.example.com", 1, Map())))
+      }
+
+      def postBlockUpdate(execId: String, blockId: String, level: StorageLevel): Unit = {
+        val bm = blockManagerId(execId)
+        val blockInfo = BlockUpdatedInfo(bm, BlockId(blockId), level, 1L, 1L)
+        val update = SparkListenerBlockUpdated(blockInfo)
+        post(bus, update)
+      }
+
+      def mapStatus(execId: String): MapStatus = {
+        new CompressedMapStatus(blockManagerId(execId), Array[Byte]())
+      }
+
+      def blockManagerId(execId: String): BlockManagerId = {
+        BlockManagerId(execId, s"$execId.example.com", 42)
+      }
+
+      //////////////////////////////
+      // Basic executor idle check, without any block storage.
+      postExecutorStart("1")
+      // post task started
+      post(bus, SparkListenerStageSubmitted(createStageInfo(1, 1)))
+      val taskInfo = createTaskInfo(0, 0, "1")
+      post(bus, SparkListenerTaskStart(1, 0, taskInfo))
+      // advance clock past idle timeout, check executor still there.
+      advanceAndVerify(1500, Set())
+      // post task end
+      post(bus, SparkListenerTaskEnd(0, 0, null, Success, taskInfo, null))
+      // advance clock and check timeout.
+      advanceAndVerify(500, Set())
+      advanceAndVerify(1000, Set("1"))
+
+      //////////////////////////////
+      // Executor idle check with cached block; check that a different timeout is applied when
+      // the executor has a cached block.
+      postExecutorStart("2")
+      // add a cached block
+      postBlockUpdate("2", "rdd_1_1", StorageLevel.MEMORY_ONLY)
+      // advance clock < cache timeout but > idle timeout, verify executor alive.
+      advanceAndVerify(1500, Set())
+      // advance past cache timeout, verify executor removed
+      advanceAndVerify(1500, Set("2"))
+
+      //////////////////////////////
+      // Executor idle check with shuffle block. Same idea as the cache test above.
+      postExecutorStart("3")
+      // add a shuffle block
+      mapOutputListener.mapOutputAdded(mapStatus("3"))
+      // advance past idle timeout, verify executor still there
+      advanceAndVerify(4000, Set())
+      // advance past shuffle timeout, verify executor removed
+      advanceAndVerify(10000, Set("3"))
+
+      //////////////////////////////
+      // Executor idle check with cached block that is removed. Make sure that the idle timeout
+      // triggers after a cached block is removed from the executor.
+      postExecutorStart("4")
+      // add a cached block
+      postBlockUpdate("4", "rdd_1_1", StorageLevel.MEMORY_ONLY)
+      // advance past idle timeout, verify executor still there
+      advanceAndVerify(1500, Set())
+      // remove cached block
+      postBlockUpdate("4", "rdd_1_1", StorageLevel.NONE)
+      // schedule same time, verify executor removed
+      advanceAndVerify(0, Set("4"))
+
+      //////////////////////////////
+      // Executor idle check with shuffle block that is removed. Same idea as previous test,
+      // for shuffle blocks.
+      postExecutorStart("5")
+      // add a shuffle block
+      mapOutputListener.mapOutputAdded(mapStatus("5"))
+      // advance past idle timeout, verify executor still there
+      advanceAndVerify(1500, Set())
+      // remove shuffle block
+      mapOutputListener.mapOutputRemoved(mapStatus("5"))
+      // schedule same time, verify executor removed
+      advanceAndVerify(0, Set("5"))
+    } finally {
+      manager.stop()
+      bus.stop()
+    }
   }
 
   private def createSparkContext(

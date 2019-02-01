@@ -29,7 +29,7 @@ import org.apache.spark.internal.{config, Logging}
 import org.apache.spark.internal.config._
 import org.apache.spark.metrics.source.Source
 import org.apache.spark.scheduler._
-import org.apache.spark.storage.BlockManagerMaster
+import org.apache.spark.storage._
 import org.apache.spark.util.{Clock, SystemClock, ThreadUtils, Utils}
 
 /**
@@ -87,7 +87,8 @@ private[spark] class ExecutorAllocationManager(
     client: ExecutorAllocationClient,
     listenerBus: LiveListenerBus,
     conf: SparkConf,
-    blockManagerMaster: BlockManagerMaster)
+    blockManagerMaster: BlockManagerMaster,
+    mapOutputTracker: MapOutputTrackerMaster)
   extends Logging {
 
   allocationManager =>
@@ -116,6 +117,19 @@ private[spark] class ExecutorAllocationManager(
 
   // During testing, the methods to actually kill and add executors are mocked out
   private val testing = conf.getBoolean("spark.dynamicAllocation.testing", false)
+
+  // Whether to force dynamic allocation even without a shuffle service. This enables some extra
+  // tracking that is not done in normal mode (to avoid introducing issues in that path).
+  private val forceDynamicAlloc = conf.get(Cloudera.DYN_ALLOCATION_FORCE_ENABLE)
+
+  private val blockTracker: mutable.HashMap[String, ExecutorTracker] =
+    if (forceDynamicAlloc) {
+      new mutable.HashMap()
+    } else {
+      null
+    }
+
+  private val shuffleIdleTimeout = conf.get(Cloudera.DYN_ALLOCATION_SHUFFLE_TIMEOUT)
 
   // TODO: The default value of 1 for spark.executor.cores works right now because dynamic
   // allocation is only supported for YARN and the default number of cores per executor in YARN is
@@ -213,8 +227,13 @@ private[spark] class ExecutorAllocationManager(
     // Require external shuffle service for dynamic allocation
     // Otherwise, we may lose shuffle files when killing executors
     if (!conf.get(config.SHUFFLE_SERVICE_ENABLED) && !testing) {
-      throw new SparkException("Dynamic allocation of executors requires the external " +
-        "shuffle service. You may enable this through spark.shuffle.service.enabled.")
+      if (forceDynamicAlloc) {
+        logWarning("Forcing dynamic allocation without an external shuffle service. " +
+          "This configuration is experimental and meant mainly for testing.")
+      } else {
+        throw new SparkException("Dynamic allocation of executors requires the external " +
+          "shuffle service. You may enable this through spark.shuffle.service.enabled.")
+      }
     }
     if (tasksPerExecutorForFullParallelism == 0) {
       throw new SparkException("spark.executor.cores must not be < spark.task.cpus.")
@@ -255,6 +274,10 @@ private[spark] class ExecutorAllocationManager(
     executor.scheduleWithFixedDelay(scheduleTask, 0, intervalMillis, TimeUnit.MILLISECONDS)
 
     client.requestTotalExecutors(numExecutorsTarget, localityAwareTasks, hostToLocalTaskCount)
+
+    if (forceDynamicAlloc) {
+      mapOutputTracker.addListener(new MapOutputListener())
+    }
   }
 
   /**
@@ -277,6 +300,9 @@ private[spark] class ExecutorAllocationManager(
     numExecutorsTarget = initialNumExecutors
     executorsPendingToRemove.clear()
     removeTimes.clear()
+    if (blockTracker != null) {
+      blockTracker.clear()
+    }
   }
 
   /**
@@ -309,13 +335,23 @@ private[spark] class ExecutorAllocationManager(
     updateAndSyncNumExecutorsTarget(now)
 
     val executorIdsToBeRemoved = ArrayBuffer[String]()
-    removeTimes.retain { case (executorId, expireTime) =>
-      val expired = now >= expireTime
-      if (expired) {
-        initializing = false
-        executorIdsToBeRemoved += executorId
+
+    if (blockTracker != null) {
+      blockTracker.foreach { case (executorId, tracker) =>
+        if (tracker.isTimedOut(now) && !executorsPendingToRemove.contains(executorId)) {
+          initializing = false
+          executorIdsToBeRemoved += executorId
+        }
       }
-      !expired
+    } else {
+      removeTimes.retain { case (executorId, expireTime) =>
+        val expired = now >= expireTime
+        if (expired) {
+          initializing = false
+          executorIdsToBeRemoved += executorId
+        }
+        !expired
+      }
     }
     if (executorIdsToBeRemoved.nonEmpty) {
       removeExecutors(executorIdsToBeRemoved)
@@ -488,15 +524,24 @@ private[spark] class ExecutorAllocationManager(
     newExecutorTotal = numExistingExecutors
     if (testing || executorsRemoved.nonEmpty) {
       executorsRemoved.foreach { removedExecutorId =>
-        // If it is a cached block, it uses cachedExecutorIdleTimeoutS for timeout
-        val idleTimeout = if (blockManagerMaster.hasCachedBlocks(removedExecutorId)) {
-          cachedExecutorIdleTimeoutS
+        if (blockTracker != null) {
+          blockTracker.get(removedExecutorId).foreach { tracker =>
+            logInfo(
+              s"Removing idle executor $removedExecutorId with " +
+              s"${tracker.cachedBlocks} cached blocks and " +
+              s"${tracker.shuffleBlocks} shuffle blocks.")
+          }
         } else {
-          executorIdleTimeoutS
+          // If it is a cached block, it uses cachedExecutorIdleTimeoutS for timeout
+          val idleTimeout = if (blockManagerMaster.hasCachedBlocks(removedExecutorId)) {
+            cachedExecutorIdleTimeoutS
+          } else {
+            executorIdleTimeoutS
+          }
+          logInfo(s"Removing executor $removedExecutorId because it has been idle for " +
+            s"$idleTimeout seconds (new desired total will be $newExecutorTotal)")
         }
         newExecutorTotal -= 1
-        logInfo(s"Removing executor $removedExecutorId because it has been idle for " +
-          s"$idleTimeout seconds (new desired total will be $newExecutorTotal)")
         executorsPendingToRemove.add(removedExecutorId)
       }
       executorsRemoved
@@ -542,12 +587,17 @@ private[spark] class ExecutorAllocationManager(
   private def onExecutorAdded(executorId: String): Unit = synchronized {
     if (!executorIds.contains(executorId)) {
       executorIds.add(executorId)
-      // If an executor (call this executor X) is not removed because the lower bound
-      // has been reached, it will no longer be marked as idle. When new executors join,
-      // however, we are no longer at the lower bound, and so we must mark executor X
-      // as idle again so as not to forget that it is a candidate for removal. (see SPARK-4951)
-      executorIds.filter(listener.isExecutorIdle).foreach(onExecutorIdle)
       logInfo(s"New executor $executorId has registered (new total is ${executorIds.size})")
+
+      if (blockTracker != null) {
+        blockTracker(executorId) = new ExecutorTracker()
+      } else {
+        // If an executor (call this executor X) is not removed because the lower bound
+        // has been reached, it will no longer be marked as idle. When new executors join,
+        // however, we are no longer at the lower bound, and so we must mark executor X
+        // as idle again so as not to forget that it is a candidate for removal. (see SPARK-4951)
+        executorIds.filter(listener.isExecutorIdle).foreach(onExecutorIdle)
+      }
     } else {
       logWarning(s"Duplicate executor $executorId has registered")
     }
@@ -565,6 +615,9 @@ private[spark] class ExecutorAllocationManager(
         executorsPendingToRemove.remove(executorId)
         logDebug(s"Executor $executorId is no longer pending to " +
           s"be removed (${executorsPendingToRemove.size} left)")
+      }
+      if (blockTracker != null) {
+        blockTracker.remove(executorId)
       }
     } else {
       logWarning(s"Unknown executor $executorId has been removed!")
@@ -600,7 +653,11 @@ private[spark] class ExecutorAllocationManager(
    * the executor is not already marked as idle.
    */
   private def onExecutorIdle(executorId: String): Unit = synchronized {
-    if (executorIds.contains(executorId)) {
+    if (blockTracker != null) {
+      blockTracker.get(executorId).foreach { tracker =>
+        tracker.idleStart = clock.getTimeMillis()
+      }
+    } else if (executorIds.contains(executorId)) {
       if (!removeTimes.contains(executorId) && !executorsPendingToRemove.contains(executorId)) {
         // Note that it is not necessary to query the executors since all the cached
         // blocks we are concerned with are reported to the driver. Note that this
@@ -632,6 +689,11 @@ private[spark] class ExecutorAllocationManager(
   private def onExecutorBusy(executorId: String): Unit = synchronized {
     logDebug(s"Clearing idle timer for $executorId because it is now running a task")
     removeTimes.remove(executorId)
+    if (blockTracker != null) {
+      blockTracker.get(executorId).foreach { tracker =>
+        tracker.idleStart = -1L
+      }
+    }
   }
 
   /**
@@ -804,6 +866,22 @@ private[spark] class ExecutorAllocationManager(
       }
     }
 
+    override def onBlockUpdated(event: SparkListenerBlockUpdated): Unit = {
+      if (blockTracker == null || !event.blockUpdatedInfo.blockId.isInstanceOf[RDDBlockId]) {
+        return
+      }
+
+      val execId = event.blockUpdatedInfo.blockManagerId.executorId
+      val storageLevel = event.blockUpdatedInfo.storageLevel
+      val delta = if (storageLevel.useDisk || storageLevel.useMemory) 1 else -1
+
+      allocationManager.synchronized {
+        blockTracker.get(execId).foreach { tracker =>
+          tracker.cachedBlocks = math.max(0, tracker.cachedBlocks + delta)
+        }
+      }
+    }
+
     /**
      * An estimate of the total number of pending tasks remaining for currently running stages. Does
      * not account for tasks which may have failed and been resubmitted.
@@ -888,6 +966,56 @@ private[spark] class ExecutorAllocationManager(
     registerGauge("numberAllExecutors", executorIds.size, 0)
     registerGauge("numberTargetExecutors", numExecutorsTarget, 0)
     registerGauge("numberMaxNeededExecutors", maxNumExecutorsNeeded(), 0)
+  }
+
+  /**
+   * Tracks information about a particular executor, so that the manager can make informed decisions
+   * about when to remove it.
+   */
+  private[spark] class ExecutorTracker {
+    /** When the executor became idle. */
+    var idleStart: Long = clock.getTimeMillis()
+    /** How many cached blocks the executor holds. */
+    var cachedBlocks: Int = 0
+    /** How many shuffle blocks the executor holds. */
+    var shuffleBlocks: Int = 0
+
+    /**
+     * Returns whether the executor has timed out based on what data it currently holds.
+     *
+     * If the executor has cached blocks or shuffle blocks, then the timeout is the higher of
+     * the cache or shuffle timeout (depending on which blocks it has). Otherwise the normal
+     * idle timeout is used. This ensures that if a cached block or shuffle block is removed
+     * after the executor becomes idle, the idle timeout triggers based on when the executor
+     * became idle.
+     *
+     * @param now Current time in milliseconds.
+     */
+    def isTimedOut(now: Long): Boolean = {
+      if (idleStart >= 0) {
+        val shuffleTimeout = if (shuffleBlocks > 0) shuffleIdleTimeout else 0L
+        val cacheTimeout = if (cachedBlocks > 0) cachedExecutorIdleTimeoutS else 0L
+        val timeout = math.max(shuffleTimeout, math.max(cacheTimeout, executorIdleTimeoutS))
+        (now - idleStart) > TimeUnit.SECONDS.toMillis(timeout)
+      } else {
+        false
+      }
+    }
+  }
+
+  private class MapOutputListener extends MapOutputTrackerListener {
+
+    override def mapOutputAdded(status: MapStatus): Unit = allocationManager.synchronized {
+      blockTracker.get(status.location.executorId).foreach { tracker =>
+        tracker.shuffleBlocks += 1
+      }
+    }
+
+    override def mapOutputRemoved(status: MapStatus): Unit = allocationManager.synchronized {
+      blockTracker.get(status.location.executorId).foreach { tracker =>
+        tracker.shuffleBlocks = math.max(tracker.shuffleBlocks - 1, 0)
+      }
+    }
   }
 }
 
