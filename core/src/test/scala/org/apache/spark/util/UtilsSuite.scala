@@ -34,7 +34,7 @@ import scala.util.Random
 
 import com.google.common.io.Files
 import org.apache.commons.io.IOUtils
-import org.apache.commons.lang3.{JavaVersion, SystemUtils}
+import org.apache.commons.lang3.SystemUtils
 import org.apache.commons.math3.stat.inference.ChiSquareTest
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.Path
@@ -984,7 +984,7 @@ class UtilsSuite extends SparkFunSuite with ResetSystemProperties with Logging {
         signal(pid, "SIGKILL")
       }
 
-      if (SystemUtils.isJavaVersionAtLeast(JavaVersion.JAVA_1_8)) {
+      if (JavaVersion.isVersionAtLeast(8)) {
         // We'll make sure that forcibly terminating a process works by
         // creating a very misbehaving process. It ignores SIGTERM and has been SIGSTOPed. On
         // older versions of java, this will *not* terminate.

@@ -85,7 +85,7 @@ private[sql] class JSONOptions(
 
   val timestampFormat: FastDateFormat =
     FastDateFormat.getInstance(
-      parameters.getOrElse("timestampFormat", "yyyy-MM-dd'T'HH:mm:ss.SSSXXX"), timeZone, Locale.US)
+      parameters.getOrElse("timestampFormat", "yyyy-MM-dd'T'HH:mm:ss.SSSZZ"), timeZone, Locale.US)
 
   val multiLine = parameters.get("multiLine").map(_.toBoolean).getOrElse(false)
 
