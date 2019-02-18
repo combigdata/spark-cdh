@@ -315,7 +315,8 @@
         "enabledConfigName" : "spark.ssl.historyServer.enabled",
         "keystoreLocationConfigName" : "spark.ssl.historyServer.keyStore",
         "keystorePasswordCredentialProviderCompatible" : false,
-        "keystorePasswordScriptBased" : false
+        "keystorePasswordScriptBased" : false,
+        "autoTlsMode" : "auto"
       },
       "configWriter" : {
         "generators" : [
