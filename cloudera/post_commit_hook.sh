@@ -20,4 +20,20 @@ export MAVEN_OPTS="-XX:ReservedCodeCacheSize=512m"
 
 export APACHE_MIRROR=http://mirror.infra.cloudera.com/apache
 export SPARK_TESTING=1
-./build/mvn -B -Dcdh.build=true package -fae -Dmaven.repo.local="$MVN_REPO_LOCAL" $EXTRA_MAVEN_ARGS
+if [ -n "$TEST_WITH_JDK_11" ]; then
+  # We want to build with JDK_8, and then run all tests w/ JDK_11
+  # Just setting JAVA_HOME isn't enough -- scalatests will use whatever java is on the PATH
+  export JAVA_HOME=$JAVA_1_8_HOME
+  ORIG_PATH=$PATH
+  export PATH=$JAVA_HOME/bin:$ORIG_PATH
+  ./build/mvn -B -Dcdh.build=true -DskipTests clean install -fae -Dmaven.repo.local="$MVN_REPO_LOCAL" $EXTRA_MAVEN_ARGS
+  echo "Done Building with Java 8, now running tests w/ Java 11"
+  export JAVA_HOME=$OPENJDK_11_HOME
+  export PATH=$JAVA_HOME/bin:$ORIG_PATH
+  echo "Running surefire (junit) test"
+  ./build/mvn -B -Dcdh.build=true -PJDK11 surefire:test -fae -Dmaven.repo.local="$MVN_REPO_LOCAL" $EXTRA_MAVEN_ARGS
+  echo "Running scalatest tests"
+  ./build/mvn -B -Dcdh.build=true -PJDK11 scalatest:test -fae -Dmaven.repo.local="$MVN_REPO_LOCAL" $EXTRA_MAVEN_ARGS
+else
+  ./build/mvn -B -Dcdh.build=true package
+fi
