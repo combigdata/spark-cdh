@@ -19,12 +19,15 @@ package org.apache.spark.streaming.kafka
 
 import java.io.{File, IOException}
 import java.lang.{Integer => JInt}
-import java.net.InetSocketAddress
+import java.net.{BindException, InetSocketAddress}
 import java.util.{Map => JMap, Properties}
 import java.util.concurrent.TimeoutException
 
 import scala.annotation.tailrec
 import scala.collection.JavaConverters._
+import scala.concurrent.{Await, Future}
+import scala.concurrent.ExecutionContext.Implicits.global
+import scala.concurrent.duration._
 import scala.util.control.NonFatal
 
 import kafka.admin.AdminUtils
@@ -103,6 +106,24 @@ private[kafka] class KafkaTestUtils extends Logging {
     zkReady = true
   }
 
+  private def runWithTimeout[O](timeout: Duration)(func: => O): O = {
+    var backgroundThread: Option[Thread] = None
+    val f = Future {
+      backgroundThread = Some(Thread.currentThread())
+      func
+    }
+    try {
+      // scalastyle:off awaitresult
+      Await.result(f, timeout)
+      // scalastyle:on awaitresult
+    } catch {
+      case _: TimeoutException =>
+        backgroundThread.foreach(_.interrupt())
+        throw new BindException("Timeout experienced in KafkaServer startup, assuming " +
+          "address already used (kafka embedded server sometimes hangs in such a case)")
+    }
+  }
+
   // Set up the Embedded Kafka server
   private def setupEmbeddedKafkaServer(): Unit = {
     assert(zkReady, "Zookeeper should be set up beforehand")
@@ -111,8 +132,11 @@ private[kafka] class KafkaTestUtils extends Logging {
     Utils.startServiceOnPort(brokerPort, port => {
       brokerPort = port
       brokerConf = KafkaConfig.fromProps(brokerConfiguration)
-      server = new KafkaServer(brokerConf)
-      server.startup()
+      server = runWithTimeout(1.minute) {
+        val s = new KafkaServer(brokerConf)
+        s.startup()
+        s
+      }
       (server, brokerPort)
     }, new SparkConf(), "KafkaBroker")
 
@@ -136,8 +160,10 @@ private[kafka] class KafkaTestUtils extends Logging {
     }
 
     if (server != null) {
-      server.shutdown()
-      server.awaitShutdown()
+      runWithTimeout(1.minute) {
+        server.shutdown()
+        server.awaitShutdown()
+      }
       server = null
     }
 

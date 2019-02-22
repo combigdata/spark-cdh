@@ -2258,6 +2258,7 @@ private[spark] object Utils extends Logging {
 
     val serviceString = if (serviceName.isEmpty) "" else s" '$serviceName'"
     val maxRetries = portMaxRetries(conf)
+    logInfo(s"max retries is $maxRetries")
     for (offset <- 0 to maxRetries) {
       // Do not increment port if startPort is 0, which is treated as a special port
       val tryPort = if (startPort == 0) {
