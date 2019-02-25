@@ -28,6 +28,7 @@ import scala.util.control.NonFatal
 
 import org.apache.spark.SparkEnv
 import org.apache.spark.internal.Logging
+import org.apache.spark.sql.kafka010.KafkaSourceProvider.ConfigUpdater
 
 private[kafka010] object CachedKafkaProducer extends Logging {
 
@@ -64,8 +65,11 @@ private[kafka010] object CachedKafkaProducer extends Logging {
       .build[Seq[(String, Object)], Producer](cacheLoader)
 
   private def createKafkaProducer(producerConfiguration: ju.Map[String, Object]): Producer = {
-    val kafkaProducer: Producer = new Producer(producerConfiguration)
-    logDebug(s"Created a new instance of KafkaProducer for $producerConfiguration.")
+    val updatedKafkaParams = ConfigUpdater("executor", producerConfiguration.asScala.toMap)
+      .setAuthenticationConfigIfNeeded()
+      .build()
+    val kafkaProducer: Producer = new Producer(updatedKafkaParams)
+    logDebug(s"Created a new instance of KafkaProducer for $updatedKafkaParams.")
     kafkaProducer
   }
 
