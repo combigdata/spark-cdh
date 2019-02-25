@@ -505,7 +505,6 @@ private[kafka010] object KafkaSourceProvider extends Logging {
       // If buffer config is not set, set it to reasonable value to work around
       // buffer issues (see KAFKA-3135)
       .setIfUnset(ConsumerConfig.RECEIVE_BUFFER_CONFIG, 65536: java.lang.Integer)
-      .setAuthenticationConfigIfNeeded()
       .build()
 
   def kafkaParamsForExecutors(
@@ -527,11 +526,10 @@ private[kafka010] object KafkaSourceProvider extends Logging {
       // If buffer config is not set, set it to reasonable value to work around
       // buffer issues (see KAFKA-3135)
       .setIfUnset(ConsumerConfig.RECEIVE_BUFFER_CONFIG, 65536: java.lang.Integer)
-      .setAuthenticationConfigIfNeeded()
       .build()
 
   /** Class to conveniently update Kafka config params, while logging the changes */
-  private case class ConfigUpdater(module: String, kafkaParams: Map[String, String]) {
+  case class ConfigUpdater(module: String, kafkaParams: Map[String, Object]) {
     private val map = new ju.HashMap[String, Object](kafkaParams.asJava)
 
     def set(key: String, value: Object): this.type = {
@@ -592,7 +590,6 @@ private[kafka010] object KafkaSourceProvider extends Logging {
     ConfigUpdater("executor", specifiedKafkaParams)
       .set(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, serClassName)
       .set(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, serClassName)
-      .setAuthenticationConfigIfNeeded()
       .build()
   }
 
