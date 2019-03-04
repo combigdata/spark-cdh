@@ -367,4 +367,10 @@ package object config {
       .booleanConf
       .createWithDefault(false)
 
+  /* Initially blacklisted YARN nodes. */
+  private[spark] val YARN_EXCLUDE_NODES = ConfigBuilder("spark.yarn.exclude.nodes")
+      .stringConf
+      .toSequence
+      .createWithDefault(Nil)
+
 }
