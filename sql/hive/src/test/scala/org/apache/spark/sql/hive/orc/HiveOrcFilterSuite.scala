@@ -361,7 +361,7 @@ class HiveOrcFilterSuite extends OrcTest with TestHiveSingleton {
     assertResult(
       Array(
         "leaf-0 = (LESS_THAN a 10)",
-        "expr = leaf-0").mkString("\n")
+        "expr = leaf-0").mkString(", ")
     ) {
       OrcFilters.createFilter(schema, Array(
         LessThan("a", 10),
@@ -373,7 +373,7 @@ class HiveOrcFilterSuite extends OrcTest with TestHiveSingleton {
     assertResult(
       Array(
         "leaf-0 = (LESS_THAN a 10)",
-        "expr = leaf-0").mkString("\n")
+        "expr = leaf-0").mkString(", ")
     ) {
       OrcFilters.createFilter(schema, Array(
         LessThan("a", 10),
