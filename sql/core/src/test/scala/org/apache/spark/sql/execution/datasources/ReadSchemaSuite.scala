@@ -18,6 +18,7 @@
 package org.apache.spark.sql.execution.datasources
 
 import org.apache.spark.sql.internal.SQLConf
+import org.scalatest.Ignore
 
 /**
  * Read schema suites have the following hierarchy and aims to guarantee users
@@ -83,6 +84,7 @@ class JsonReadSchemaSuite
   override val format: String = "json"
 }
 
+@Ignore
 class OrcReadSchemaSuite
   extends ReadSchemaSuite
   with AddColumnIntoTheMiddleTest
