@@ -19,6 +19,8 @@ package org.apache.spark.sql.hive.orc
 
 import java.io.File
 
+import org.scalatest.Ignore
+
 import org.apache.spark.sql.{AnalysisException, Row}
 import org.apache.spark.sql.TestingUDT.{IntervalData, IntervalUDT}
 import org.apache.spark.sql.execution.datasources.orc.OrcSuite
@@ -27,6 +29,7 @@ import org.apache.spark.sql.hive.test.TestHiveSingleton
 import org.apache.spark.sql.types._
 import org.apache.spark.util.Utils
 
+@Ignore
 class HiveOrcSourceSuite extends OrcSuite with TestHiveSingleton {
 
   override val orcImp: String = "hive"
