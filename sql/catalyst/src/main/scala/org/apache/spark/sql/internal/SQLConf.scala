@@ -481,11 +481,12 @@ object SQLConf {
     .createWithDefault("snappy")
 
   val ORC_IMPLEMENTATION = buildConf("spark.sql.orc.impl")
-    .doc("This configuration does nothing in CDH. It is hardcoded to use the Hive implementation.")
+    .doc("When native, use the native version of ORC support instead of the ORC library in Hive " +
+      "1.2.1. It is 'hive' by default prior to Spark 2.4.")
     .internal()
     .stringConf
-    .checkValues(Set("hive"))
-    .createWithDefault("hive")
+    .checkValues(Set("hive", "native"))
+    .createWithDefault("native")
 
   val ORC_VECTORIZED_READER_ENABLED = buildConf("spark.sql.orc.enableVectorizedReader")
     .doc("Enables vectorized orc decoding.")

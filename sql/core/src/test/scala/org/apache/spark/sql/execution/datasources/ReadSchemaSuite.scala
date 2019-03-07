@@ -17,8 +17,6 @@
 
 package org.apache.spark.sql.execution.datasources
 
-import org.scalatest.Ignore
-
 import org.apache.spark.sql.internal.SQLConf
 
 /**
@@ -85,8 +83,6 @@ class JsonReadSchemaSuite
   override val format: String = "json"
 }
 
-// CDH-74083: native ORC support is disabled in CDH.
-@Ignore
 class OrcReadSchemaSuite
   extends ReadSchemaSuite
   with AddColumnIntoTheMiddleTest
@@ -107,8 +103,6 @@ class OrcReadSchemaSuite
   }
 }
 
-// CDH-74083: native ORC support is disabled in CDH.
-@Ignore
 class VectorizedOrcReadSchemaSuite
   extends ReadSchemaSuite
   with AddColumnIntoTheMiddleTest

@@ -103,8 +103,7 @@ class HiveSparkSubmitSuite
     runSparkSubmit(args)
   }
 
-  // Not supported in CDH.
-  ignore("SPARK-8368: includes jars passed in through --jars") {
+  test("SPARK-8368: includes jars passed in through --jars") {
     val unusedJar = TestUtils.createJarWithClasses(Seq.empty)
     val jar1 = TestUtils.createJarWithClasses(Seq("SparkSubmitClassA"))
     val jar2 = TestUtils.createJarWithClasses(Seq("SparkSubmitClassB"))

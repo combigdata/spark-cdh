@@ -208,11 +208,19 @@ case class RelationConversions(
     } else {
       val options = relation.tableMeta.properties.filterKeys(isOrcProperty) ++
         relation.tableMeta.storage.properties
-      sessionCatalog.metastoreCatalog.convertToLogicalRelation(
-        relation,
-        options,
-        classOf[org.apache.spark.sql.hive.orc.OrcFileFormat],
-        "orc")
+      if (conf.getConf(SQLConf.ORC_IMPLEMENTATION) == "native") {
+        sessionCatalog.metastoreCatalog.convertToLogicalRelation(
+          relation,
+          options,
+          classOf[org.apache.spark.sql.execution.datasources.orc.OrcFileFormat],
+          "orc")
+      } else {
+        sessionCatalog.metastoreCatalog.convertToLogicalRelation(
+          relation,
+          options,
+          classOf[org.apache.spark.sql.hive.orc.OrcFileFormat],
+          "orc")
+      }
     }
   }
 

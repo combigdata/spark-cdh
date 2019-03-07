@@ -488,8 +488,7 @@ class DataFrameReaderWriterSuite extends QueryTest with SharedSQLContext with Be
       spark.read.schema(userSchema).parquet(Seq(dir, dir): _*), expData ++ expData, userSchema)
   }
 
-  // CDH-74083: native ORC support is disabled in CDH.
-  ignore("orc - API and behavior regarding schema") {
+  test("orc - API and behavior regarding schema") {
     withSQLConf(SQLConf.ORC_IMPLEMENTATION.key -> "native") {
       // Writer
       spark.createDataset(data).toDF("str").write.mode(SaveMode.Overwrite).orc(dir)
@@ -518,8 +517,7 @@ class DataFrameReaderWriterSuite extends QueryTest with SharedSQLContext with Be
     }
   }
 
-  // CDH-74083: native ORC support is disabled in CDH.
-  ignore("column nullability and comment - write and then read") {
+  test("column nullability and comment - write and then read") {
     withSQLConf(SQLConf.ORC_IMPLEMENTATION.key -> "native") {
       Seq("json", "orc", "parquet", "csv").foreach { format =>
         val schema = StructType(

@@ -69,8 +69,7 @@ object OrcReadBenchmark {
     }
   }
 
-  // CDH-74083: native ORC support is disabled in CDH.
-  // private val NATIVE_ORC_FORMAT = classOf[org.apache.spark.sql.execution.datasources.orc.OrcFileFormat].getCanonicalName
+  private val NATIVE_ORC_FORMAT = classOf[org.apache.spark.sql.execution.datasources.orc.OrcFileFormat].getCanonicalName
   private val HIVE_ORC_FORMAT = classOf[org.apache.spark.sql.hive.orc.OrcFileFormat].getCanonicalName
 
   private def prepareTable(dir: File, df: DataFrame, partition: Option[String] = None): Unit = {
@@ -82,7 +81,7 @@ object OrcReadBenchmark {
       df.write.orc(dirORC)
     }
 
-    // spark.read.format(NATIVE_ORC_FORMAT).load(dirORC).createOrReplaceTempView("nativeOrcTable")
+    spark.read.format(NATIVE_ORC_FORMAT).load(dirORC).createOrReplaceTempView("nativeOrcTable")
     spark.read.format(HIVE_ORC_FORMAT).load(dirORC).createOrReplaceTempView("hiveOrcTable")
   }
 

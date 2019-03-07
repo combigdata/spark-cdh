@@ -149,8 +149,6 @@ class HiveOrcQuerySuite extends OrcQueryTest with TestHiveSingleton {
     }
   }
 
-  // CDH-74083: native ORC support is disabled in CDH.
-  /*
   test("SPARK-20728 Make ORCFileFormat configurable between sql/hive and sql/core") {
     Seq(
       ("native", classOf[org.apache.spark.sql.execution.datasources.orc.OrcFileFormat]),
@@ -168,14 +166,12 @@ class HiveOrcQuerySuite extends OrcQueryTest with TestHiveSingleton {
         }
     }
   }
-  */
 
   // Since Hive 1.2.1 library code path still has this problem, users may hit this
   // when spark.sql.hive.convertMetastoreOrc=false. However, after SPARK-22279,
   // Apache Spark with the default configuration doesn't hit this bug.
   test("SPARK-22267 Spark SQL incorrectly reads ORC files when column order is different") {
-    // CDH-74083: native ORC support is disabled in CDH.
-    Seq("hive").foreach { orcImpl =>
+    Seq("native", "hive").foreach { orcImpl =>
       withSQLConf(SQLConf.ORC_IMPLEMENTATION.key -> orcImpl) {
         withTempPath { f =>
           val path = f.getCanonicalPath
@@ -197,8 +193,7 @@ class HiveOrcQuerySuite extends OrcQueryTest with TestHiveSingleton {
   // when spark.sql.hive.convertMetastoreOrc=false. However, after SPARK-22279,
   // Apache Spark with the default configuration doesn't hit this bug.
   test("SPARK-19809 NullPointerException on zero-size ORC file") {
-    // CDH-74083: native ORC support is disabled in CDH.
-    Seq("hive").foreach { orcImpl =>
+    Seq("native", "hive").foreach { orcImpl =>
       withSQLConf(SQLConf.ORC_IMPLEMENTATION.key -> orcImpl) {
         withTempPath { dir =>
           withTable("spark_19809") {
@@ -214,8 +209,7 @@ class HiveOrcQuerySuite extends OrcQueryTest with TestHiveSingleton {
     }
   }
 
-  // CDH-74083: bug in ORC still present in the CDH Hive fork.
-  ignore("SPARK-23340 Empty float/double array columns raise EOFException") {
+  test("SPARK-23340 Empty float/double array columns raise EOFException") {
     withSQLConf(HiveUtils.CONVERT_METASTORE_ORC.key -> "false") {
       withTable("spark_23340") {
         sql("CREATE TABLE spark_23340(a array<float>, b array<double>) STORED AS ORC")
