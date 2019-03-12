@@ -658,6 +658,21 @@ package object config {
       .timeConf(TimeUnit.SECONDS)
       .createWithDefaultString("1h")
 
+  private[spark] val SHUFFLE_DETECT_CORRUPT =
+    ConfigBuilder("spark.shuffle.detectCorrupt")
+      .doc("Whether to detect any corruption in fetched blocks.")
+      .booleanConf
+      .createWithDefault(true)
+
+  private[spark] val SHUFFLE_DETECT_CORRUPT_MEMORY =
+    ConfigBuilder("spark.shuffle.detectCorrupt.useExtraMemory")
+      .doc("If enabled, part of a compressed/encrypted stream will be de-compressed/de-crypted " +
+        "by using extra memory to detect early corruption. Any IOException thrown will cause " +
+        "the task to be retried once and if it fails again with same exception, then " +
+        "FetchFailedException will be thrown to retry previous stage")
+      .booleanConf
+      .createWithDefault(false)
+
   private[spark] val SHUFFLE_MIN_NUM_PARTS_TO_HIGHLY_COMPRESS =
     ConfigBuilder("spark.shuffle.minNumPartitionsToHighlyCompress")
       .internal()
