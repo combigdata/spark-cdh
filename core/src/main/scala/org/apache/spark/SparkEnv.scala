@@ -197,10 +197,11 @@ object SparkEnv extends Logging {
       numCores: Int,
       ioEncryptionKey: Option[Array[Byte]],
       isLocal: Boolean): SparkEnv = {
+    val bindAddress = if (conf.get(EXECUTOR_RPC_BIND_TO_ALL)) "0.0.0.0" else hostname
     val env = create(
       conf,
       executorId,
-      hostname,
+      bindAddress,
       hostname,
       None,
       isLocal,
