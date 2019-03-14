@@ -342,6 +342,13 @@ package object config {
     .doc("Address where to bind network listen sockets on the driver.")
     .fallbackConf(DRIVER_HOST_ADDRESS)
 
+  private[spark] val EXECUTOR_RPC_BIND_TO_ALL =
+    ConfigBuilder("spark.executor.rpc.bindToAll")
+      .doc("Whether to bind network listen sockets of the executors to all IPv4 addresses " +
+        "(to the address 0.0.0.0).")
+      .booleanConf
+      .createWithDefault(false)
+
   private[spark] val BLOCK_MANAGER_PORT = ConfigBuilder("spark.blockManager.port")
     .doc("Port to use for the block manager when a more specific setting is not provided.")
     .intConf
