@@ -31,7 +31,7 @@ ARG k8s_tests=kubernetes/tests
 
 RUN set -ex && \
     apk upgrade --no-cache && \
-    apk add --no-cache bash tini libc6-compat linux-pam krb5 krb5-libs && \
+    apk add --no-cache bash tini libc6-compat linux-pam krb5 krb5-libs nss && \
     mkdir -p /opt/spark && \
     mkdir -p /opt/spark/examples && \
     mkdir -p /opt/spark/work-dir && \
