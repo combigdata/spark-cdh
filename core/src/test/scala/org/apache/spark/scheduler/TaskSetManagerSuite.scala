@@ -1620,7 +1620,7 @@ class TaskSetManagerSuite extends SparkFunSuite with LocalSparkContext with Logg
   test("SPARK-13704 Rack Resolution is done with a batch of de-duped hosts") {
     val conf = new SparkConf()
       .set(config.LOCALITY_WAIT, 0L)
-      .set(config.LOCALITY_WAIT_RACK, 1L)
+      .set("spark.locality.wait.rack", "1")
     sc = new SparkContext("local", "test", conf)
     // Create a cluster with 20 racks, with hosts spread out among them
     val execAndHost = (0 to 199).map { i =>
