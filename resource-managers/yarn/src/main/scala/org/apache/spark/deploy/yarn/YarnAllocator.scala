@@ -419,7 +419,7 @@ private[yarn] class YarnAllocator(
         override def run(): Unit = {
           try {
             for (allocatedContainer <- remainingAfterHostMatches) {
-              val rack = resolver.resolve(conf, allocatedContainer.getNodeId.getHost)
+              val rack = resolver.resolve(allocatedContainer.getNodeId.getHost)
               matchContainerToRequest(allocatedContainer, rack, containersToUse,
                 remainingAfterRackMatches)
             }
