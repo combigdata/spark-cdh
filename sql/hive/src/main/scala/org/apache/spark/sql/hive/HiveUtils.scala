@@ -317,19 +317,25 @@ private[spark] object HiveUtils extends Logging {
       }
 
       val classLoader = Utils.getContextOrSparkClassLoader
-      val jars = allJars(classLoader)
-      if (JavaVersion.isVersionAtLeast(9)) {
-        // Do nothing. The system classloader is no longer a URLClassLoader in Java 9,
-        // so it won't match the case in allJars above. It no longer exposes URLs of
-        // the system classpath
-      } else {
-        // Verify at least one jar was found
-        if (jars.length == 0) {
-          throw new IllegalArgumentException(
-            "Unable to locate hive jars to connect to metastore. " +
-              s"Please set ${HIVE_METASTORE_JARS.key}.")
+      val jars: Array[URL] =
+        if (JavaVersion.isVersionAtLeast(9)) {
+          // Do nothing. The system classloader is no longer a URLClassLoader in Java 9,
+          // so it won't match the case in allJars above. It no longer exposes URLs of
+          // the system classpath
+          // Furthermore the jars discovered on the UrlClassLoaders in the Classloader chain
+          // will not contain hive classes. We would like to avoid `IsolatedClientLoader` to handle
+          // such jars as the source of hive classes.
+          Array[URL]()
+        } else {
+          val candidates = allJars(classLoader)
+          // Verify at least one jar was found
+          if (candidates.length == 0) {
+            throw new IllegalArgumentException(
+              "Unable to locate hive jars to connect to metastore. " +
+                s"Please set ${HIVE_METASTORE_JARS.key}.")
+          }
+          candidates
         }
-      }
 
       logInfo(
         s"Initializing HiveMetastoreConnection version $hiveMetastoreVersion using Spark classes.")
