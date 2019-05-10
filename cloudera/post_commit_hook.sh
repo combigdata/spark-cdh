@@ -35,5 +35,5 @@ if [ -n "$TEST_WITH_JDK_11" ]; then
   echo "Running scalatest tests"
   ./build/mvn -B -Dcdh.build=true -PJDK11 scalatest:test -fae -Dmaven.repo.local="$MVN_REPO_LOCAL" $EXTRA_MAVEN_ARGS
 else
-  ./build/mvn -B -Dcdh.build=true package
+  ./build/mvn -B -Dcdh.build=true package -fae -Dmaven.repo.local="$MVN_REPO_LOCAL" $EXTRA_MAVEN_ARGS
 fi
