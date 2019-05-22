@@ -56,6 +56,7 @@ import org.apache.spark.deploy.yarn.security.YARNHadoopDelegationTokenManager
 import org.apache.spark.internal.Logging
 import org.apache.spark.internal.config._
 import org.apache.spark.launcher.{LauncherBackend, SparkAppHandle, YarnCommandBuilderUtils}
+import org.apache.spark.launcher.CommandBuilderUtils.getDefaultGcOptions
 import org.apache.spark.util.{CallerContext, Utils}
 
 private[spark] class Client(
@@ -938,6 +939,8 @@ private[spark] class Client(
         prefixEnv = Some(createLibraryPathPrefix(paths, sparkConf))
       }
     }
+
+    javaOpts ++= getDefaultGcOptions(javaOpts.asJava).asScala
 
     // For log4j configuration to reference
     javaOpts += ("-Dspark.yarn.app.container.log.dir=" + ApplicationConstants.LOG_DIR_EXPANSION_VAR)

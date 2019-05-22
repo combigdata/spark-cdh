@@ -38,6 +38,7 @@ import org.apache.hadoop.yarn.util.{ConverterUtils, Records}
 import org.apache.spark.{SecurityManager, SparkConf, SparkException}
 import org.apache.spark.internal.Logging
 import org.apache.spark.internal.config._
+import org.apache.spark.launcher.CommandBuilderUtils.getDefaultGcOptions
 import org.apache.spark.network.util.JavaUtils
 import org.apache.spark.util.Utils
 
@@ -140,6 +141,8 @@ private[yarn] class ExecutorRunnable(
       val subsOpt = Utils.substituteAppNExecIds(opts, appId, executorId)
       javaOpts ++= Utils.splitCommandString(subsOpt).map(YarnSparkHadoopUtil.escapeForShell)
     }
+
+    javaOpts ++= getDefaultGcOptions(javaOpts.asJava).asScala
 
     if (Utils.isTesting) {
       javaOpts += "-Dspark.testing=1"

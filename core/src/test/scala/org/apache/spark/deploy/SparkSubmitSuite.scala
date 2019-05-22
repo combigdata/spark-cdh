@@ -18,10 +18,12 @@
 package org.apache.spark.deploy
 
 import java.io._
+import java.lang.management.ManagementFactory
 import java.net.URI
 import java.nio.charset.StandardCharsets
 import java.nio.file.{Files, Paths}
 
+import scala.collection.JavaConverters._
 import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
 import scala.io.Source
@@ -44,7 +46,7 @@ import org.apache.spark.internal.Logging
 import org.apache.spark.internal.config._
 import org.apache.spark.launcher.SparkLauncher
 import org.apache.spark.scheduler.EventLoggingListener
-import org.apache.spark.util.{CommandLineUtils, ResetSystemProperties, Utils}
+import org.apache.spark.util.{CommandLineUtils, JavaVersion, ResetSystemProperties, Utils}
 
 trait TestPrematureExit {
   suite: SparkFunSuite =>
@@ -509,6 +511,53 @@ class SparkSubmitSuite
       "--conf", "spark.master.rest.enabled=false",
       unusedJar.toString)
     runSparkSubmit(args)
+  }
+
+  test("Default garbage collector is not added on jdk 8") {
+    if (JavaVersion.isVersionAtLeast(9)) {
+      cancel("jdk 9 and above default gc is set")
+    }
+    val unusedJar = TestUtils.createJarWithClasses(Seq.empty)
+    val args = Seq(
+      "--class", GcPrintTest.getClass.getName.stripSuffix("$"),
+      "--name", "testApp",
+      "--master", "local",
+      "--conf", "spark.ui.enabled=false",
+      "--conf", "spark.master.rest.enabled=false",
+      unusedJar.toString,
+      "")
+    runSparkSubmit(args)
+  }
+
+  test("Default garbage collector is added as java options on jdk 11") {
+    if (!JavaVersion.isVersionAtLeast(9)) {
+      cancel("Below jdk 9 default gc is not touched")
+    }
+    val unusedJar = TestUtils.createJarWithClasses(Seq.empty)
+    val args = Seq(
+      "--class", GcPrintTest.getClass.getName.stripSuffix("$"),
+      "--name", "testApp",
+      "--master", "local",
+      "--conf", "spark.ui.enabled=false",
+      "--conf", "spark.master.rest.enabled=false",
+      unusedJar.toString,
+      "-XX:+UseParallelGC")
+    runSparkSubmit(args)
+  }
+
+  test("User can overwrite default gc with extraJavaOptions") {
+      val unusedJar = TestUtils.createJarWithClasses(Seq.empty)
+      val args = Seq(
+        "--class", GcPrintTest.getClass.getName.stripSuffix("$"),
+        "--name", "testApp",
+        "--master", "local",
+        "--conf", "spark.ui.enabled=false",
+        "--conf", "spark.master.rest.enabled=false",
+        "--conf", "spark.executor.extraJavaOptions=-XX:+UseG1GC",
+        "--conf", "spark.driver.extraJavaOptions=-XX:+UseG1GC",
+        unusedJar.toString,
+        "-XX:+UseG1GC")
+      runSparkSubmit(args)
   }
 
   test("launch simple application with spark-submit with redaction") {
@@ -1293,6 +1342,37 @@ object SimpleApplicationTest {
       }
     }
     sc.stop()
+  }
+}
+
+object GcPrintTest {
+  def main(args: Array[String]) {
+    TestUtils.configTestLog4j("INFO")
+    val conf = new SparkConf()
+    val sc = new SparkContext(conf)
+    val expectedArgs = args(0)
+
+
+    val executorGcs = sc
+      .makeRDD(1 to 5, 2)
+      .flatMap(_ => gcSelectionArgs)
+      .collect()
+    val allGcs = executorGcs ++ gcSelectionArgs
+    val actualGcArgs = allGcs
+      .distinct
+      .sorted
+      .mkString(",")
+    sc.stop()
+    if (expectedArgs != actualGcArgs) {
+      throw new SparkException(
+        s"Expected gc is $expectedArgs actual gcs: $actualGcArgs"
+      )
+    }
+  }
+
+  private def gcSelectionArgs: List[String] = {
+    ManagementFactory.getRuntimeMXBean
+      .getInputArguments.asScala.filter(_.matches(".*Use.*GC.*")).toList
   }
 }
 

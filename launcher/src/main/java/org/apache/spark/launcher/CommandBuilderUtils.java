@@ -22,11 +22,19 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
+import static java.util.Collections.singletonList;
+import static java.util.Collections.emptyList;
+
 /**
  * Helper methods for command builders.
  */
-class CommandBuilderUtils {
+public class CommandBuilderUtils {
 
+  /** If any VM options matches this, the garbage collector specified by SPARK_DEFAULT_GC_KEY
+   * will not be added to the list */
+  public static final String SPARK_GC_PATTERN = "(['\"]?)-XX:\\+Use(.*)GC\\1";
+  /** Default GC setting to be used for every java process launch **/
+  public static final String SPARK_DEFAULT_GC_VALUE = "-XX:+UseParallelGC";
   static final String DEFAULT_MEM = "1g";
   static final String DEFAULT_PROPERTIES_FILE = "spark-defaults.conf";
   static final String ENV_SPARK_HOME = "SPARK_HOME";
@@ -346,6 +354,23 @@ class CommandBuilderUtils {
       }
     }
     return libdir.getAbsolutePath();
+  }
+
+  /**
+   * Inserts additional jvm options for default garbage collector. In case there is already a
+   * setting for using a specific one the default gc setting will be ignored.
+   */
+  public static void addDefaultGcOptions(List<String> cmd) {
+    cmd.addAll(getDefaultGcOptions(cmd));
+  }
+
+  public static List<String> getDefaultGcOptions(List<String> cmd) {
+    if (javaMajorVersion(System.getProperty("java.specification.version")) >= 9 &&
+        cmd.stream().noneMatch(s -> s.matches(SPARK_GC_PATTERN))) {
+      return singletonList(SPARK_DEFAULT_GC_VALUE);
+    } else {
+      return emptyList();
+    }
   }
 
 }
