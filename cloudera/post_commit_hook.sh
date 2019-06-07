@@ -30,10 +30,8 @@ if [ -n "$TEST_WITH_JDK_11" ]; then
   echo "Done Building with Java 8, now running tests w/ Java 11"
   export JAVA_HOME=$OPENJDK_11_HOME
   export PATH=$JAVA_HOME/bin:$ORIG_PATH
-  echo "Running surefire (junit) test"
-  ./build/mvn -B -Dcdh.build=true -PJDK11 surefire:test -fae -Dmaven.repo.local="$MVN_REPO_LOCAL" $EXTRA_MAVEN_ARGS
-  echo "Running scalatest tests"
-  ./build/mvn -B -Dcdh.build=true -PJDK11 scalatest:test -fae -Dmaven.repo.local="$MVN_REPO_LOCAL" $EXTRA_MAVEN_ARGS
+  echo "Running tests"
+  ./build/mvn -B -Dcdh.build=true -Pskip-compilation install -fae -Dmaven.repo.local="$MVN_REPO_LOCAL" $EXTRA_MAVEN_ARGS
 else
   ./build/mvn -B -Dcdh.build=true package -fae -Dmaven.repo.local="$MVN_REPO_LOCAL" $EXTRA_MAVEN_ARGS
 fi

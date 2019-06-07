@@ -3021,5 +3021,38 @@
         </pluginManagement>
       </build>
     </profile>
+    <!--
+      This profile is needed if one wants to run the tests using a different JDK than the one was
+      used for compiling the code previously, like using a JDK 11 runtime to test code compiled with
+      JDK 8 jdk.
+    -->
+    <profile>
+      <id>skip-compilation</id>
+      <build>
+        <pluginManagement>
+          <plugins>
+            <plugin>
+              <groupId>net.alchim31.maven</groupId>
+              <artifactId>scala-maven-plugin</artifactId>
+              <executions>
+                <execution>
+                  <id>eclipse-add-source</id>
+                  <phase>none</phase>
+                </execution>
+                <execution>
+                  <id>scala-compile-first</id>
+                  <phase>none</phase>
+                </execution>
+                <execution>
+                  <id>scala-test-compile-first</id>
+                  <phase>none</phase>
+                </execution>
+              </executions>
+
+            </plugin>
+          </plugins>
+        </pluginManagement>
+      </build>
+    </profile>
   </profiles>
 </project>
