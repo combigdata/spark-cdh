@@ -19,6 +19,7 @@ package org.apache.spark.launcher;
 
 import java.io.File;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 
@@ -360,8 +361,25 @@ public class CommandBuilderUtils {
    * Inserts additional jvm options for default garbage collector. In case there is already a
    * setting for using a specific one the default gc setting will be ignored.
    */
-  public static void addDefaultGcOptions(List<String> cmd) {
+  public static void addJdk11Options(List<String> cmd) {
     cmd.addAll(getDefaultGcOptions(cmd));
+    cmd.addAll(getAddOpenOptions());
+  }
+
+  private static List<String> getAddOpenOptions() {
+    if (javaMajorVersion(System.getProperty("java.specification.version")) >= 9) {
+      return Arrays.asList(
+        "--add-opens", "java.base/java.lang.invoke=ALL-UNNAMED",
+        "--add-opens", "java.base/java.nio=ALL-UNNAMED",
+        "--add-opens", "java.base/java.net=ALL-UNNAMED",
+        "--add-opens", "java.base/java.util=ALL-UNNAMED",
+        "--add-opens", "java.base/jdk.internal.misc=ALL-UNNAMED",
+        "--add-opens", "java.base/sun.nio.ch=ALL-UNNAMED",
+        "--add-opens", "java.security.jgss/sun.security.krb5=ALL-UNNAMED"
+      );
+    } else {
+      return emptyList();
+    }
   }
 
   public static List<String> getDefaultGcOptions(List<String> cmd) {
