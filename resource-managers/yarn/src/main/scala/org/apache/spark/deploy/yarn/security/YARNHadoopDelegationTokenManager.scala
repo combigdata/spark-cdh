@@ -55,10 +55,10 @@ private[spark] class YARNHadoopDelegationTokenManager(
       s"${credentialProviders.keys.mkString(", ")}.")
   }
 
-  override def obtainDelegationTokens(creds: Credentials): Long = {
-    val superInterval = super.obtainDelegationTokens(creds)
+  override protected def obtainDelegationTokens(): (Credentials, Long) = {
+    val (creds, superInterval) = super.obtainDelegationTokens()
 
-    credentialProviders.values.flatMap { provider =>
+    val newInterval = credentialProviders.values.flatMap { provider =>
       if (provider.credentialsRequired(hadoopConf)) {
         provider.obtainCredentials(hadoopConf, sparkConf, creds)
       } else {
@@ -67,6 +67,8 @@ private[spark] class YARNHadoopDelegationTokenManager(
         None
       }
     }.foldLeft(superInterval)(math.min)
+
+    (creds, newInterval)
   }
 
   // For testing.
