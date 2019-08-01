@@ -393,7 +393,7 @@ class TaskSchedulerImplSuite extends SparkFunSuite with LocalSparkContext with B
         val taskIndex = task.index
         (0 until 4).foreach { attempt =>
           assert(task.attemptNumber === attempt)
-          tsm.handleFailedTask(task.taskId, TaskState.FAILED, TaskResultLost)
+          failTask(task.taskId, TaskState.FAILED, TaskResultLost, tsm)
           val nextAttempts =
             taskScheduler.resourceOffers(IndexedSeq(WorkerOffer("executor4", "host4", 1))).flatten
           if (attempt < 3) {
@@ -525,11 +525,7 @@ class TaskSchedulerImplSuite extends SparkFunSuite with LocalSparkContext with B
 
     // Fail the running task
     val failedTask = firstTaskAttempts.find(_.executorId == "executor0").get
-    taskScheduler.statusUpdate(failedTask.taskId, TaskState.FAILED, ByteBuffer.allocate(0))
-    // we explicitly call the handleFailedTask method here to avoid adding a sleep in the test suite
-    // Reason being - handleFailedTask is run by an executor service and there is a momentary delay
-    // before it is launched and this fails the assertion check.
-    tsm.handleFailedTask(failedTask.taskId, TaskState.FAILED, UnknownReason)
+    failTask(failedTask.taskId, TaskState.FAILED, UnknownReason, tsm)
     when(tsm.taskSetBlacklistHelperOpt.get.isExecutorBlacklistedForTask(
       "executor0", failedTask.index)).thenReturn(true)
 
@@ -561,11 +557,7 @@ class TaskSchedulerImplSuite extends SparkFunSuite with LocalSparkContext with B
 
     // Fail the running task
     val failedTask = firstTaskAttempts.head
-    taskScheduler.statusUpdate(failedTask.taskId, TaskState.FAILED, ByteBuffer.allocate(0))
-    // we explicitly call the handleFailedTask method here to avoid adding a sleep in the test suite
-    // Reason being - handleFailedTask is run by an executor service and there is a momentary delay
-    // before it is launched and this fails the assertion check.
-    tsm.handleFailedTask(failedTask.taskId, TaskState.FAILED, UnknownReason)
+    failTask(failedTask.taskId, TaskState.FAILED, UnknownReason, tsm)
     when(tsm.taskSetBlacklistHelperOpt.get.isExecutorBlacklistedForTask(
       "executor0", failedTask.index)).thenReturn(true)
 
@@ -607,8 +599,7 @@ class TaskSchedulerImplSuite extends SparkFunSuite with LocalSparkContext with B
 
     // Fail the running task
     val failedTask = firstTaskAttempts.head
-    taskScheduler.statusUpdate(failedTask.taskId, TaskState.FAILED, ByteBuffer.allocate(0))
-    tsm.handleFailedTask(failedTask.taskId, TaskState.FAILED, UnknownReason)
+    failTask(failedTask.taskId, TaskState.FAILED, UnknownReason, tsm)
     when(tsm.taskSetBlacklistHelperOpt.get.isExecutorBlacklistedForTask(
       "executor0", failedTask.index)).thenReturn(true)
 
@@ -622,8 +613,7 @@ class TaskSchedulerImplSuite extends SparkFunSuite with LocalSparkContext with B
 
     val tsm2 = stageToMockTaskSetManager(1)
     val failedTask2 = secondTaskAttempts.head
-    taskScheduler.statusUpdate(failedTask2.taskId, TaskState.FAILED, ByteBuffer.allocate(0))
-    tsm2.handleFailedTask(failedTask2.taskId, TaskState.FAILED, UnknownReason)
+    failTask(failedTask2.taskId, TaskState.FAILED, UnknownReason, tsm2)
     when(tsm2.taskSetBlacklistHelperOpt.get.isExecutorBlacklistedForTask(
       "executor0", failedTask2.index)).thenReturn(true)
 
@@ -671,8 +661,7 @@ class TaskSchedulerImplSuite extends SparkFunSuite with LocalSparkContext with B
 
     // Fail the running task
     val failedTask = taskAttempts.head
-    taskScheduler.statusUpdate(failedTask.taskId, TaskState.FAILED, ByteBuffer.allocate(0))
-    tsm.handleFailedTask(failedTask.taskId, TaskState.FAILED, UnknownReason)
+    failTask(failedTask.taskId, TaskState.FAILED, UnknownReason, tsm)
     when(tsm.taskSetBlacklistHelperOpt.get.isExecutorBlacklistedForTask(
       "executor0", failedTask.index)).thenReturn(true)
 
@@ -820,7 +809,7 @@ class TaskSchedulerImplSuite extends SparkFunSuite with LocalSparkContext with B
 
     // Fail one of the tasks, but leave the other running.
     val failedTask = firstTaskAttempts.find(_.executorId == "executor0").get
-    taskScheduler.handleFailedTask(tsm, failedTask.taskId, TaskState.FAILED, TaskResultLost)
+    failTask(failedTask.taskId, TaskState.FAILED, TaskResultLost, tsm)
     // At this point, our failed task could run on the other executor, so don't give up the task
     // set yet.
     assert(!failedTaskSet)
@@ -880,7 +869,7 @@ class TaskSchedulerImplSuite extends SparkFunSuite with LocalSparkContext with B
 
     // fail all the tasks on the bad executor
     firstTaskAttempts.foreach { taskAttempt =>
-      taskScheduler.handleFailedTask(tsm, taskAttempt.taskId, TaskState.FAILED, TaskResultLost)
+      failTask(taskAttempt.taskId, TaskState.FAILED, TaskResultLost, tsm)
     }
 
     // Here is the main check of this test -- we have the same offers again, and we schedule it
@@ -1319,4 +1308,19 @@ class TaskSchedulerImplSuite extends SparkFunSuite with LocalSparkContext with B
     tsm.handleFailedTask(tsm.taskAttempts.head.head.taskId, TaskState.FAILED, TaskKilled("test"))
     assert(tsm.isZombie)
   }
+
+  /**
+   * Used by tests to simulate a task failure. This calls the failure handler explicitly, to ensure
+   * that all the state is updated when this method returns. Otherwise, there's no way to know when
+   * that happens, since the operation is performed asynchronously by the TaskResultGetter.
+   */
+  private def failTask(
+      tid: Long,
+      state: TaskState.TaskState,
+      reason: TaskFailedReason,
+      tsm: TaskSetManager): Unit = {
+    taskScheduler.statusUpdate(tid, state, ByteBuffer.allocate(0))
+    taskScheduler.handleFailedTask(tsm, tid, state, reason)
+  }
+
 }
