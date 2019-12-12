@@ -747,4 +747,9 @@ package object config {
       .stringConf
       .toSequence
       .createWithDefault(Nil)
+
+  val PROXY_REDIRECT_URI = ConfigBuilder("spark.ui.proxyRedirectUri")
+    .doc("Proxy address to use when responding with HTTP redirects.")
+    .stringConf
+    .createOptional
 }
